@@ -7,30 +7,38 @@ const mongoose = require('mongoose');
 // @route   POST /api/orders
 // @access  Private (Admin, Staff)
 const createOrder = async (req, res) => {
-  const session = await mongoose.startSession();
-  session.startTransaction();
   try {
     const { customer, items, discount, paymentMethod } = req.body;
     const staff = req.user._id;
 
-    // 1. Duyệt từng món trong đơn để kiểm tra và trừ nguyên liệu
+    console.log('Nhận được items:', JSON.stringify(items)); // debug
+
+    // 1. Duyệt từng món, kiểm tra và trừ kho
     for (const item of items) {
+      if (!item.menuItem) {
+        throw new Error('Mỗi món phải có menuItem');
+      }
+
       const menuItem = await MenuItem.findById(item.menuItem).populate('ingredients.ingredient');
       if (!menuItem) {
         throw new Error(`Món ăn không tồn tại: ${item.menuItem}`);
       }
 
-      // Lấy danh sách nguyên liệu cần cho món này
+      // Duyệt nguyên liệu
       for (const ing of menuItem.ingredients) {
-        const requiredQty = ing.quantity * item.quantity; // tổng lượng nguyên liệu cần
-        const ingredient = await Ingredient.findById(ing.ingredient._id).session(session);
+        if (!ing.ingredient) continue; // bỏ qua nguyên liệu đã bị xóa
+        const requiredQty = ing.quantity * item.quantity;
+        const ingredient = await Ingredient.findById(ing.ingredient._id);
         if (!ingredient) throw new Error(`Nguyên liệu không tồn tại: ${ing.ingredient._id}`);
 
         if (ingredient.stock < requiredQty) {
-          throw new Error(`Nguyên liệu ${ingredient.name} không đủ. Cần ${requiredQty} ${ingredient.unit}, hiện có ${ingredient.stock}`);
+          throw new Error(
+            `Nguyên liệu ${ingredient.name} không đủ. Cần ${requiredQty} ${ingredient.unit}, hiện có ${ingredient.stock}`
+          );
         }
+
         ingredient.stock -= requiredQty;
-        await ingredient.save({ session });
+        await ingredient.save(); // không dùng session
       }
     }
 
@@ -39,42 +47,40 @@ const createOrder = async (req, res) => {
     const orderItems = [];
     for (const item of items) {
       const menuItem = await MenuItem.findById(item.menuItem);
+      if (!menuItem) throw new Error(`Món không tồn tại: ${item.menuItem}`);
+
       const price = menuItem.price;
       const totalItem = price * item.quantity;
       subtotal += totalItem;
       orderItems.push({
         menuItem: menuItem._id,
         quantity: item.quantity,
-        price: price
+        price: price,
       });
     }
 
     const discountAmount = discount || 0;
     const total = subtotal - discountAmount;
 
-    // 3. Tạo order
-    const order = await Order.create([{
+    // 3. Tạo đơn hàng
+    const order = await Order.create({
       customer: customer || { name: 'Khách lẻ', phone: '' },
       staff,
       items: orderItems,
       subtotal,
       discount: discountAmount,
       total,
-      paymentMethod: paymentMethod || 'cash'
-    }], { session });
+      paymentMethod: paymentMethod || 'cash',
+    });
 
-    await session.commitTransaction();
-    session.endSession();
-
-    // Lấy order vừa tạo kèm thông tin liên quan
-    const populatedOrder = await Order.findById(order[0]._id)
+    const populatedOrder = await Order.findById(order._id)
       .populate('staff', 'name')
       .populate('items.menuItem', 'name price');
 
+    console.log('Tạo đơn thành công:', order._id);
     res.status(201).json(populatedOrder);
   } catch (error) {
-    await session.abortTransaction();
-    session.endSession();
+    console.error('Lỗi tạo đơn:', error.message);
     res.status(400).json({ message: error.message });
   }
 };
@@ -84,7 +90,15 @@ const createOrder = async (req, res) => {
 // @access  Private (Admin, Staff)
 const getOrders = async (req, res) => {
   try {
-    const orders = await Order.find({})
+    const { startDate, endDate } = req.query;
+    const filter = {};
+    if (startDate && endDate) {
+      filter.createdAt = {
+        $gte: new Date(startDate),
+        $lte: new Date(endDate),
+      };
+    }
+    const orders = await Order.find(filter)
       .populate('staff', 'name')
       .populate('items.menuItem', 'name price')
       .sort('-createdAt');

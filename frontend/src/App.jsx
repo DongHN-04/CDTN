@@ -1,5 +1,6 @@
 import { BrowserRouter, Routes, Route } from 'react-router-dom';
 import { AuthProvider } from './contexts/AuthContext';
+import { CartProvider } from './contexts/CartContext';
 
 // Layouts
 import CustomerLayout from './components/Layout/CustomerLayout';
@@ -28,111 +29,122 @@ import ReportsPage from './pages/admin/ReportsPage';
 import POSPage from './pages/staff/POSPage';
 
 // Shared Pages
-import CustomerListPage from './pages/shared/CustomerListPage';
+import CustomerManagementPage from './pages/shared/CustomerManagementPage.jsx';
 import InvoiceListPage from './pages/shared/InvoiceListPage';
+import InvoiceDetailPage from './pages/shared/InvoiceDetailPage.jsx';
 
 function App() {
   return (
     <AuthProvider>
-      <BrowserRouter>
-        <Routes>
-          {/* ========== PUBLIC ROUTES (CUSTOMER SIDE) ========== */}
-          <Route element={<CustomerLayout />}>
-            <Route path="/" element={<HomePage />} />
-            <Route path="/menu" element={<MenuPage />} />
-            <Route path="/cart" element={<CartPage />} />
-            <Route path="/login" element={<LoginPage />} />
-            <Route path="/register" element={<RegisterPage />} />
-          </Route>
+      <CartProvider>
+        <BrowserRouter>
+          <Routes>
+            {/* ========== PUBLIC ROUTES (CUSTOMER SIDE) ========== */}
+            <Route element={<CustomerLayout />}>
+              <Route path="/" element={<HomePage />} />
+              <Route path="/menu" element={<MenuPage />} />
+              <Route path="/cart" element={<CartPage />} />
+              <Route path="/login" element={<LoginPage />} />
+              <Route path="/register" element={<RegisterPage />} />
+            </Route>
 
-          {/* ========== PROTECTED ROUTES (ADMIN & STAFF) ========== */}
-          <Route
-            element={
-              <PrivateRoute>
-                <AdminLayout />
-              </PrivateRoute>
-            }
-          >
-            {/* Dashboard - cả admin và staff */}
+            {/* ========== PROTECTED ROUTES (ADMIN & STAFF) ========== */}
             <Route
-              path="/admin/dashboard"
               element={
-                <RoleBasedRoute allowedRoles={['admin', 'staff']}>
-                  <DashboardPage />
-                </RoleBasedRoute>
+                <PrivateRoute>
+                  <AdminLayout />
+                </PrivateRoute>
               }
-            />
+            >
+              {/* Dashboard - cả admin và staff */}
+              <Route
+                path="/admin/dashboard"
+                element={
+                  <RoleBasedRoute allowedRoles={['admin', 'staff']}>
+                    <DashboardPage />
+                  </RoleBasedRoute>
+                }
+              />
 
-            {/* Admin only */}
-            <Route
-              path="/admin/employees"
-              element={
-                <RoleBasedRoute allowedRoles={['admin']}>
-                  <EmployeeManagementPage />
-                </RoleBasedRoute>
-              }
-            />
-            <Route
-              path="/admin/menu"
-              element={
-                <RoleBasedRoute allowedRoles={['admin']}>
-                  <MenuManagementPage />
-                </RoleBasedRoute>
-              }
-            />
-            <Route
-              path="/admin/inventory"
-              element={
-                <RoleBasedRoute allowedRoles={['admin']}>
-                  <InventoryPage />
-                </RoleBasedRoute>
-              }
-            />
-            <Route
-              path="/admin/reports"
-              element={
-                <RoleBasedRoute allowedRoles={['admin']}>
-                  <ReportsPage />
-                </RoleBasedRoute>
-              }
-            />
+              {/* Admin only */}
+              <Route
+                path="/admin/employees"
+                element={
+                  <RoleBasedRoute allowedRoles={['admin']}>
+                    <EmployeeManagementPage />
+                  </RoleBasedRoute>
+                }
+              />
+              <Route
+                path="/admin/menu"
+                element={
+                  <RoleBasedRoute allowedRoles={['admin']}>
+                    <MenuManagementPage />
+                  </RoleBasedRoute>
+                }
+              />
+              <Route
+                path="/admin/inventory"
+                element={
+                  <RoleBasedRoute allowedRoles={['admin']}>
+                    <InventoryPage />
+                  </RoleBasedRoute>
+                }
+              />
+              <Route
+                path="/admin/reports"
+                element={
+                  <RoleBasedRoute allowedRoles={['admin']}>
+                    <ReportsPage />
+                  </RoleBasedRoute>
+                }
+              />
 
-            {/* Staff only */}
-            <Route
-              path="/staff/pos"
-              element={
-                <RoleBasedRoute allowedRoles={['staff']}>
-                  <POSPage />
-                </RoleBasedRoute>
-              }
-            />
+              {/* Staff only */}
+              <Route
+                path="/staff/pos"
+                element={
+                  <RoleBasedRoute allowedRoles={['staff']}>
+                    <POSPage />
+                  </RoleBasedRoute>
+                }
+              />
 
-            {/* Shared routes */}
-            <Route
-              path="/admin/customers"
-              element={
-                <RoleBasedRoute allowedRoles={['admin', 'staff']}>
-                  <CustomerListPage />
-                </RoleBasedRoute>
-              }
-            />
-            <Route
-              path="/admin/invoices"
-              element={
-                <RoleBasedRoute allowedRoles={['admin', 'staff']}>
-                  <InvoiceListPage />
-                </RoleBasedRoute>
-              }
-            />
+              {/* Shared routes */}
+              <Route
+                path="/admin/customers"
+                element={
+                  <RoleBasedRoute allowedRoles={['admin', 'staff']}>
+                    <CustomerManagementPage />
+                  </RoleBasedRoute>
+                }
+              />
+              <Route
+                path="/admin/invoices"
+                element={
+                  <RoleBasedRoute allowedRoles={['admin', 'staff']}>
+                    <InvoiceListPage />
+                  </RoleBasedRoute>
+                }
+              />
+              <Route
+                path="/admin/invoices/:id"
+                element={
+                  <RoleBasedRoute allowedRoles={['admin', 'staff']}>
+                    <InvoiceDetailPage />
+                  </RoleBasedRoute>
+                }
+              />
 
-            {/* Fallback route cho /admin */}
-            <Route path="/admin" element={<DashboardPage />} />
-          </Route>
+              {/* Fallback route cho /admin */}
+              <Route path="/admin" element={<DashboardPage />} />
+            </Route>
 
-          {/* Catch-all route cho 404 */}
-          <Route path="*" element={<NotFoundPage />} />
-        </Routes>
-      </BrowserRouter>
+            {/* Catch-all route cho 404 */}
+            <Route path="*" element={<NotFoundPage />} />
+          </Routes>
+        </BrowserRouter>
+      </CartProvider>
     </AuthProvider>
   );
 }

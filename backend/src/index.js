@@ -9,6 +9,8 @@ const ingredientRoutes = require('./routes/ingredientRoutes');
 const menuRoutes = require('./routes/menuRoutes');
 const path = require('path');
 const uploadRoutes = require('./routes/uploadRoutes');
+const orderRoutes = require('./routes/orderRoutes');
+const customerRoutes = require('./routes/customerRoutes');
 
 // Nạp biến môi trường từ file .env
 dotenv.config();
@@ -28,7 +30,8 @@ app.use('/api/users', userRoutes);
 app.use('/api/ingredients', ingredientRoutes);
 app.use('/api/menu', menuRoutes);
 app.use('/api/upload', uploadRoutes);
-app.use('/api/orders', require('./routes/orderRoutes'));
+app.use('/api/orders', orderRoutes);
+app.use('/api/customers', customerRoutes);
 
 // Route mặc định
 app.get('/', (req, res) => {

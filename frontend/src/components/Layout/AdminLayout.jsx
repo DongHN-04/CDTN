@@ -1,4 +1,4 @@
-import React, { useState } from 'react'; // THÊM useState ở đây
+import React, { useState } from 'react';
 import { Outlet, Link, useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
 
@@ -7,7 +7,6 @@ const AdminLayout = () => {
   const navigate = useNavigate();
   const location = useLocation();
 
-  // Tạo state để quản lý việc ẩn/hiện bảng thông báo
   const [showNotifications, setShowNotifications] = useState(false);
 
   const handleLogout = () => {
@@ -15,7 +14,7 @@ const AdminLayout = () => {
     navigate('/login');
   };
 
-  // Dữ liệu thông báo mẫu (Sau này bạn sẽ lấy từ API Backend/MongoDB)
+  // Dữ liệu thông báo mẫu
   const notifications = [
     { id: 1, text: 'Có đơn hàng mới #SD-8493 cần xác nhận', time: '5 phút trước', isRead: false },
     { id: 2, text: 'Kho hàng sắp hết: Gà rán giòn (còn 5 phần)', time: '1 giờ trước', isRead: false },
@@ -38,7 +37,6 @@ const AdminLayout = () => {
 
   return (
     <div style={appContainerStyle}>
-      
       {/* ================= SIDEBAR ================= */}
       <aside style={sidebarStyle}>
         <div style={{ padding: '30px 20px 20px 20px' }}>
@@ -47,10 +45,10 @@ const AdminLayout = () => {
 
         <div style={userInfoStyle}>
           <div style={avatarWrapperStyle}>
-            <img 
-              src="https://i.pravatar.cc/150?img=11" 
-              alt="Avatar" 
-              style={{ width: '100%', height: '100%', objectFit: 'cover' }} 
+            <img
+              src="https://i.pravatar.cc/150?img=11"
+              alt="Avatar"
+              style={{ width: '100%', height: '100%', objectFit: 'cover' }}
             />
           </div>
           <div>
@@ -65,24 +63,28 @@ const AdminLayout = () => {
               const isActive = location.pathname.includes(item.path);
               return (
                 <li key={item.path} style={{ marginBottom: '5px' }}>
-                  <Link 
-                    to={item.path} 
+                  <Link
+                    to={item.path}
                     style={{
-                      ...sidebarLinkStyle,
-                      ...(isActive ? activeLinkStyle : inactiveLinkStyle)
+                      ...sidebarLinkBaseStyle,
+                      ...(isActive
+                        ? sidebarLinkActiveStyle
+                        : sidebarLinkInactiveStyle),
                     }}
                   >
                     {item.iconSrc && (
-                      <img 
-                        src={item.iconSrc} 
-                        alt="" 
+                      <img
+                        src={item.iconSrc}
+                        alt=""
                         style={{
                           ...iconStyle,
-                          filter: isActive ? 'none' : 'grayscale(100%) opacity(60%)' 
-                        }} 
+                          filter: isActive ? 'none' : 'grayscale(100%) opacity(60%)',
+                        }}
                       />
                     )}
-                    <span style={{ fontWeight: isActive ? '600' : '500' }}>{item.label}</span>
+                    <span style={{ fontWeight: isActive ? '600' : '500' }}>
+                      {item.label}
+                    </span>
                   </Link>
                 </li>
               );
@@ -95,74 +97,68 @@ const AdminLayout = () => {
       <div style={rightWrapperStyle}>
         <header style={headerStyle}>
           <h2 style={{ color: '#c0392b', fontSize: '20px', margin: 0 }}>Sơn Đông Fast Food</h2>
-          
           <div style={headerRightStyle}>
-            <input 
-              type="text" 
-              placeholder="Tìm kiếm ..." 
-              style={searchInputStyle}
-            />
-            
+            <input type="text" placeholder="Tìm kiếm ..." style={searchInputStyle} />
             <div style={headerActionStyle}>
-              
-              {/* === KHU VỰC NÚT THÔNG BÁO === */}
+              {/* Nút thông báo */}
               <div style={{ position: 'relative' }}>
-                <button 
-                  style={iconButtonStyle} 
+                <button
+                  style={iconButtonStyle}
                   title="Thông báo"
-                  onClick={() => setShowNotifications(!showNotifications)} // Bật/tắt trạng thái
+                  onClick={() => setShowNotifications(!showNotifications)}
                 >
                   <img src="/images/ICON/ICnotice.png" alt="" style={headerIconStyle} />
-                  {/* Chấm đỏ báo có thông báo mới */}
                   <span style={notificationBadgeStyle}>2</span>
                 </button>
-
-                {/* Bảng thả xuống (Chỉ hiện khi showNotifications = true) */}
                 {showNotifications && (
                   <div style={notificationDropdownStyle}>
                     <div style={notificationHeaderStyle}>
-                      <h4 style={{ margin: 0, fontSize: '15px', color: '#1f2937' }}>Thông báo mới</h4>
-                      <span style={{ fontSize: '12px', color: '#3b82f6', cursor: 'pointer' }}>Đánh dấu đã đọc</span>
+                      <h4 style={{ margin: 0, fontSize: '15px', color: '#1f2937' }}>
+                        Thông báo mới
+                      </h4>
+                      <span style={{ fontSize: '12px', color: '#3b82f6', cursor: 'pointer' }}>
+                        Đánh dấu đã đọc
+                      </span>
                     </div>
-                    
                     <ul style={notificationListStyle}>
                       {notifications.map(notif => (
-                        <li key={notif.id} style={{
-                          ...notificationItemStyle,
-                          backgroundColor: notif.isRead ? '#ffffff' : '#eff6ff' // Bôi màu xanh nhạt nếu chưa đọc
-                        }}>
-                          <p style={{ 
-                            margin: '0 0 4px 0', 
-                            fontSize: '13px', 
-                            color: '#374151',
-                            fontWeight: notif.isRead ? '400' : '600'
-                          }}>
+                        <li
+                          key={notif.id}
+                          style={{
+                            ...notificationItemStyle,
+                            backgroundColor: notif.isRead ? '#ffffff' : '#eff6ff',
+                          }}
+                        >
+                          <p
+                            style={{
+                              margin: '0 0 4px 0',
+                              fontSize: '13px',
+                              color: '#374151',
+                              fontWeight: notif.isRead ? '400' : '600',
+                            }}
+                          >
                             {notif.text}
                           </p>
-                          <span style={{ fontSize: '11px', color: '#9ca3af' }}>{notif.time}</span>
+                          <span style={{ fontSize: '11px', color: '#9ca3af' }}>
+                            {notif.time}
+                          </span>
                         </li>
                       ))}
                     </ul>
-                    
-                    <div style={notificationFooterStyle}>
-                      Xem tất cả thông báo
-                    </div>
+                    <div style={notificationFooterStyle}>Xem tất cả thông báo</div>
                   </div>
                 )}
               </div>
-              {/* === HẾT KHU VỰC NÚT THÔNG BÁO === */}
 
               <button style={iconButtonStyle} title="Cài đặt">
                 <img src="/images/ICON/ICsetting.png" alt="" style={headerIconStyle} />
               </button>
-              
               <button onClick={handleLogout} style={logoutBtnStyle} title="Đăng xuất">
                 <img src="/images/ICON/IClogout.png" alt="" style={logoutIconStyle} />
               </button>
             </div>
           </div>
         </header>
-
         <main style={mainContentStyle}>
           <Outlet />
         </main>
@@ -171,31 +167,177 @@ const AdminLayout = () => {
   );
 };
 
-// ================= CSS STYLES (Inline) =================
+// ================= STYLES =================
+const appContainerStyle = {
+  display: 'flex',
+  height: '100vh',
+  backgroundColor: '#f5f7fa',
+  fontFamily: 'system-ui, -apple-system, sans-serif',
+};
 
-const appContainerStyle = { display: 'flex', height: '100vh', backgroundColor: '#f5f7fa', fontFamily: 'system-ui, -apple-system, sans-serif' };
-const sidebarStyle = { width: '260px', background: '#f8f9fa', borderRight: '1px solid #e5e7eb', display: 'flex', flexDirection: 'column', zIndex: 10 };
-const logoTextStyle = { color: '#c0392b', margin: 0, fontSize: '18px', fontWeight: '900', letterSpacing: '0.5px' };
-const userInfoStyle = { display: 'flex', alignItems: 'center', gap: '12px', padding: '0 20px 20px 20px' };
-const avatarWrapperStyle = { width: '45px', height: '45px', borderRadius: '8px', backgroundColor: '#333', overflow: 'hidden' };
-const userNameStyle = { margin: 0, fontWeight: 'bold', fontSize: '15px', color: '#111' };
-const userSubStyle = { margin: 0, fontSize: '13px', color: '#666' };
-const sidebarLinkStyle = { display: 'flex', alignItems: 'center', gap: '15px', padding: '12px 20px', textDecoration: 'none', fontSize: '14px', transition: 'all 0.2s', borderLeft: '4px solid transparent' };
-const activeLinkStyle = { backgroundColor: '#fceaea', color: '#c0392b', borderLeftColor: '#c0392b' };
-const inactiveLinkStyle = { color: '#4b5563' };
-const iconStyle = { width: '22px', height: '22px', objectFit: 'contain' };
-const rightWrapperStyle = { flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden' };
-const headerStyle = { height: '70px', backgroundColor: '#ffffff', display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '0 30px', borderBottom: '1px solid #e5e7eb' };
-const headerRightStyle = { display: 'flex', alignItems: 'center', gap: '20px' };
-const searchInputStyle = { padding: '8px 15px', borderRadius: '8px', border: 'none', backgroundColor: '#f3f4f6', width: '250px', fontSize: '14px', outline: 'none' };
-const headerActionStyle = { display: 'flex', alignItems: 'center', gap: '15px', borderLeft: '1px solid #e5e7eb', paddingLeft: '20px' };
-const iconButtonStyle = { background: 'none', border: 'none', padding: 0, cursor: 'pointer', position: 'relative', display: 'flex', alignItems: 'center', justifyContent: 'center' };
-const logoutBtnStyle = { background: '#c0392b', border: 'none', borderRadius: '8px', width: '35px', height: '35px', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer' };
-const mainContentStyle = { flex: 1, padding: '30px', overflowY: 'auto' };
-const headerIconStyle = { width: '24px', height: '24px', objectFit: 'contain', opacity: 0.7, cursor: 'pointer' };
-const logoutIconStyle = { width: '18px', height: '18px', objectFit: 'contain', filter: 'brightness(0) invert(1)' };
+const sidebarStyle = {
+  width: '260px',
+  background: '#f8f9fa',
+  borderRight: '1px solid #e5e7eb',
+  display: 'flex',
+  flexDirection: 'column',
+  zIndex: 10,
+};
 
-/* --- CSS MỚI CHO BẢNG THÔNG BÁO --- */
+const logoTextStyle = {
+  color: '#c0392b',
+  margin: 0,
+  fontSize: '18px',
+  fontWeight: '900',
+  letterSpacing: '0.5px',
+};
+
+const userInfoStyle = {
+  display: 'flex',
+  alignItems: 'center',
+  gap: '12px',
+  padding: '0 20px 20px 20px',
+};
+
+const avatarWrapperStyle = {
+  width: '45px',
+  height: '45px',
+  borderRadius: '8px',
+  backgroundColor: '#333',
+  overflow: 'hidden',
+};
+
+const userNameStyle = {
+  margin: 0,
+  fontWeight: 'bold',
+  fontSize: '15px',
+  color: '#111',
+};
+
+const userSubStyle = {
+  margin: 0,
+  fontSize: '13px',
+  color: '#666',
+};
+
+// --- Sidebar link styles ---
+const sidebarLinkBaseStyle = {
+  display: 'flex',
+  alignItems: 'center',
+  gap: '15px',
+  padding: '12px 20px',
+  textDecoration: 'none',
+  fontSize: '14px',
+  transition: 'all 0.2s',
+  // Dùng các thuộc tính border-left riêng để tránh xung đột khi đổi màu
+  borderLeftWidth: 4,
+  borderLeftStyle: 'solid',
+  borderLeftColor: 'transparent',
+};
+
+const sidebarLinkActiveStyle = {
+  backgroundColor: '#fceaea',
+  color: '#c0392b',
+  borderLeftColor: '#c0392b',
+};
+
+const sidebarLinkInactiveStyle = {
+  backgroundColor: 'transparent',
+  color: '#4b5563',
+  borderLeftColor: 'transparent',
+};
+
+const iconStyle = {
+  width: '22px',
+  height: '22px',
+  objectFit: 'contain',
+};
+
+const rightWrapperStyle = {
+  flex: 1,
+  display: 'flex',
+  flexDirection: 'column',
+  overflow: 'hidden',
+};
+
+const headerStyle = {
+  height: '70px',
+  backgroundColor: '#ffffff',
+  display: 'flex',
+  alignItems: 'center',
+  justifyContent: 'space-between',
+  padding: '0 30px',
+  borderBottom: '1px solid #e5e7eb',
+};
+
+const headerRightStyle = {
+  display: 'flex',
+  alignItems: 'center',
+  gap: '20px',
+};
+
+const searchInputStyle = {
+  padding: '8px 15px',
+  borderRadius: '8px',
+  border: 'none',
+  backgroundColor: '#f3f4f6',
+  width: '250px',
+  fontSize: '14px',
+  outline: 'none',
+};
+
+const headerActionStyle = {
+  display: 'flex',
+  alignItems: 'center',
+  gap: '15px',
+  borderLeft: '1px solid #e5e7eb',          // Đây là đường gạch đứng, giữ nguyên được
+  paddingLeft: '20px',
+};
+
+const iconButtonStyle = {
+  background: 'none',
+  border: 'none',
+  padding: 0,
+  cursor: 'pointer',
+  position: 'relative',
+  display: 'flex',
+  alignItems: 'center',
+  justifyContent: 'center',
+};
+
+const logoutBtnStyle = {
+  background: '#c0392b',
+  border: 'none',
+  borderRadius: '8px',
+  width: '35px',
+  height: '35px',
+  display: 'flex',
+  alignItems: 'center',
+  justifyContent: 'center',
+  cursor: 'pointer',
+};
+
+const mainContentStyle = {
+  flex: 1,
+  padding: '30px',
+  overflowY: 'auto',
+};
+
+const headerIconStyle = {
+  width: '24px',
+  height: '24px',
+  objectFit: 'contain',
+  opacity: 0.7,
+  cursor: 'pointer',
+};
+
+const logoutIconStyle = {
+  width: '18px',
+  height: '18px',
+  objectFit: 'contain',
+  filter: 'brightness(0) invert(1)',
+};
+
 const notificationBadgeStyle = {
   position: 'absolute',
   top: '-4px',
@@ -210,13 +352,13 @@ const notificationBadgeStyle = {
   display: 'flex',
   alignItems: 'center',
   justifyContent: 'center',
-  border: '2px solid white'
+  border: '2px solid white',
 };
 
 const notificationDropdownStyle = {
   position: 'absolute',
   top: '40px',
-  right: '-60px', // Đẩy lùi sang trái một chút để không bị lẹm ra ngoài màn hình
+  right: '-60px',
   width: '320px',
   backgroundColor: '#ffffff',
   borderRadius: '8px',
@@ -224,7 +366,7 @@ const notificationDropdownStyle = {
   border: '1px solid #e5e7eb',
   zIndex: 50,
   display: 'flex',
-  flexDirection: 'column'
+  flexDirection: 'column',
 };
 
 const notificationHeaderStyle = {
@@ -232,22 +374,22 @@ const notificationHeaderStyle = {
   justifyContent: 'space-between',
   alignItems: 'center',
   padding: '12px 16px',
-  borderBottom: '1px solid #e5e7eb'
+  borderBottom: '1px solid #e5e7eb',
 };
 
 const notificationListStyle = {
   listStyle: 'none',
   padding: 0,
   margin: 0,
-  maxHeight: '320px', // Giới hạn chiều cao
-  overflowY: 'auto'   // Thêm thanh cuộn nếu có quá nhiều thông báo
+  maxHeight: '320px',
+  overflowY: 'auto',
 };
 
 const notificationItemStyle = {
   padding: '12px 16px',
   borderBottom: '1px solid #f3f4f6',
   cursor: 'pointer',
-  transition: 'background-color 0.2s'
+  transition: 'background-color 0.2s',
 };
 
 const notificationFooterStyle = {
@@ -260,7 +402,7 @@ const notificationFooterStyle = {
   borderTop: '1px solid #e5e7eb',
   backgroundColor: '#f9fafb',
   borderBottomLeftRadius: '8px',
-  borderBottomRightRadius: '8px'
+  borderBottomRightRadius: '8px',
 };
 
 export default AdminLayout;
