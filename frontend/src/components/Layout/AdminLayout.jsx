@@ -98,11 +98,11 @@ const AdminLayout = () => {
       <div className="flex-1 flex flex-col overflow-hidden">
         
         <header className="h-[70px] bg-white flex items-center justify-between px-8 border-b border-gray-200 shrink-0">
-          {/* Đã sửa chữ và in đậm hơn theo yêu cầu */}
+
           <h2 className="text-[#c0392b] text-2xl font-black m-0 tracking-tight">Sơn Đông Food</h2>
           
           <div className="flex items-center gap-5">
-            {/* Phần Tìm kiếm đã được xóa bỏ */}
+
             
             <div className="flex items-center gap-4 pl-5 border-l border-gray-200">
               {/* Nút thông báo */}
