@@ -11,18 +11,35 @@ const getAuthHeader = () => {
 };
 
 const orderService = {
+  // Tạo đơn hàng (cho POS)
   createOrder: async (orderData) => {
     const headers = getAuthHeader();
-    console.log('Headers gửi đi:', headers); // debug
+    console.log('Headers gửi đi:', headers);
     const response = await axios.post(API_URL, orderData, { headers });
     return response.data;
   },
+
+  // Lấy danh sách hóa đơn (có hỗ trợ lọc)
   getOrders: async (params) => {
     const response = await axios.get(API_URL, { headers: getAuthHeader(), params });
     return response.data;
   },
+
+  // Lấy chi tiết một hóa đơn
   getOrderById: async (id) => {
     const response = await axios.get(API_URL + id, { headers: getAuthHeader() });
+    return response.data;
+  },
+
+  // 🆕 Lấy danh sách đơn hàng từ khách đang chờ xác nhận
+  getPendingOrders: async () => {
+    const response = await axios.get(API_URL + 'pending', { headers: getAuthHeader() });
+    return response.data;
+  },
+
+  // 🆕 Xác nhận đơn hàng từ khách (trừ kho)
+  confirmOrder: async (id) => {
+    const response = await axios.put(API_URL + id + '/confirm', {}, { headers: getAuthHeader() });
     return response.data;
   }
 };

@@ -24,6 +24,9 @@ import EmployeeManagementPage from './pages/admin/EmployeeManagementPage';
 import MenuManagementPage from './pages/admin/MenuManagementPage';
 import InventoryPage from './pages/admin/InventoryPage';
 import ReportsPage from './pages/admin/ReportsPage';
+import PromotionManagementPage from './pages/admin/PromotionManagementPage';
+import ComboManagementPage from './pages/admin/ComboManagementPage';
+import QRManagementPage from './pages/admin/QRManagementPage';
 
 // Staff Pages
 import POSPage from './pages/staff/POSPage';
@@ -32,6 +35,7 @@ import POSPage from './pages/staff/POSPage';
 import CustomerManagementPage from './pages/shared/CustomerManagementPage.jsx';
 import InvoiceListPage from './pages/shared/InvoiceListPage';
 import InvoiceDetailPage from './pages/shared/InvoiceDetailPage.jsx';
+import CustomerOrdersPage from './pages/shared/CustomerOrdersPage';
 
 function App() {
   return (
@@ -92,6 +96,27 @@ function App() {
                 }
               />
               <Route
+                path="/admin/promotions"
+                element={
+                  <RoleBasedRoute allowedRoles={['admin']}>
+                    <PromotionManagementPage />
+                  </RoleBasedRoute>
+                }
+              />
+              <Route
+                path="/admin/combos"
+                element={
+                  <RoleBasedRoute allowedRoles={['admin']}>
+                    <ComboManagementPage />
+                  </RoleBasedRoute>
+                }
+              />
+              <Route path="/admin/qrcodes" element={
+                <RoleBasedRoute allowedRoles={['admin']}>
+                  <QRManagementPage />
+                </RoleBasedRoute>
+              } />
+              <Route
                 path="/admin/reports"
                 element={
                   <RoleBasedRoute allowedRoles={['admin']}>
@@ -135,6 +160,11 @@ function App() {
                   </RoleBasedRoute>
                 }
               />
+              <Route path="/admin/customer-orders" element={
+                <RoleBasedRoute allowedRoles={['admin', 'staff']}>
+                  <CustomerOrdersPage />
+                </RoleBasedRoute>
+              } />
 
               {/* Fallback route cho /admin */}
               <Route path="/admin" element={<DashboardPage />} />
