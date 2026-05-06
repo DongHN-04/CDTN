@@ -1,4 +1,16 @@
 npm install -D tailwindcss postcss autoprefixer
 npx tailwindcss init -p
 
+Backend
+npm init -y (khởi tạo package.json)
+npm install express mongoose dotenv bcryptjs jsonwebtoken cors
+npm install -D nodemon
+npm install multer (khi thêm upload ảnh)
+
+Frontend
+npx create-react-app . (khởi tạo dự án React)
+npm install react-router-dom axios
+npm install recharts (cho biểu đồ)
+npm install qrcode.react (cho mã QR)
+
 npm install xlsx lucide-react -- lệnh cài đặt thư viện xử lý Excel 
