@@ -36,55 +36,52 @@ const AdminLayout = () => {
   const filteredMenu = menuItems.filter(item => item.roles.includes(user?.role || 'admin'));
 
   return (
-    <div style={appContainerStyle}>
+    <div className="flex h-screen bg-gray-50 font-sans">
+      
       {/* ================= SIDEBAR ================= */}
-      <aside style={sidebarStyle}>
-        <div style={{ padding: '30px 20px 20px 20px' }}>
-          <h2 style={logoTextStyle}>SƠN ĐÔNG ADMIN</h2>
+      <aside className="w-[260px] bg-gray-50 border-r border-gray-200 flex flex-col z-10 shrink-0">
+        <div className="pt-8 px-5 pb-5">
+          <h2 className="text-[#c0392b] m-0 text-lg font-black tracking-wide">SƠN ĐÔNG ADMIN</h2>
         </div>
 
-        <div style={userInfoStyle}>
-          <div style={avatarWrapperStyle}>
+        <div className="flex items-center gap-3 px-5 pb-5">
+          <div className="w-[45px] h-[45px] rounded-lg bg-gray-800 overflow-hidden shrink-0">
             <img
               src="https://i.pravatar.cc/150?img=11"
               alt="Avatar"
-              style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+              className="w-full h-full object-cover"
             />
           </div>
           <div>
-            <p style={userNameStyle}>{user?.role === 'admin' ? 'Quản lý' : 'Nhân viên'}</p>
-            <p style={userSubStyle}>{user?.name || 'Sơn Đông Admin'}</p>
+            <p className="m-0 font-bold text-[15px] text-gray-900">{user?.role === 'admin' ? 'Quản lý' : 'Nhân viên'}</p>
+            <p className="m-0 text-[13px] text-gray-500">{user?.name || 'Sơn Đông Admin'}</p>
           </div>
         </div>
 
-        <nav style={{ flex: 1, marginTop: '10px' }}>
-          <ul style={{ listStyle: 'none', padding: 0, margin: 0 }}>
+        <nav className="flex-1 mt-2 overflow-y-auto">
+          <ul className="list-none p-0 m-0">
             {filteredMenu.map(item => {
               const isActive = location.pathname.includes(item.path);
               return (
-                <li key={item.path} style={{ marginBottom: '5px' }}>
+                <li key={item.path} className="mb-1">
                   <Link
                     to={item.path}
-                    style={{
-                      ...sidebarLinkBaseStyle,
-                      ...(isActive
-                        ? sidebarLinkActiveStyle
-                        : sidebarLinkInactiveStyle),
-                    }}
+                    className={`flex items-center gap-4 py-3 px-5 no-underline text-sm transition-all border-l-4 ${
+                      isActive
+                        ? 'bg-red-50 text-[#c0392b] border-[#c0392b] font-semibold'
+                        : 'bg-transparent text-gray-600 border-transparent font-medium hover:bg-gray-100 hover:text-gray-900'
+                    }`}
                   >
                     {item.iconSrc && (
                       <img
                         src={item.iconSrc}
                         alt=""
-                        style={{
-                          ...iconStyle,
-                          filter: isActive ? 'none' : 'grayscale(100%) opacity(60%)',
-                        }}
+                        className={`w-[22px] h-[22px] object-contain transition-all ${
+                          isActive ? '' : 'grayscale opacity-60'
+                        }`}
                       />
                     )}
-                    <span style={{ fontWeight: isActive ? '600' : '500' }}>
-                      {item.label}
-                    </span>
+                    <span>{item.label}</span>
                   </Link>
                 </li>
               );
@@ -94,315 +91,83 @@ const AdminLayout = () => {
       </aside>
 
       {/* ================= PHẦN BÊN PHẢI ================= */}
-      <div style={rightWrapperStyle}>
-        <header style={headerStyle}>
-          <h2 style={{ color: '#c0392b', fontSize: '20px', margin: 0 }}>Sơn Đông Fast Food</h2>
-          <div style={headerRightStyle}>
-            <input type="text" placeholder="Tìm kiếm ..." style={searchInputStyle} />
-            <div style={headerActionStyle}>
+      <div className="flex-1 flex flex-col overflow-hidden">
+        
+        <header className="h-[70px] bg-white flex items-center justify-between px-8 border-b border-gray-200 shrink-0">
+          {/* Đã sửa chữ và in đậm hơn theo yêu cầu */}
+          <h2 className="text-[#c0392b] text-2xl font-black m-0 tracking-tight">Sơn Đông Food</h2>
+          
+          <div className="flex items-center gap-5">
+            {/* Phần Tìm kiếm đã được xóa bỏ */}
+            
+            <div className="flex items-center gap-4 pl-5 border-l border-gray-200">
               {/* Nút thông báo */}
-              <div style={{ position: 'relative' }}>
+              <div className="relative">
                 <button
-                  style={iconButtonStyle}
+                  className="bg-transparent border-none p-1 cursor-pointer flex items-center justify-center hover:bg-gray-100 rounded-full transition-colors"
                   title="Thông báo"
                   onClick={() => setShowNotifications(!showNotifications)}
                 >
-                  <img src="/images/ICON/ICnotice.png" alt="" style={headerIconStyle} />
-                  <span style={notificationBadgeStyle}>2</span>
+                  <img src="/images/ICON/ICnotice.png" alt="Notice" className="w-6 h-6 object-contain opacity-70" />
+                  <span className="absolute -top-1 -right-1 bg-red-500 text-white text-[10px] font-bold w-4 h-4 rounded-full flex items-center justify-center border-2 border-white">
+                    2
+                  </span>
                 </button>
+                
+                {/* Dropdown Thông báo */}
                 {showNotifications && (
-                  <div style={notificationDropdownStyle}>
-                    <div style={notificationHeaderStyle}>
-                      <h4 style={{ margin: 0, fontSize: '15px', color: '#1f2937' }}>
-                        Thông báo mới
-                      </h4>
-                      <span style={{ fontSize: '12px', color: '#3b82f6', cursor: 'pointer' }}>
-                        Đánh dấu đã đọc
-                      </span>
+                  <div className="absolute top-12 -right-4 w-80 bg-white rounded-lg shadow-xl border border-gray-100 z-50 flex flex-col overflow-hidden">
+                    <div className="flex justify-between items-center p-3 px-4 border-b border-gray-100 bg-gray-50/50">
+                      <h4 className="m-0 text-[15px] font-bold text-gray-800">Thông báo mới</h4>
+                      <span className="text-xs text-blue-500 cursor-pointer hover:underline font-medium">Đánh dấu đã đọc</span>
                     </div>
-                    <ul style={notificationListStyle}>
+                    <ul className="list-none p-0 m-0 max-h-80 overflow-y-auto">
                       {notifications.map(notif => (
                         <li
                           key={notif.id}
-                          style={{
-                            ...notificationItemStyle,
-                            backgroundColor: notif.isRead ? '#ffffff' : '#eff6ff',
-                          }}
+                          className={`p-3 px-4 border-b border-gray-50 cursor-pointer transition-colors hover:bg-gray-50 ${
+                            notif.isRead ? 'bg-white' : 'bg-blue-50/30'
+                          }`}
                         >
-                          <p
-                            style={{
-                              margin: '0 0 4px 0',
-                              fontSize: '13px',
-                              color: '#374151',
-                              fontWeight: notif.isRead ? '400' : '600',
-                            }}
-                          >
+                          <p className={`m-0 mb-1 text-[13px] text-gray-700 ${notif.isRead ? 'font-normal' : 'font-semibold'}`}>
                             {notif.text}
                           </p>
-                          <span style={{ fontSize: '11px', color: '#9ca3af' }}>
-                            {notif.time}
-                          </span>
+                          <span className="text-[11px] text-gray-400">{notif.time}</span>
                         </li>
                       ))}
                     </ul>
-                    <div style={notificationFooterStyle}>Xem tất cả thông báo</div>
+                    <div className="p-2.5 text-center text-[13px] text-gray-600 font-semibold cursor-pointer border-t border-gray-100 bg-gray-50 hover:bg-gray-100 transition-colors">
+                      Xem tất cả thông báo
+                    </div>
                   </div>
                 )}
               </div>
 
-              <button style={iconButtonStyle} title="Cài đặt">
-                <img src="/images/ICON/ICsetting.png" alt="" style={headerIconStyle} />
+              {/* Nút Cài đặt */}
+              <button className="bg-transparent border-none p-1 cursor-pointer flex items-center justify-center hover:bg-gray-100 rounded-full transition-colors" title="Cài đặt">
+                <img src="/images/ICON/ICsetting.png" alt="Settings" className="w-6 h-6 object-contain opacity-70" />
               </button>
-              <button onClick={handleLogout} style={logoutBtnStyle} title="Đăng xuất">
-                <img src="/images/ICON/IClogout.png" alt="" style={logoutIconStyle} />
+              
+              {/* Nút Đăng xuất */}
+              <button 
+                onClick={handleLogout} 
+                className="bg-[#c0392b] border-none rounded-lg w-[35px] h-[35px] flex items-center justify-center cursor-pointer hover:bg-red-800 transition-colors ml-2 shadow-sm" 
+                title="Đăng xuất"
+              >
+                <img src="/images/ICON/IClogout.png" alt="Logout" className="w-[18px] h-[18px] object-contain brightness-0 invert" />
               </button>
             </div>
           </div>
         </header>
-        <main style={mainContentStyle}>
+        
+        {/* Nội dung trang con */}
+        <main className="flex-1 p-6 sm:p-8 overflow-y-auto bg-gray-50">
           <Outlet />
         </main>
+        
       </div>
     </div>
   );
-};
-
-// ================= STYLES =================
-const appContainerStyle = {
-  display: 'flex',
-  height: '100vh',
-  backgroundColor: '#f5f7fa',
-  fontFamily: 'system-ui, -apple-system, sans-serif',
-};
-
-const sidebarStyle = {
-  width: '260px',
-  background: '#f8f9fa',
-  borderRight: '1px solid #e5e7eb',
-  display: 'flex',
-  flexDirection: 'column',
-  zIndex: 10,
-};
-
-const logoTextStyle = {
-  color: '#c0392b',
-  margin: 0,
-  fontSize: '18px',
-  fontWeight: '900',
-  letterSpacing: '0.5px',
-};
-
-const userInfoStyle = {
-  display: 'flex',
-  alignItems: 'center',
-  gap: '12px',
-  padding: '0 20px 20px 20px',
-};
-
-const avatarWrapperStyle = {
-  width: '45px',
-  height: '45px',
-  borderRadius: '8px',
-  backgroundColor: '#333',
-  overflow: 'hidden',
-};
-
-const userNameStyle = {
-  margin: 0,
-  fontWeight: 'bold',
-  fontSize: '15px',
-  color: '#111',
-};
-
-const userSubStyle = {
-  margin: 0,
-  fontSize: '13px',
-  color: '#666',
-};
-
-// --- Sidebar link styles ---
-const sidebarLinkBaseStyle = {
-  display: 'flex',
-  alignItems: 'center',
-  gap: '15px',
-  padding: '12px 20px',
-  textDecoration: 'none',
-  fontSize: '14px',
-  transition: 'all 0.2s',
-  // Dùng các thuộc tính border-left riêng để tránh xung đột khi đổi màu
-  borderLeftWidth: 4,
-  borderLeftStyle: 'solid',
-  borderLeftColor: 'transparent',
-};
-
-const sidebarLinkActiveStyle = {
-  backgroundColor: '#fceaea',
-  color: '#c0392b',
-  borderLeftColor: '#c0392b',
-};
-
-const sidebarLinkInactiveStyle = {
-  backgroundColor: 'transparent',
-  color: '#4b5563',
-  borderLeftColor: 'transparent',
-};
-
-const iconStyle = {
-  width: '22px',
-  height: '22px',
-  objectFit: 'contain',
-};
-
-const rightWrapperStyle = {
-  flex: 1,
-  display: 'flex',
-  flexDirection: 'column',
-  overflow: 'hidden',
-};
-
-const headerStyle = {
-  height: '70px',
-  backgroundColor: '#ffffff',
-  display: 'flex',
-  alignItems: 'center',
-  justifyContent: 'space-between',
-  padding: '0 30px',
-  borderBottom: '1px solid #e5e7eb',
-};
-
-const headerRightStyle = {
-  display: 'flex',
-  alignItems: 'center',
-  gap: '20px',
-};
-
-const searchInputStyle = {
-  padding: '8px 15px',
-  borderRadius: '8px',
-  border: 'none',
-  backgroundColor: '#f3f4f6',
-  width: '250px',
-  fontSize: '14px',
-  outline: 'none',
-};
-
-const headerActionStyle = {
-  display: 'flex',
-  alignItems: 'center',
-  gap: '15px',
-  borderLeft: '1px solid #e5e7eb',          // Đây là đường gạch đứng, giữ nguyên được
-  paddingLeft: '20px',
-};
-
-const iconButtonStyle = {
-  background: 'none',
-  border: 'none',
-  padding: 0,
-  cursor: 'pointer',
-  position: 'relative',
-  display: 'flex',
-  alignItems: 'center',
-  justifyContent: 'center',
-};
-
-const logoutBtnStyle = {
-  background: '#c0392b',
-  border: 'none',
-  borderRadius: '8px',
-  width: '35px',
-  height: '35px',
-  display: 'flex',
-  alignItems: 'center',
-  justifyContent: 'center',
-  cursor: 'pointer',
-};
-
-const mainContentStyle = {
-  flex: 1,
-  padding: '30px',
-  overflowY: 'auto',
-};
-
-const headerIconStyle = {
-  width: '24px',
-  height: '24px',
-  objectFit: 'contain',
-  opacity: 0.7,
-  cursor: 'pointer',
-};
-
-const logoutIconStyle = {
-  width: '18px',
-  height: '18px',
-  objectFit: 'contain',
-  filter: 'brightness(0) invert(1)',
-};
-
-const notificationBadgeStyle = {
-  position: 'absolute',
-  top: '-4px',
-  right: '-4px',
-  backgroundColor: '#ef4444',
-  color: 'white',
-  fontSize: '10px',
-  fontWeight: 'bold',
-  width: '16px',
-  height: '16px',
-  borderRadius: '50%',
-  display: 'flex',
-  alignItems: 'center',
-  justifyContent: 'center',
-  border: '2px solid white',
-};
-
-const notificationDropdownStyle = {
-  position: 'absolute',
-  top: '40px',
-  right: '-60px',
-  width: '320px',
-  backgroundColor: '#ffffff',
-  borderRadius: '8px',
-  boxShadow: '0 10px 25px -5px rgba(0, 0, 0, 0.1), 0 8px 10px -6px rgba(0, 0, 0, 0.1)',
-  border: '1px solid #e5e7eb',
-  zIndex: 50,
-  display: 'flex',
-  flexDirection: 'column',
-};
-
-const notificationHeaderStyle = {
-  display: 'flex',
-  justifyContent: 'space-between',
-  alignItems: 'center',
-  padding: '12px 16px',
-  borderBottom: '1px solid #e5e7eb',
-};
-
-const notificationListStyle = {
-  listStyle: 'none',
-  padding: 0,
-  margin: 0,
-  maxHeight: '320px',
-  overflowY: 'auto',
-};
-
-const notificationItemStyle = {
-  padding: '12px 16px',
-  borderBottom: '1px solid #f3f4f6',
-  cursor: 'pointer',
-  transition: 'background-color 0.2s',
-};
-
-const notificationFooterStyle = {
-  padding: '10px',
-  textAlign: 'center',
-  fontSize: '13px',
-  color: '#4b5563',
-  fontWeight: '600',
-  cursor: 'pointer',
-  borderTop: '1px solid #e5e7eb',
-  backgroundColor: '#f9fafb',
-  borderBottomLeftRadius: '8px',
-  borderBottomRightRadius: '8px',
 };
 
 export default AdminLayout;
