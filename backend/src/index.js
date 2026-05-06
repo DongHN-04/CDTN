@@ -11,6 +11,10 @@ const path = require('path');
 const uploadRoutes = require('./routes/uploadRoutes');
 const orderRoutes = require('./routes/orderRoutes');
 const customerRoutes = require('./routes/customerRoutes');
+const reportRoutes = require('./routes/reportRoutes');
+const promotionRoutes = require('./routes/promotionRoutes');
+const comboRoutes = require('./routes/comboRoutes');
+const publicRoutes = require('./routes/publicRoutes');
 
 // Nạp biến môi trường từ file .env
 dotenv.config();
@@ -32,6 +36,10 @@ app.use('/api/menu', menuRoutes);
 app.use('/api/upload', uploadRoutes);
 app.use('/api/orders', orderRoutes);
 app.use('/api/customers', customerRoutes);
+app.use('/api/reports', reportRoutes);
+app.use('/api/promotions', promotionRoutes);
+app.use('/api/combos', comboRoutes);
+app.use('/api/public', publicRoutes); // Routes công khai cho khách hàng (lấy menu, tạo đơn hàng)
 
 // Route mặc định
 app.get('/', (req, res) => {

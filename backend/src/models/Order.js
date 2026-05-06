@@ -1,9 +1,11 @@
 const mongoose = require('mongoose');
 
 const orderItemSchema = new mongoose.Schema({
-  menuItem: { type: mongoose.Schema.Types.ObjectId, ref: 'MenuItem', required: true },
+  menuItem: { type: mongoose.Schema.Types.ObjectId, ref: 'MenuItem' }, // không còn required
+  comboId: { type: mongoose.Schema.Types.ObjectId, ref: 'Combo' },
+  name: String,   // lưu tên combo nếu là combo
   quantity: { type: Number, required: true },
-  price: { type: Number, required: true } // giá tại thời điểm bán
+  price: { type: Number, required: true }
 });
 
 const orderSchema = new mongoose.Schema({
@@ -11,13 +13,21 @@ const orderSchema = new mongoose.Schema({
     name: { type: String, default: 'Khách lẻ' },
     phone: { type: String, default: '' }
   },
-  staff: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
+  staff: { type: mongoose.Schema.Types.ObjectId, ref: 'User' }, // không bắt buộc (vì khách tự đặt)
   items: [orderItemSchema],
   subtotal: { type: Number, required: true },
   discount: { type: Number, default: 0 },
   total: { type: Number, required: true },
   paymentMethod: { type: String, enum: ['cash', 'card', 'qr'], default: 'cash' },
-  status: { type: String, enum: ['pending', 'completed', 'cancelled'], default: 'completed' }
+  status: {
+    type: String,
+    enum: ['pending', 'confirmed', 'completed', 'cancelled'],
+    default: 'pending' // mặc định là chờ xác nhận khi khách đặt
+  },
+  // Dành cho đơn từ khách:
+  tableNumber: { type: String, default: '' },  // số bàn (khách nhập)
+  notes: { type: String, default: '' },        // ghi chú
+  isCustomerOrder: { type: Boolean, default: false } // đánh dấu đơn từ khách
 }, { timestamps: true });
 
 module.exports = mongoose.model('Order', orderSchema);
