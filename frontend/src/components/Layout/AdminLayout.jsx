@@ -30,10 +30,10 @@ const AdminLayout = () => {
     { label: 'Quản lý kho', path: '/admin/inventory', roles: ['admin'], iconSrc: '/images/ICON/ICKho.png' },
     { label: 'Quản lý khách hàng', path: '/admin/customers', roles: ['admin', 'staff'], iconSrc: '/images/ICON/ICCustomer.png' },
     { label: 'Quản lý hóa đơn', path: '/admin/invoices', roles: ['admin', 'staff'], iconSrc: '/images/ICON/ICHoaDon.png' },
-    { label: 'Quản lý Khuyến mãi', path: '/admin/promotions', roles: ['admin'], iconSrc: '/images/ICON/ICPromo.png' },
+    { label: 'Quản lý Khuyến mãi', path: '/admin/promotions', roles: ['admin'], iconSrc: '/images/ICON/ICKmai.png' },
     { label: 'Quản lý Combo', path: '/admin/combos', roles: ['admin'], iconSrc: '/images/ICON/ICCombo.png' },
     { label: 'Đơn hàng khách', path: '/admin/customer-orders', roles: ['admin', 'staff'], iconSrc: '/images/ICON/ICOrder.png' },
-    { label: 'Quản lý QR Bàn', path: '/admin/qrcodes', roles: ['admin'], iconSrc: '/images/ICON/ICQR.png' },
+    { label: 'Quản lý QR Bàn', path: '/admin/qrcodes', roles: ['admin'], iconSrc: '/images/ICON/ICQrPhone.png' },
     { label: 'Báo cáo thống kê', path: '/admin/reports', roles: ['admin'], iconSrc: '/images/ICON/ICDoanhThu.png' },
   ];
 
