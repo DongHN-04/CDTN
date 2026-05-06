@@ -23,11 +23,16 @@ const userSchema = mongoose.Schema(
       enum: ['admin', 'staff', 'customer'],
       default: 'customer',
     },
+
+    position: {
+      type: String,
+    },
     phone: {
       type: String,
     },
-    address: {
-      type: String,
+
+    salary: {
+      type: Number, 
     },
   },
   {

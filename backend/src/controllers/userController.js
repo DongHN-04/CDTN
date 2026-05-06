@@ -18,7 +18,8 @@ const getUsers = async (req, res) => {
 // @route   POST /api/users
 // @access  Private/Admin
 const createUser = async (req, res) => {
-  const { name, email, password, role, phone, address } = req.body;
+  // Thay address thành salary để khớp với giao diện Frontend mới
+  const { name, email, password, role, phone, salary } = req.body;
 
   try {
     const userExists = await User.findOne({ email });
@@ -26,13 +27,18 @@ const createUser = async (req, res) => {
       return res.status(400).json({ message: 'Email đã tồn tại' });
     }
 
+    // Tách role tiếng Việt từ Frontend thành role hệ thống và chức vụ hiển thị
+    const systemRole = role === 'admin' ? 'admin' : 'staff';
+    const displayPosition = role === 'admin' ? 'Quản trị viên' : role;
+
     const user = await User.create({
       name,
       email,
-      password,
-      role: role || 'staff', // mặc định là staff
+      password, // Nhận mật khẩu trực tiếp từ form
+      role: systemRole,
+      position: displayPosition,
       phone,
-      address,
+      salary, // Lưu mức lương
     });
 
     if (user) {
@@ -41,13 +47,14 @@ const createUser = async (req, res) => {
         name: user.name,
         email: user.email,
         role: user.role,
+        position: user.position,
         phone: user.phone,
-        address: user.address,
+        salary: user.salary,
         token: generateToken(user._id, user.role), // trả token nếu cần dùng ngay
       });
     }
   } catch (error) {
-    res.status(400).json({ message: 'Dữ liệu không hợp lệ' });
+    res.status(400).json({ message: 'Dữ liệu không hợp lệ', error: error.message });
   }
 };
 
@@ -61,14 +68,26 @@ const updateUser = async (req, res) => {
       return res.status(404).json({ message: 'Không tìm thấy người dùng' });
     }
 
-    // Cập nhật các trường được phép (không cho đổi email nếu đã tồn tại ở người khác)
+    // Cập nhật các trường được phép
     user.name = req.body.name || user.name;
     user.phone = req.body.phone || user.phone;
-    user.address = req.body.address || user.address;
-    user.role = req.body.role || user.role; // Admin có thể thay đổi role
+    
+    // Cập nhật lương nếu có
+    if (req.body.salary !== undefined) {
+      user.salary = req.body.salary;
+    }
 
+    // Xử lý cập nhật chức vụ
+    if (req.body.role) {
+      const systemRole = req.body.role === 'admin' ? 'admin' : 'staff';
+      const displayPosition = req.body.role === 'admin' ? 'Quản trị viên' : req.body.role;
+      user.role = systemRole;
+      user.position = displayPosition;
+    }
+
+    // Chỉ cập nhật mật khẩu nếu Frontend có gửi lên (ô mật khẩu không bị bỏ trống)
     if (req.body.password) {
-      user.password = req.body.password; // Sẽ được hash tự động nhờ hook pre-save
+      user.password = req.body.password; // Sẽ được hash tự động nhờ hook pre-save của bạn
     }
 
     const updatedUser = await user.save();
@@ -77,11 +96,12 @@ const updateUser = async (req, res) => {
       name: updatedUser.name,
       email: updatedUser.email,
       role: updatedUser.role,
+      position: updatedUser.position,
       phone: updatedUser.phone,
-      address: updatedUser.address,
+      salary: updatedUser.salary,
     });
   } catch (error) {
-    res.status(400).json({ message: 'Cập nhật thất bại' });
+    res.status(400).json({ message: 'Cập nhật thất bại', error: error.message });
   }
 };
 
@@ -96,7 +116,7 @@ const deleteUser = async (req, res) => {
     }
 
     // Ngăn admin xóa chính mình
-    if (user._id.toString() === req.user._id.toString()) {
+    if (req.user && user._id.toString() === req.user._id.toString()) {
       return res.status(400).json({ message: 'Bạn không thể xóa chính mình' });
     }
 
