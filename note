@@ -14,3 +14,4 @@ npm install recharts (cho biểu đồ)
 npm install qrcode.react (cho mã QR)
 
 npm install xlsx lucide-react -- lệnh cài đặt thư viện xử lý Excel 
+

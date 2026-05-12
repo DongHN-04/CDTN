@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { useCart } from '../../contexts/CartContext';
 import publicService from '../../services/publicService';
+import paymentService from '../../services/paymentService'; // Import service thanh toán
 
 const CartPage = () => {
   const { items, removeItem, updateQuantity, clearCart, getCartTotal, getItemCount } = useCart();
@@ -11,20 +12,24 @@ const CartPage = () => {
   const [notes, setNotes] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+  const [paymentMethod, setPaymentMethod] = useState('cash'); // 'cash' hoặc 'online'
   const navigate = useNavigate();
 
   const handleSubmit = async () => {
     if (!name.trim()) return setError('Vui lòng nhập tên');
     if (items.length === 0) return setError('Giỏ hàng trống');
 
+    // Lưu thông tin khách hàng
     localStorage.setItem('customerName', name);
     localStorage.setItem('customerPhone', phone);
     localStorage.setItem('customerAddress', address);
 
     setLoading(true);
     setError('');
+
     try {
-      await publicService.createOrder({
+      // Tạo đơn hàng chung (cho cả hai phương thức)
+      const order = await publicService.createOrder({
         customer: { name, phone, address },
         notes,
         items: items.map(item => ({
@@ -34,8 +39,20 @@ const CartPage = () => {
         })).filter(i => i.menuItem || i.comboId),
         tableNumber: '',
       });
-      clearCart();
-      navigate('/');
+
+      if (paymentMethod === 'online') {
+        // Thanh toán online: lấy URL từ backend và chuyển hướng
+        const { paymentUrl } = await paymentService.createPayment({
+          orderId: order._id,
+          amount: order.total,
+        });
+        clearCart(); // Xóa giỏ hàng trước khi rời trang
+        window.location.href = paymentUrl; // Chuyển sang cổng VNPay
+      } else {
+        // Thanh toán tiền mặt: chuyển về trang chủ (hoặc trang thành công)
+        clearCart();
+        navigate('/'); // hoặc navigate('/order-success')
+      }
     } catch (error) {
       setError(error.response?.data?.message || 'Đặt món thất bại');
     } finally {
@@ -122,6 +139,18 @@ const CartPage = () => {
               style={inputStyle} />
             <textarea placeholder="Ghi chú" value={notes} onChange={e => setNotes(e.target.value)}
               rows={3} style={inputStyle} />
+            
+            <div style={{ marginBottom: '15px' }}>
+              <label style={{ display: 'block', marginBottom: '5px' }}>Phương thức thanh toán:</label>
+              <select 
+                value={paymentMethod} 
+                onChange={e => setPaymentMethod(e.target.value)}
+                style={{ ...inputStyle, marginBottom: 0 }}
+              >
+                <option value="cash">Tiền mặt khi nhận hàng</option>
+                <option value="online">Thanh toán online (VNPay)</option>
+              </select>
+            </div>
           </div>
 
           <div style={{ textAlign: 'right', marginBottom: '20px' }}>
@@ -133,11 +162,11 @@ const CartPage = () => {
 
           <button onClick={handleSubmit} disabled={loading}
             style={{
-              width: '100%', padding: '15px', background: '#e74c3c', color: 'white',
+              width: '100%', padding: '15px', background: paymentMethod === 'online' ? '#3498db' : '#e74c3c', color: 'white',
               border: 'none', borderRadius: '8px', fontSize: '18px', fontWeight: 'bold',
               cursor: 'pointer', opacity: loading ? 0.7 : 1
             }}>
-            {loading ? 'Đang đặt...' : 'Đặt món'}
+            {loading ? 'Đang xử lý...' : paymentMethod === 'online' ? 'Thanh toán online' : 'Đặt món (tiền mặt)'}
           </button>
         </>
       )}

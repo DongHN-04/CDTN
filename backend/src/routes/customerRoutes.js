@@ -5,7 +5,7 @@ const {
   getCustomers,
   createCustomer,
   updateCustomer,
-  deleteCustomer,
+  deleteCustomer
 } = require('../controllers/customerController');
 
 // GET và POST đều yêu cầu đăng nhập, staff cũng có thể thêm khách hàng mới khi bán hàng

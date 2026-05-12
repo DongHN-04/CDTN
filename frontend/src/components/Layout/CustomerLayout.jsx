@@ -33,6 +33,7 @@ const CustomerLayout = () => {
             <Link to="/promotions" style={isActive('/promotions') ? activeLinkStyle : linkStyle}>Khuyến mãi</Link>
             <Link to="/about" style={isActive('/about') ? activeLinkStyle : linkStyle}>Giới thiệu</Link>
             <Link to="/contact" style={isActive('/contact') ? activeLinkStyle : linkStyle}>Liên hệ</Link>
+            <Link to="/cart" style={isActive('/cart') ? activeLinkStyle : linkStyle}>Giỏ hàng</Link>
           </nav>
 
           {/* Auth Section */}
