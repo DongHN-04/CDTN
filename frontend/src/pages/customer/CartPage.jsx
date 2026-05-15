@@ -37,7 +37,6 @@ const CartPage = () => {
           comboId: item.comboId,
           quantity: item.quantity,
         })).filter(i => i.menuItem || i.comboId),
-        tableNumber: '',
       });
 
       if (paymentMethod === 'online') {

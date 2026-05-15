@@ -2,18 +2,57 @@ const mongoose = require('mongoose');
 
 const promotionSchema = new mongoose.Schema(
   {
-    name: { type: String, required: true },          // Tên chương trình
-    description: { type: String, default: '' },      // Mô tả
+    name: {
+      type: String,
+      required: true,
+      trim: true,
+      maxlength: 120,
+    },
+    description: {
+      type: String,
+      default: '',
+      trim: true,
+      maxlength: 500,
+    },
     type: {
       type: String,
-      enum: ['percent', 'fixed', 'buyXgetY'],        // Loại: giảm %, giảm tiền, mua X tặng Y
-      required: true
+      enum: ['percent', 'fixed', 'buyXgetY'],
+      required: true,
     },
-    value: { type: Number, default: 0 },             // Giá trị: số % hoặc số tiền
-    minOrderValue: { type: Number, default: 0 },     // Đơn tối thiểu để áp dụng
-    startDate: { type: Date, required: true },
-    endDate: { type: Date, required: true },
-    isActive: { type: Boolean, default: true }       // Bật/tắt nhanh
+    value: {
+      type: Number,
+      required: true,
+      min: 0,
+      validate: {
+        validator(value) {
+          return this.type !== 'percent' || value <= 100;
+        },
+        message: 'Giảm phần trăm không được vượt quá 100',
+      },
+    },
+    minOrderValue: {
+      type: Number,
+      default: 0,
+      min: 0,
+    },
+    startDate: {
+      type: Date,
+      required: true,
+    },
+    endDate: {
+      type: Date,
+      required: true,
+      validate: {
+        validator(value) {
+          return !this.startDate || value >= this.startDate;
+        },
+        message: 'Ngày kết thúc phải sau ngày bắt đầu',
+      },
+    },
+    isActive: {
+      type: Boolean,
+      default: true,
+    },
   },
   { timestamps: true }
 );

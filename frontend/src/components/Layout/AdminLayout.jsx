@@ -36,15 +36,12 @@ const AdminLayout = () => {
     { label: 'Quản lý ca làm việc', path: '/admin/shifts', roles: ['admin', 'staff'], iconSrc: '/images/ICON/ICShift.png' },
     { label: 'Nhà cung cấp', path: '/admin/suppliers', roles: ['admin'], iconSrc: '/images/ICON/ICSupplier.png' },
     { label: 'Lịch sử nhập hàng', path: '/admin/purchases', roles: ['admin'], iconSrc: '/images/ICON/ICPurchase.png' },
-    { label: 'Quản lý QR Bàn', path: '/admin/qrcodes', roles: ['admin'], iconSrc: '/images/ICON/ICQrPhone.png' },
-    { label: 'Báo cáo thống kê', path: '/admin/reports', roles: ['admin'], iconSrc: '/images/ICON/ICDoanhThu.png' },
   ];
 
   const filteredMenu = menuItems.filter(item => item.roles.includes(user?.role || 'admin'));
 
   return (
     <div className="flex h-screen bg-gray-50 font-sans">
-
       {/* ================= SIDEBAR ================= */}
       <aside className="w-[260px] bg-gray-50 border-r border-gray-200 flex flex-col z-10 shrink-0">
         <div className="pt-8 px-5 pb-5">
@@ -73,17 +70,17 @@ const AdminLayout = () => {
                 <li key={item.path} className="mb-1">
                   <Link
                     to={item.path}
-                    className={`flex items-center gap-4 py-3 px-5 no-underline text-sm transition-all border-l-4 ${isActive
+                    className={`flex items-center gap-4 py-3 px-5 no-underline text-sm transition-all border-l-4 ${
+                      isActive
                         ? 'bg-red-50 text-[#c0392b] border-[#c0392b] font-semibold'
                         : 'bg-transparent text-gray-600 border-transparent font-medium hover:bg-gray-100 hover:text-gray-900'
-                      }`}
+                    }`}
                   >
                     {item.iconSrc && (
                       <img
                         src={item.iconSrc}
                         alt=""
-                        className={`w-[22px] h-[22px] object-contain transition-all ${isActive ? '' : 'grayscale opacity-60'
-                          }`}
+                        className={`w-[22px] h-[22px] object-contain transition-all ${isActive ? '' : 'grayscale opacity-60'}`}
                       />
                     )}
                     <span>{item.label}</span>
@@ -97,14 +94,10 @@ const AdminLayout = () => {
 
       {/* ================= PHẦN BÊN PHẢI ================= */}
       <div className="flex-1 flex flex-col overflow-hidden">
-
         <header className="h-[70px] bg-white flex items-center justify-between px-8 border-b border-gray-200 shrink-0">
-
           <h2 className="text-[#c0392b] text-2xl font-black m-0 tracking-tight">Sơn Đông Food</h2>
 
           <div className="flex items-center gap-5">
-
-
             <div className="flex items-center gap-4 pl-5 border-l border-gray-200">
               {/* Nút thông báo */}
               <div className="relative">
@@ -130,8 +123,9 @@ const AdminLayout = () => {
                       {notifications.map(notif => (
                         <li
                           key={notif.id}
-                          className={`p-3 px-4 border-b border-gray-50 cursor-pointer transition-colors hover:bg-gray-50 ${notif.isRead ? 'bg-white' : 'bg-blue-50/30'
-                            }`}
+                          className={`p-3 px-4 border-b border-gray-50 cursor-pointer transition-colors hover:bg-gray-50 ${
+                            notif.isRead ? 'bg-white' : 'bg-blue-50/30'
+                          }`}
                         >
                           <p className={`m-0 mb-1 text-[13px] text-gray-700 ${notif.isRead ? 'font-normal' : 'font-semibold'}`}>
                             {notif.text}
@@ -168,7 +162,6 @@ const AdminLayout = () => {
         <main className="flex-1 p-6 sm:p-8 overflow-y-auto bg-gray-50">
           <Outlet />
         </main>
-
       </div>
     </div>
   );

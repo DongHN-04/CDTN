@@ -12,8 +12,6 @@ const createOrder = async (req, res) => {
     const { customer, items, discount, paymentMethod } = req.body;
     const staff = req.user._id;
 
-    console.log('Nhận được items:', JSON.stringify(items));
-
     let subtotal = 0;
     const orderItems = [];
 
@@ -125,7 +123,6 @@ const createOrder = async (req, res) => {
       .populate('staff', 'name')
       .populate('items.menuItem', 'name price');
 
-    console.log('Tạo đơn thành công:', order._id);
     res.status(201).json(populatedOrder);
   } catch (error) {
     console.error('Lỗi tạo đơn:', error.message);

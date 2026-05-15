@@ -2,9 +2,10 @@ const express = require('express');
 const router = express.Router();
 const { protect, authorize } = require('../middleware/authMiddleware');
 const { createOrder, getOrders, getOrderById, getPendingOrders, confirmOrder } = require('../controllers/orderController');
+const { validateOrderCreate } = require('../middleware/validationMiddleware');
 
 router.route('/')
-  .post(protect, authorize('admin', 'staff'), createOrder)
+  .post(protect, authorize('admin', 'staff'), validateOrderCreate, createOrder)
   .get(protect, authorize('admin', 'staff'), getOrders);
 
 router.get('/pending', protect, authorize('admin', 'staff'), getPendingOrders);

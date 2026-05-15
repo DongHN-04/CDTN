@@ -24,10 +24,8 @@ import DashboardPage from './pages/admin/DashboardPage';
 import EmployeeManagementPage from './pages/admin/EmployeeManagementPage';
 import MenuManagementPage from './pages/admin/MenuManagementPage';
 import InventoryPage from './pages/admin/InventoryPage';
-import ReportsPage from './pages/admin/ReportsPage';
 import PromotionManagementPage from './pages/admin/PromotionManagementPage';
 import ComboManagementPage from './pages/admin/ComboManagementPage';
-import QRManagementPage from './pages/admin/QRManagementPage';
 import SupplierManagementPage from './pages/admin/SupplierManagementPage';
 import PurchaseHistoryPage from './pages/admin/PurchaseHistoryPage';
 
@@ -65,7 +63,6 @@ function App() {
                 </PrivateRoute>
               }
             >
-              {/* Dashboard - cả admin và staff */}
               <Route
                 path="/admin/dashboard"
                 element={
@@ -75,7 +72,6 @@ function App() {
                 }
               />
 
-              {/* Admin only */}
               <Route
                 path="/admin/employees"
                 element={
@@ -132,21 +128,7 @@ function App() {
                   </RoleBasedRoute>
                 }
               />
-              <Route path="/admin/qrcodes" element={
-                <RoleBasedRoute allowedRoles={['admin']}>
-                  <QRManagementPage />
-                </RoleBasedRoute>
-              } />
-              <Route
-                path="/admin/reports"
-                element={
-                  <RoleBasedRoute allowedRoles={['admin']}>
-                    <ReportsPage />
-                  </RoleBasedRoute>
-                }
-              />
 
-              {/* Staff only */}
               <Route
                 path="/staff/pos"
                 element={
@@ -156,7 +138,6 @@ function App() {
                 }
               />
 
-              {/* Shared routes */}
               <Route
                 path="/admin/customers"
                 element={
@@ -181,11 +162,13 @@ function App() {
                   </RoleBasedRoute>
                 }
               />
-              <Route path="/admin/customer-orders" element={
-                <RoleBasedRoute allowedRoles={['admin', 'staff']}>
-                  <CustomerOrdersPage />
-                </RoleBasedRoute>
-              }
+              <Route
+                path="/admin/customer-orders"
+                element={
+                  <RoleBasedRoute allowedRoles={['admin', 'staff']}>
+                    <CustomerOrdersPage />
+                  </RoleBasedRoute>
+                }
               />
               <Route
                 path="/admin/shifts"
@@ -196,11 +179,9 @@ function App() {
                 }
               />
 
-              {/* Fallback route cho /admin */}
               <Route path="/admin" element={<DashboardPage />} />
             </Route>
 
-            {/* Catch-all route cho 404 */}
             <Route path="*" element={<NotFoundPage />} />
           </Routes>
         </BrowserRouter>

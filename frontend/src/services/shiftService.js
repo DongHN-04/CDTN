@@ -1,5 +1,5 @@
 import axios from 'axios';
-const API_URL = 'http://localhost:5000/api/shifts/';
+const API_URL = `${process.env.REACT_APP_API_URL}/shifts/`;
 
 const getAuthHeader = () => {
   const user = JSON.parse(localStorage.getItem('user'));

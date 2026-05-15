@@ -6,6 +6,7 @@ npm init -y (khởi tạo package.json)
 npm install express mongoose dotenv bcryptjs jsonwebtoken cors
 npm install -D nodemon
 npm install multer (khi thêm upload ảnh)
+npm install vnpay
 
 Frontend
 npx create-react-app . (khởi tạo dự án React)
