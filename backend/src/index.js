@@ -4,6 +4,7 @@ const cors = require('cors');
 const path = require('path');
 const connectDB = require('./config/db');
 const seedAdmin = require('./utils/seedAdmin');
+const seedData = require('./utils/seedData');
 const authRoutes = require('./routes/authRoutes');
 const userRoutes = require('./routes/userRoutes');
 const ingredientRoutes = require('./routes/ingredientRoutes');
@@ -77,6 +78,7 @@ const startServer = async () => {
   try {
     await connectDB();
     await seedAdmin();
+    await seedData();
 
     app.listen(PORT, () => {
       console.log(`Server running on port ${PORT}`);

@@ -126,7 +126,7 @@ const LoginPage = () => {
         {/* Footer */}
         <div style={footerStyle}>
           <p style={{ margin: 0, color: '#6b7280', fontSize: '14px' }}>
-            Chưa có tài khoản quản trị? <Link to="/register" style={registerLinkStyle}>Yêu cầu đăng ký</Link>
+            Bạn chưa có tài khoản ? <Link to="/register" style={registerLinkStyle}>Yêu cầu đăng ký</Link>
           </p>
         </div>
       </div>

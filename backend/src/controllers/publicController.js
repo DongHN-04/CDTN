@@ -79,4 +79,75 @@ const createOrder = async (req, res) => {
   }
 };
 
-module.exports = { getMenu, createOrder };
+// @desc    Lấy danh sách combo công khai
+// @route   GET /api/public/combos
+// @access  Public
+const getCombos = async (req, res) => {
+  try {
+    const combos = await Combo.find({ isActive: true }).populate('items.menuItem', 'name price image');
+    res.json(combos);
+  } catch (error) {
+    res.status(500).json({ message: 'Lỗi server' });
+  }
+};
+
+// @desc    Lấy khuyến mãi đang hoạt động
+// @route   GET /api/public/promotions
+// @access  Public
+const getPromotions = async (req, res) => {
+  try {
+    const Promotion = require('../models/Promotion');
+    const now = new Date();
+    const promotions = await Promotion.find({
+      startDate: { $lte: now },
+      endDate: { $gte: now },
+    });
+    res.json(promotions);
+  } catch (error) {
+    res.status(500).json({ message: 'Lỗi server' });
+  }
+};
+
+// @desc    Lấy dữ liệu trang chủ (menu + combos + promotions gộp)
+// @route   GET /api/public/homepage
+// @access  Public
+const getHomepageData = async (req, res) => {
+  try {
+    const Promotion = require('../models/Promotion');
+    const now = new Date();
+
+    const [menuItems, combos, promotions] = await Promise.all([
+      MenuItem.find({}),
+      Combo.find({ isActive: true }).populate('items.menuItem', 'name price image'),
+      Promotion.find({
+        startDate: { $lte: now },
+        endDate: { $gte: now },
+      }),
+    ]);
+
+    // Lấy danh sách category duy nhất
+    const categories = [...new Set(menuItems.map(item => item.category).filter(Boolean))];
+
+    // Chọn món nổi bật (featured) - lấy tối đa 8 món
+    const featured = menuItems.slice(0, 8).map(item => ({
+      _id: item._id,
+      name: item.name,
+      price: item.price,
+      description: item.description,
+      category: item.category,
+      image: item.image,
+    }));
+
+    res.json({
+      featured,
+      categories,
+      combos,
+      promotions,
+      totalMenuItems: menuItems.length,
+    });
+  } catch (error) {
+    res.status(500).json({ message: 'Lỗi server' });
+  }
+};
+
+module.exports = { getMenu, createOrder, getCombos, getPromotions, getHomepageData };

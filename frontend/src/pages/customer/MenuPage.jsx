@@ -1,353 +1,45 @@
-// import React, { useState, useEffect, useRef } from 'react';
-// import * as XLSX from 'xlsx';
-// import { 
-//   Download, Upload, List, 
-//   Edit3, Trash2, TrendingUp, Utensils 
-// } from 'lucide-react';
-
-// // Nhúng service gọi API
-// import menuService from '../../services/menuService';
-
-// const MenuManagementPage = () => {
-//   // State chứa dữ liệu thật từ DB
-//   const [menuItems, setMenuItems] = useState([]);
-//   const [loading, setLoading] = useState(true);
-  
-//   const fileInputRef = useRef(null);
-//   const [editingId, setEditingId] = useState(null);
-
-//   const [formData, setFormData] = useState({
-//     name: '',
-//     category: 'Gà Rán',
-//     price: '',
-//     status: 'ĐANG BÁN'
-//   });
-
-//   // ====== GỌI DỮ LIỆU TỪ MONGODB ======
-//   const fetchMenu = async () => {
-//     try {
-//       setLoading(true);
-//       const data = await menuService.getMenu();
-//       setMenuItems(data);
-//     } catch (error) {
-//       console.error("Lỗi tải thực đơn:", error);
-//       alert('Không thể tải dữ liệu thực đơn từ server');
-//     } finally {
-//       setLoading(false);
-//     }
-//   };
-
-//   // Chạy ngay khi mở trang
-//   useEffect(() => {
-//     fetchMenu();
-//   }, []);
-
-//   // ====== LƯU MÓN ĂN MỚI HOẶC CẬP NHẬT ======
-//   const handleFormSubmit = async (e) => {
-//     e.preventDefault();
-//     try {
-//       if (editingId) {
-//         const updated = await menuService.updateMenu(editingId, formData);
-//         setMenuItems(menuItems.map(item => (item._id === updated._id ? updated : item)));
-//         setEditingId(null);
-//       } else {
-//         const newItem = await menuService.createMenu(formData);
-//         setMenuItems([newItem, ...menuItems]);
-//       }
-      
-//       // Reset form
-//       setFormData({ name: '', category: 'Gà Rán', price: '', status: 'ĐANG BÁN' });
-//       alert("Lưu món ăn thành công!");
-//     } catch (error) {
-//       alert(error.response?.data?.message || 'Lỗi khi lưu món ăn');
-//     }
-//   };
-
-//   // ====== XÓA MÓN ĂN ======
-//   const handleDelete = async (id) => {
-//     if (window.confirm('Bạn có chắc chắn muốn xóa món này khỏi thực đơn?')) {
-//       try {
-//         await menuService.deleteMenu(id);
-//         setMenuItems(menuItems.filter(item => item._id !== id));
-//       } catch (error) {
-//         alert('Xóa thất bại');
-//       }
-//     }
-//   };
-
-//   // Bấm sửa món
-//   const handleEditClick = (item) => {
-//     setEditingId(item._id);
-//     setFormData({
-//       name: item.name,
-//       category: item.category,
-//       price: item.price,
-//       status: item.status
-//     });
-//   };
-
-//   // Nút Làm mới form
-//   const handleResetForm = (e) => {
-//     e.preventDefault();
-//     setEditingId(null);
-//     setFormData({ name: '', category: 'Gà Rán', price: '', status: 'ĐANG BÁN' });
-//   };
-
-//   // ====== XỬ LÝ XUẤT EXCEL ======
-//   const handleExportExcel = () => {
-//     const dataToExport = menuItems.map(item => ({
-//       'Mã Món': item._id,
-//       'Tên Món Ăn': item.name,
-//       'Danh Mục': item.category,
-//       'Giá Bán (VNĐ)': item.price,
-//       'Trạng Thái': item.status
-//     }));
-
-//     const worksheet = XLSX.utils.json_to_sheet(dataToExport);
-//     const workbook = XLSX.utils.book_new();
-//     XLSX.utils.book_append_sheet(workbook, worksheet, "Thực Đơn");
-//     XLSX.writeFile(workbook, "Danh_Sach_Thuc_Don.xlsx");
-//   };
-
-//   // ====== XỬ LÝ NHẬP EXCEL ======
-//   const handleImportExcel = async (e) => {
-//     const file = e.target.files[0];
-//     if (!file) return;
-
-//     const reader = new FileReader();
-//     reader.onload = async (event) => {
-//       try {
-//         const data = new Uint8Array(event.target.result);
-//         const workbook = XLSX.read(data, { type: 'array' });
-//         const sheetName = workbook.SheetNames[0];
-//         const worksheet = workbook.Sheets[sheetName];
-        
-//         const importedData = XLSX.utils.sheet_to_json(worksheet);
-        
-//         // Push từng dòng excel lên DB
-//         let successCount = 0;
-//         for (const item of importedData) {
-//             const newItemData = {
-//               name: item['Tên Món Ăn'] || 'Chưa có tên',
-//               category: item['Danh Mục'] || 'Khác',
-//               price: item['Giá Bán (VNĐ)'] || 0,
-//               status: item['Trạng Thái'] || 'TẠM NGƯNG'
-//             };
-//             await menuService.createMenu(newItemData);
-//             successCount++;
-//         }
-        
-//         alert(`Đã nhập thành công ${successCount} món ăn từ Excel lên Database!`);
-//         fetchMenu(); // Gọi lại API để load dữ liệu mới nhất
-//       } catch (error) {
-//         alert("Lỗi khi nhập dữ liệu Excel. Vui lòng kiểm tra định dạng file.");
-//         console.error(error);
-//       }
-      
-//       e.target.value = null;
-//     };
-//     reader.readAsArrayBuffer(file);
-//   };
-
-//   return (
-//     <div className="font-sans text-gray-800">
-      
-//       {/* ===== HEADER ===== */}
-//       <div className="flex flex-col md:flex-row justify-between items-start md:items-end mb-6 gap-4">
-//         <div>
-//           <h1 className="text-2xl font-bold text-gray-900 mb-1">Quản lý Thực đơn</h1>
-//           <p className="text-sm text-gray-500 m-0">Cập nhật và điều chỉnh danh sách món ăn trong hệ thống</p>
-//         </div>
-        
-//         <div className="flex items-center gap-3">
-//           <input type="file" ref={fileInputRef} onChange={handleImportExcel} accept=".xlsx, .xls" className="hidden" />
-          
-//           <button onClick={() => fileInputRef.current.click()} className="flex items-center gap-2 bg-emerald-50 text-emerald-600 px-4 py-2 rounded-lg text-sm font-semibold hover:bg-emerald-100 transition-colors border border-emerald-200">
-//             <Upload size={16} /> Nhập Excel
-//           </button>
-
-//           <button onClick={handleExportExcel} className="flex items-center gap-2 bg-gray-100 text-gray-700 px-4 py-2 rounded-lg text-sm font-semibold hover:bg-gray-200 transition-colors">
-//             <Download size={16} /> Xuất báo cáo
-//           </button>
-//         </div>
-//       </div>
-
-//       <div className="grid grid-cols-1 xl:grid-cols-12 gap-6">
-        
-//         {/* ===== CỘT TRÁI: FORM & STATS ===== */}
-//         <div className="xl:col-span-4 flex flex-col gap-6">
-          
-//           {/* Card Form */}
-//           <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
-//             <div className="flex items-center gap-2 mb-6">
-//               <List size={20} className="text-[#c0392b]" />
-//               <h3 className="text-lg font-bold text-gray-900 m-0">
-//                 {editingId ? 'Cập nhật món ăn' : 'Chi tiết món ăn'}
-//               </h3>
-//             </div>
-
-//             <form onSubmit={handleFormSubmit} className="flex flex-col gap-5">
-//               <div className="flex flex-col gap-1.5">
-//                 <label className="text-[11px] font-bold text-gray-500 uppercase tracking-wide">Tên món ăn</label>
-//                 <input 
-//                   type="text" 
-//                   value={formData.name}
-//                   onChange={(e) => setFormData({...formData, name: e.target.value})}
-//                   required
-//                   className="border-b border-gray-300 py-2 outline-none text-sm font-semibold focus:border-[#c0392b] transition-colors"
-//                 />
-//               </div>
-
-//               <div className="flex flex-col gap-1.5">
-//                 <label className="text-[11px] font-bold text-gray-500 uppercase tracking-wide">Danh mục</label>
-//                 <select 
-//                   value={formData.category}
-//                   onChange={(e) => setFormData({...formData, category: e.target.value})}
-//                   className="border-b border-gray-300 py-2 outline-none text-sm font-semibold text-gray-800 cursor-pointer focus:border-[#c0392b] transition-colors appearance-none bg-transparent"
-//                 >
-//                   <option value="Gà Rán">Gà Rán</option>
-//                   <option value="Burger">Burger</option>
-//                   <option value="Đồ uống">Đồ uống</option>
-//                   <option value="Món phụ">Món phụ</option>
-//                 </select>
-//               </div>
-
-//               <div className="grid grid-cols-2 gap-4">
-//                 <div className="flex flex-col gap-1.5">
-//                   <label className="text-[11px] font-bold text-gray-500 uppercase tracking-wide">Giá (VNĐ)</label>
-//                   <input 
-//                     type="number" 
-//                     value={formData.price}
-//                     onChange={(e) => setFormData({...formData, price: e.target.value})}
-//                     required
-//                     className="border-b border-gray-300 py-2 outline-none text-sm font-semibold focus:border-[#c0392b] transition-colors"
-//                   />
-//                 </div>
-//                 <div className="flex flex-col gap-1.5">
-//                   <label className="text-[11px] font-bold text-gray-500 uppercase tracking-wide">Trạng thái</label>
-//                   <select 
-//                     value={formData.status}
-//                     onChange={(e) => setFormData({...formData, status: e.target.value})}
-//                     className="border-b border-gray-300 py-2 outline-none text-sm font-semibold text-gray-800 cursor-pointer focus:border-[#c0392b] transition-colors appearance-none bg-transparent"
-//                   >
-//                     <option value="ĐANG BÁN">Đang bán</option>
-//                     <option value="TẠM NGƯNG">Tạm ngưng</option>
-//                   </select>
-//                 </div>
-//               </div>
-
-//               <div className="flex gap-3 mt-4">
-//                 <button type="button" onClick={handleResetForm} className="flex-1 py-2.5 rounded-lg text-sm font-bold text-gray-700 bg-gray-100 hover:bg-gray-200 transition-colors">
-//                   Làm mới
-//                 </button>
-//                 <button type="submit" className="flex-1 py-2.5 rounded-lg text-sm font-bold text-white bg-[#c0392b] hover:bg-red-800 transition-colors shadow-sm">
-//                   Lưu món ăn
-//                 </button>
-//               </div>
-//             </form>
-//           </div>
-
-//           {/* Card Thống kê */}
-//           <div className="bg-[#fdf0f0] rounded-xl p-6 relative overflow-hidden border border-red-50">
-//             <div className="relative z-10">
-//               <h4 className="text-[#c0392b] font-bold text-xs uppercase tracking-wider mb-2">Tổng số món ăn</h4>
-//               <div className="text-4xl font-black text-gray-900 mb-2">{menuItems.length}</div>
-//               <div className="flex items-center gap-1.5 text-xs font-semibold text-[#c0392b]">
-//                 <TrendingUp size={14} />
-//                 <span>Trạng thái hoạt động tốt</span>
-//               </div>
-//             </div>
-//             <Utensils size={100} className="absolute -bottom-4 -right-4 text-[#c0392b] opacity-10 rotate-12" />
-//           </div>
-
-//         </div>
-
-//         {/* ===== CỘT PHẢI: BẢNG DỮ LIỆU ===== */}
-//         <div className="xl:col-span-8 bg-white rounded-xl shadow-sm border border-gray-100 flex flex-col">
-          
-//           <div className="p-5 flex justify-between items-center border-b border-gray-100">
-//             <h3 className="text-base font-bold text-gray-900 m-0">Danh sách thực đơn</h3>
-//           </div>
-
-//           <div className="overflow-x-auto flex-1">
-//             <table className="w-full text-left border-collapse min-w-[600px]">
-//               <thead>
-//                 <tr className="bg-gray-50/50">
-//                   <th className="px-5 py-4 text-[11px] font-bold text-gray-500 uppercase tracking-wider">Mã món</th>
-//                   <th className="px-5 py-4 text-[11px] font-bold text-gray-500 uppercase tracking-wider">Tên món ăn</th>
-//                   <th className="px-5 py-4 text-[11px] font-bold text-gray-500 uppercase tracking-wider">Danh mục</th>
-//                   <th className="px-5 py-4 text-[11px] font-bold text-gray-500 uppercase tracking-wider">Giá bán</th>
-//                   <th className="px-5 py-4 text-[11px] font-bold text-gray-500 uppercase tracking-wider">Trạng thái</th>
-//                   <th className="px-5 py-4 text-[11px] font-bold text-gray-500 uppercase tracking-wider text-right">Thao tác</th>
-//                 </tr>
-//               </thead>
-//               <tbody>
-//                 {loading ? (
-//                   <tr><td colSpan="6" className="text-center py-10 text-gray-500">Đang tải dữ liệu...</td></tr>
-//                 ) : menuItems.length === 0 ? (
-//                   <tr><td colSpan="6" className="text-center py-10 text-gray-500">Chưa có món ăn nào trong thực đơn.</td></tr>
-//                 ) : (
-//                   menuItems.map((item) => (
-//                     <tr key={item._id} className="border-b border-gray-50 hover:bg-gray-50/50 transition-colors">
-//                       <td className="px-5 py-4 text-xs text-gray-400 font-mono">
-//                         {item._id.substring(item._id.length - 6).toUpperCase()}
-//                       </td>
-//                       <td className="px-5 py-4">
-//                         <span className="font-bold text-gray-800 text-sm">{item.name}</span>
-//                       </td>
-//                       <td className="px-5 py-4 text-sm text-gray-600">{item.category}</td>
-//                       <td className="px-5 py-4 text-sm font-bold text-[#c0392b]">
-//                         {Number(item.price).toLocaleString('vi-VN')}đ
-//                       </td>
-//                       <td className="px-5 py-4">
-//                         <span className={`px-2.5 py-1 rounded-full text-[10px] font-bold tracking-wide uppercase
-//                           ${item.status === 'ĐANG BÁN' ? 'bg-green-100 text-green-700' : 'bg-gray-200 text-gray-600'}`}
-//                         >
-//                           {item.status}
-//                         </span>
-//                       </td>
-//                       <td className="px-5 py-4 text-right">
-//                         <div className="flex justify-end gap-3">
-//                           <button onClick={() => handleEditClick(item)} className="text-[#3b82f6] hover:text-blue-800 transition-colors">
-//                             <Edit3 size={16} />
-//                           </button>
-//                           <button onClick={() => handleDelete(item._id)} className="text-[#ef4444] hover:text-red-800 transition-colors">
-//                             <Trash2 size={16} />
-//                           </button>
-//                         </div>
-//                       </td>
-//                     </tr>
-//                   ))
-//                 )}
-//               </tbody>
-//             </table>
-//           </div>
-//         </div>
-//       </div>
-//     </div>
-//   );
-// };
-
-// export default MenuManagementPage;
-
 import React, { useState, useEffect } from 'react';
 import { useCart } from '../../contexts/CartContext';
 import publicService from '../../services/publicService';
 import { useLocation } from 'react-router-dom';
 
+// Định nghĩa defaultImages
+const defaultImages = {
+  'Burger': '/images/home/product-burger.png',
+  'Gà Rán': '/images/home/product-chicken.png',
+  'Pizza': '/images/home/product-pizza.png',
+  'Đồ Uống': '/images/home/product-sandwich.png',
+  'Tráng Miệng': '/images/home/product-sandwich.png',
+  'Khai Vị': '/images/home/product-chicken.png',
+};
+
+const formatPrice = (val) => val.toLocaleString('vi-VN') + 'đ';
+
+// Định nghĩa cấu trúc danh mục UI
+const categoriesUI = [
+  { id: 'all', label: 'Tất cả' },
+  { id: 'burger', label: 'Burger', dbCats: ['Burger'] },
+  { id: 'garan', label: 'Gà rán', dbCats: ['Gà Rán'] },
+  { id: 'ankem', label: 'Món ăn kèm', dbCats: ['Pizza', 'Khai Vị', 'Tráng Miệng', 'Combo'] },
+  { id: 'douong', label: 'Đồ uống', dbCats: ['Đồ Uống'] }
+];
+
 const MenuPage = () => {
   const [menuItems, setMenuItems] = useState([]);
-  const [categories, setCategories] = useState(['Tất cả']);
-  const [selectedCategory, setSelectedCategory] = useState('Tất cả');
+  const [selectedCatIds, setSelectedCatIds] = useState(['all']);
   const [search, setSearch] = useState('');
+  const [sortBy, setSortBy] = useState('popular');
+  const [minPriceInput, setMinPriceInput] = useState('0');
+  const [maxPriceInput, setMaxPriceInput] = useState('500.000');
+  const [onlyAvailable, setOnlyAvailable] = useState(true);
+  const [toast, setToast] = useState({ show: false, message: '' });
+
   const { addItem } = useCart();
   const location = useLocation();
 
   useEffect(() => {
     publicService.getMenu().then(data => {
-      setMenuItems(data);
-      const cats = ['Tất cả', ...new Set(data.map(item => item.category))];
-      setCategories(cats);
+      setMenuItems(data || []);
     });
   }, []);
 
@@ -355,69 +47,351 @@ const MenuPage = () => {
   useEffect(() => {
     const params = new URLSearchParams(location.search);
     const cat = params.get('category');
-    if (cat) setSelectedCategory(cat);
+    if (cat) {
+      const foundUI = categoriesUI.find(ui => ui.dbCats?.includes(cat));
+      if (foundUI) {
+        setSelectedCatIds([foundUI.id]);
+      }
+    }
   }, [location]);
 
-  const filteredMenu = menuItems.filter(item => {
-    const matchCategory = selectedCategory === 'Tất cả' || item.category === selectedCategory;
-    const matchSearch = item.name.toLowerCase().includes(search.toLowerCase());
-    return matchCategory && matchSearch;
+  const handleCategoryToggle = (id) => {
+    if (id === 'all') {
+      setSelectedCatIds(['all']);
+    } else {
+      let next = selectedCatIds.filter(x => x !== 'all');
+      if (next.includes(id)) {
+        next = next.filter(x => x !== id);
+      } else {
+        next.push(id);
+      }
+      if (next.length === 0) {
+        setSelectedCatIds(['all']);
+      } else {
+        setSelectedCatIds(next);
+      }
+    }
+  };
+
+  const parsePrice = (str) => {
+    const cleanStr = str.replace(/[^0-9]/g, '');
+    return cleanStr ? parseInt(cleanStr, 10) : 0;
+  };
+
+  const handlePriceChange = (val, isMin) => {
+    // Chỉ giữ lại số
+    const num = val.replace(/[^0-9]/g, '');
+    let formatted = '';
+    if (num) {
+      formatted = parseInt(num, 10).toLocaleString('vi-VN');
+    }
+    
+    if (isMin) {
+      setMinPriceInput(formatted ? formatted + 'đ' : '0đ');
+    } else {
+      setMaxPriceInput(formatted ? formatted + 'đ' : '');
+    }
+  };
+
+  const handleAddToCart = (item) => {
+    addItem(item, 1);
+    setToast({ show: true, message: `Đã thêm "${item.name}" vào giỏ hàng!` });
+    setTimeout(() => {
+      setToast({ show: false, message: '' });
+    }, 2500);
+  };
+
+  // Trích lọc dữ liệu và trang trí (badges, out of stock)
+  const filteredMenu = menuItems.map((item, idx) => {
+    let badge = null;
+    if (item.name === 'Burger Bò Đặc Biệt' || item.name === 'Pizza Pepperoni') {
+      badge = 'PHỔ BIẾN';
+    } else if (item.name.toLowerCase().includes('cay')) {
+      badge = 'CAY';
+    } else if (item.name === 'Khoai Tây Chiên' || item.name === 'Sinh Tố Bơ') {
+      badge = 'MỚI';
+    }
+
+    let status = 'ĐANG BÁN';
+    if (item.name === 'Burger Phô Mai Đôi' || item.name === 'Bánh Flan Trứng') {
+      status = 'HẾT HÀNG';
+    }
+
+    // Gán ảnh chuẩn hoặc fallback
+    const resolvedImage = item.image 
+      ? (item.image.startsWith('data:image') || item.image.startsWith('/images') ? item.image : `http://localhost:5000${item.image}`) 
+      : defaultImages[item.category] || '/images/home/product-burger.png';
+
+    return {
+      ...item,
+      badge,
+      status,
+      resolvedImage,
+    };
+  }).filter(item => {
+    // 1. Tìm kiếm tên/mô tả
+    const matchSearch = item.name.toLowerCase().includes(search.toLowerCase()) ||
+                        (item.description && item.description.toLowerCase().includes(search.toLowerCase()));
+
+    // 2. Lọc category checklist
+    let matchCategory = false;
+    if (selectedCatIds.includes('all')) {
+      matchCategory = true;
+    } else {
+      const activeCats = categoriesUI.filter(ui => selectedCatIds.includes(ui.id));
+      const allowedDbCats = activeCats.flatMap(ui => ui.dbCats || []);
+      matchCategory = allowedDbCats.includes(item.category);
+    }
+
+    // 3. Lọc khoảng giá
+    const parsedMin = parsePrice(minPriceInput);
+    const parsedMax = parsePrice(maxPriceInput);
+    const matchPrice = item.price >= parsedMin && (parsedMax === 0 || item.price <= parsedMax);
+
+    // 4. Lọc trạng thái "Chỉ còn hàng"
+    const matchAvailability = !onlyAvailable || item.status === 'ĐANG BÁN';
+
+    return matchSearch && matchCategory && matchPrice && matchAvailability;
+  });
+
+  // Sắp xếp
+  const sortedMenu = [...filteredMenu].sort((a, b) => {
+    if (sortBy === 'price-asc') return a.price - b.price;
+    if (sortBy === 'price-desc') return b.price - a.price;
+    if (sortBy === 'popular') {
+      const aVal = a.badge === 'PHỔ BIẾN' ? 1 : 0;
+      const bVal = b.badge === 'PHỔ BIẾN' ? 1 : 0;
+      return bVal - aVal;
+    }
+    return 0;
   });
 
   return (
-    <div style={{ padding: '20px', maxWidth: '1200px', margin: '0 auto' }}>
-      <h1 style={{ textAlign: 'center' }}>Thực Đơn</h1>
-      <div style={{ display: 'flex', gap: '10px', marginBottom: '20px', justifyContent: 'center' }}>
-        <input
-          type="text"
-          placeholder="Tìm món..."
-          value={search}
-          onChange={e => setSearch(e.target.value)}
-          style={{ padding: '10px', width: '300px', borderRadius: '8px', border: '1px solid #ddd' }}
-        />
-        <select
-          value={selectedCategory}
-          onChange={e => setSelectedCategory(e.target.value)}
-          style={{ padding: '10px', borderRadius: '8px', border: '1px solid #ddd' }}
-        >
-          {categories.map(cat => <option key={cat} value={cat}>{cat}</option>)}
-        </select>
-      </div>
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(250px, 1fr))', gap: '20px' }}>
-        {filteredMenu.map(item => (
-          <div key={item._id} style={{
-            background: '#fff',
-            borderRadius: '12px',
-            overflow: 'hidden',
-            boxShadow: '0 2px 8px rgba(0,0,0,0.1)',
-            cursor: 'pointer',
-            transition: 'transform 0.2s'
-          }} onClick={() => addItem(item, 1)}>
-            <img
-              src={item.image ? (item.image.startsWith('data:image') ? item.image : `http://localhost:5000${item.image}`) : 'https://via.placeholder.com/300x200?text=No+Image'}
-              alt={item.name}
-              style={{ width: '100%', height: '200px', objectFit: 'cover' }}
-            />
-            <div style={{ padding: '15px' }}>
-              <h3 style={{ margin: '0 0 10px' }}>{item.name}</h3>
-              <p style={{ color: '#666', margin: '0 0 10px' }}>{item.description}</p>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                <span style={{ fontSize: '20px', fontWeight: 'bold', color: '#e74c3c' }}>
-                  {item.price.toLocaleString()}₫
+    <div className="bg-[#f8f9fa] min-h-screen py-10">
+      <div className="max-w-[1240px] mx-auto px-5 flex flex-col md:flex-row gap-8">
+        
+        {/* ===================== SIDEBAR BỘ LỌC ===================== */}
+        <aside className="w-full md:w-[260px] shrink-0">
+          <div className="bg-white rounded-3xl border border-gray-100 p-6 shadow-sm sticky top-24">
+            <h2 className="text-xl font-black text-gray-800 mb-6 border-b border-gray-100 pb-3 tracking-tight">
+              Bộ lọc
+            </h2>
+
+            {/* Mục 1: DANH MỤC */}
+            <div className="mb-8">
+              <h3 className="text-xs font-black text-gray-400 uppercase tracking-wider mb-4">
+                DANH MỤC
+              </h3>
+              <div className="flex flex-col gap-3.5">
+                {categoriesUI.map(cat => {
+                  const isChecked = selectedCatIds.includes(cat.id);
+                  return (
+                    <label key={cat.id} className="flex items-center gap-3 cursor-pointer group select-none">
+                      <input
+                        type="checkbox"
+                        checked={isChecked}
+                        onChange={() => handleCategoryToggle(cat.id)}
+                        className="w-[18px] h-[18px] rounded border-gray-300 text-[#c0392b] focus:ring-[#c0392b] accent-[#c0392b] cursor-pointer"
+                      />
+                      <span className={`text-[14px] font-bold group-hover:text-[#c0392b] transition-colors ${isChecked ? 'text-gray-800' : 'text-gray-500'}`}>
+                        {cat.label}
+                      </span>
+                    </label>
+                  );
+                })}
+              </div>
+            </div>
+
+            {/* Mục 2: MỨC GIÁ */}
+            <div className="mb-8">
+              <h3 className="text-xs font-black text-gray-400 uppercase tracking-wider mb-4">
+                MỨC GIÁ
+              </h3>
+              <div className="flex items-center gap-2">
+                <input
+                  type="text"
+                  value={minPriceInput}
+                  onChange={(e) => handlePriceChange(e.target.value, true)}
+                  className="w-full text-[13px] font-bold text-gray-700 bg-gray-50 border border-gray-100 rounded-xl px-3 py-2 outline-none focus:border-[#c0392b] focus:bg-white transition-all text-center"
+                  placeholder="Từ"
+                />
+                <span className="text-gray-400 font-bold">-</span>
+                <input
+                  type="text"
+                  value={maxPriceInput}
+                  onChange={(e) => handlePriceChange(e.target.value, false)}
+                  className="w-full text-[13px] font-bold text-gray-700 bg-gray-50 border border-gray-100 rounded-xl px-3 py-2 outline-none focus:border-[#c0392b] focus:bg-white transition-all text-center"
+                  placeholder="Đến"
+                />
+              </div>
+            </div>
+
+            {/* Mục 3: TRẠNG THÁI */}
+            <div>
+              <h3 className="text-xs font-black text-gray-400 uppercase tracking-wider mb-4">
+                TRẠNG THÁI
+              </h3>
+              <label className="flex items-center gap-3 cursor-pointer group select-none">
+                <input
+                  type="checkbox"
+                  checked={onlyAvailable}
+                  onChange={(e) => setOnlyAvailable(e.target.checked)}
+                  className="w-[18px] h-[18px] rounded border-gray-300 text-[#c0392b] focus:ring-[#c0392b] accent-[#c0392b] cursor-pointer"
+                />
+                <span className={`text-[14px] font-bold group-hover:text-[#c0392b] transition-colors ${onlyAvailable ? 'text-gray-800' : 'text-gray-500'}`}>
+                  Chỉ còn hàng
                 </span>
-                <button style={{
-                  background: '#27ae60',
-                  color: 'white',
-                  border: 'none',
-                  padding: '8px 15px',
-                  borderRadius: '8px',
-                  cursor: 'pointer'
-                }}>+ Thêm</button>
+              </label>
+            </div>
+
+          </div>
+        </aside>
+
+        {/* ===================== KHU VỰC THỰC ĐƠN ===================== */}
+        <main className="flex-1">
+          
+          {/* THANH TOP BAR */}
+          <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-4 mb-8">
+            <div className="relative flex-1 max-w-lg">
+              <span className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none text-gray-400">
+                <svg className="w-5 h-5" fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                </svg>
+              </span>
+              <input
+                type="text"
+                placeholder="Tìm kiếm món ăn ngon..."
+                className="w-full pl-11 pr-4 py-3 bg-white border border-gray-100 rounded-full shadow-sm outline-none text-[14px] font-semibold text-gray-700 focus:border-[#c0392b] focus:shadow-md transition-all"
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+              />
+            </div>
+
+            <div className="flex items-center gap-3 shrink-0 justify-end">
+              <span className="text-[13px] font-extrabold text-gray-400 uppercase tracking-wider">
+                Sắp xếp theo:
+              </span>
+              <div className="relative">
+                <select
+                  value={sortBy}
+                  onChange={(e) => setSortBy(e.target.value)}
+                  className="appearance-none bg-white border border-gray-100 rounded-2xl px-4 py-2.5 pr-10 text-[14px] font-bold text-gray-700 outline-none shadow-sm focus:border-[#c0392b] transition-all cursor-pointer select-none"
+                >
+                  <option value="popular">Phổ biến</option>
+                  <option value="price-asc">Giá tăng dần</option>
+                  <option value="price-desc">Giá giảm dần</option>
+                </select>
+                <span className="absolute inset-y-0 right-0 pr-3.5 flex items-center pointer-events-none text-gray-400">
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
+                  </svg>
+                </span>
               </div>
             </div>
           </div>
-        ))}
+
+          {/* GRID DANH SÁCH MÓN */}
+          {sortedMenu.length === 0 ? (
+            <div className="bg-white rounded-3xl border border-gray-100 p-12 text-center shadow-sm">
+              <span className="text-5xl block mb-4">🍔</span>
+              <h3 className="text-[18px] font-black text-gray-800 mb-1">Không tìm thấy món ăn nào</h3>
+              <p className="text-gray-400 text-sm">Vui lòng điều chỉnh lại bộ lọc hoặc từ khóa tìm kiếm</p>
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+              {sortedMenu.map(item => {
+                const isOutOfStock = item.status === 'HẾT HÀNG';
+                
+                return (
+                  <div 
+                    key={item._id} 
+                    className="bg-white rounded-3xl border border-gray-100 overflow-hidden shadow-sm hover:shadow-xl hover:-translate-y-1 transition-all duration-300 flex flex-col group"
+                  >
+                    {/* KHU VỰC ẢNH */}
+                    <div className="h-[200px] overflow-hidden relative bg-gray-50 shrink-0">
+                      <img
+                        src={item.resolvedImage}
+                        alt={item.name}
+                        className={`w-full h-full object-cover group-hover:scale-105 transition-transform duration-500 ${isOutOfStock ? 'grayscale blur-[1px] opacity-60' : ''}`}
+                      />
+                      
+                      {/* Badge Top Left */}
+                      {item.badge && !isOutOfStock && (
+                        <span className={`absolute top-3 left-3 text-[10px] font-black uppercase px-3 py-1 rounded-full tracking-wider shadow-sm text-white ${
+                          item.badge === 'PHỔ BIẾN' ? 'bg-[#c0392b]' :
+                          item.badge === 'CAY' ? 'bg-[#e67e22]' : 'bg-[#2980b9]'
+                        }`}>
+                          {item.badge}
+                        </span>
+                      )}
+
+                      {/* Phủ Hết Hàng */}
+                      {isOutOfStock && (
+                        <div className="absolute inset-0 flex items-center justify-center bg-black/20 backdrop-blur-[0.5px]">
+                          <span className="bg-white/95 text-gray-800 text-[11px] font-black uppercase px-4 py-1.5 rounded-full shadow-md tracking-wider">
+                            Hết hàng
+                          </span>
+                        </div>
+                      )}
+                    </div>
+
+                    {/* KHU VỰC THÔNG TIN */}
+                    <div className="p-5 flex-1 flex flex-col justify-between">
+                      <div>
+                        <div className="flex items-start justify-between gap-2 mb-2">
+                          <h3 className="text-[16px] font-extrabold text-gray-800 leading-snug line-clamp-2 pr-1">
+                            {item.name}
+                          </h3>
+                          <span className="text-[#c0392b] font-black text-[17px] shrink-0">
+                            {formatPrice(item.price)}
+                          </span>
+                        </div>
+                        <p className="text-gray-400 text-xs leading-relaxed line-clamp-2 h-8">
+                          {item.description}
+                        </p>
+                      </div>
+
+                      {/* NÚT THAO TÁC */}
+                      {isOutOfStock ? (
+                        <button
+                          disabled
+                          className="w-full mt-4 py-3 bg-gray-100 text-gray-400 rounded-2xl flex items-center justify-center text-sm font-extrabold cursor-not-allowed border border-gray-200"
+                        >
+                          Ngừng bán
+                        </button>
+                      ) : (
+                        <button
+                          onClick={() => handleAddToCart(item)}
+                          className="w-full mt-4 py-3 bg-[#c0392b] text-white rounded-2xl flex items-center justify-center gap-2 text-sm font-extrabold hover:bg-[#a93226] transition-all duration-300 shadow-md hover:shadow-lg focus:outline-none cursor-pointer"
+                        >
+                          <svg className="w-5 h-5" fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" d="M3 3h2l.4 2M7 13h10l4-8H5.4M7 13L5.4 5M7 13l-2.293 2.293c-.63.63-.184 1.707.707 1.707H17m0 0a2 2 0 100 4 2 2 0 000-4zm-8 2a2 2 0 11-4 0 2 2 0 014 0z" />
+                          </svg>
+                          Thêm vào giỏ hàng
+                        </button>
+                      )}
+                    </div>
+
+                  </div>
+                );
+              })}
+            </div>
+          )}
+          
+        </main>
+
       </div>
+
+      {/* ===== TOAST NOTIFICATION ===== */}
+      {toast.show && (
+        <div className="fixed bottom-6 right-6 z-50 bg-slate-900 text-white px-5 py-3.5 rounded-xl shadow-2xl flex items-center gap-3 border border-slate-700 animate-bounce duration-300">
+          <div className="w-5 h-5 rounded-full bg-emerald-500 flex items-center justify-center text-white text-[11px] font-bold">
+            ✓
+          </div>
+          <span className="text-sm font-medium">{toast.message}</span>
+        </div>
+      )}
+
     </div>
   );
 };
