@@ -7,15 +7,14 @@ const {
   updateCustomer,
   deleteCustomer
 } = require('../controllers/customerController');
+const { validateCustomerCreate, validateCustomerUpdate } = require('../middleware/validationMiddleware');
 
-// GET và POST đều yêu cầu đăng nhập, staff cũng có thể thêm khách hàng mới khi bán hàng
 router.route('/')
   .get(protect, authorize('admin', 'staff'), getCustomers)
-  .post(protect, authorize('admin', 'staff'), createCustomer);
+  .post(protect, authorize('admin', 'staff'), validateCustomerCreate, createCustomer);
 
-// PUT và DELETE: chỉ Admin mới được xóa, sửa thì admin+staff
 router.route('/:id')
-  .put(protect, authorize('admin', 'staff'), updateCustomer)
+  .put(protect, authorize('admin', 'staff'), validateCustomerUpdate, updateCustomer)
   .delete(protect, authorize('admin'), deleteCustomer);
 
 module.exports = router;

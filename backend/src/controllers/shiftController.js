@@ -158,7 +158,7 @@ const closeShift = async (req, res) => {
         // Tính tổng tiền mặt từ các đơn hàng trong khoảng thời gian ca
         const orders = await Order.find({
             paymentMethod: 'cash',
-            status: { $in: 'cancelled' },
+            status: { $in: ['confirmed', 'completed'] },
             createdAt: { $gte: shift.startTime, $lte: req.body.endTime || new Date() },
         });
 

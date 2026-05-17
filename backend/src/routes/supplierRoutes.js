@@ -11,21 +11,24 @@ const {
   getPurchases,
   payDebt
 } = require('../controllers/supplierController');
+const {
+  validateSupplierCreate,
+  validateSupplierUpdate,
+  validatePurchaseCreate,
+  validatePayDebt
+} = require('../middleware/validationMiddleware');
 
-// Purchase
-router.post('/purchase', protect, authorize('admin'), createPurchase);
-router.get('/purchases', protect, authorize('admin'), getPurchases); // Có thể tách route riêng nếu muốn
-// Thanh toán công nợ (PUT)
-router.put('/:id/pay-debt', protect, authorize('admin'), payDebt);
+router.post('/purchase', protect, authorize('admin'), validatePurchaseCreate, createPurchase);
+router.get('/purchases', protect, authorize('admin'), getPurchases);
+router.put('/:id/pay-debt', protect, authorize('admin'), validatePayDebt, payDebt);
 
-// CRUD Supplier
 router.route('/')
   .get(protect, authorize('admin'), getSuppliers)
-  .post(protect, authorize('admin'), createSupplier);
+  .post(protect, authorize('admin'), validateSupplierCreate, createSupplier);
 
 router.route('/:id')
   .get(protect, authorize('admin'), getSupplierById)
-  .put(protect, authorize('admin'), updateSupplier)
+  .put(protect, authorize('admin'), validateSupplierUpdate, updateSupplier)
   .delete(protect, authorize('admin'), deleteSupplier);
 
 module.exports = router;

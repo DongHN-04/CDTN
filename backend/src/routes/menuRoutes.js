@@ -2,13 +2,14 @@ const express = require('express');
 const router = express.Router();
 const { protect, authorize } = require('../middleware/authMiddleware');
 const { getMenuItems, createMenuItem, updateMenuItem, deleteMenuItem } = require('../controllers/menuController');
+const { validateMenuItemCreate, validateMenuItemUpdate } = require('../middleware/validationMiddleware');
 
-// Cho phép cả admin và staff xem menu (dùng chung route sau này), nhưng chỉ admin mới thêm/sửa/xóa
 router.route('/')
-  .get(protect, getMenuItems) // không authorize admin vì staff cũng cần xem
-  .post(protect, authorize('admin'), createMenuItem);
+  .get(protect, getMenuItems)
+  .post(protect, authorize('admin'), validateMenuItemCreate, createMenuItem);
+
 router.route('/:id')
-  .put(protect, authorize('admin'), updateMenuItem)
+  .put(protect, authorize('admin'), validateMenuItemUpdate, updateMenuItem)
   .delete(protect, authorize('admin'), deleteMenuItem);
 
 module.exports = router;

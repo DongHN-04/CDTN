@@ -7,14 +7,14 @@ const {
   deleteUser
 } = require('../controllers/userController');
 const { protect, authorize } = require('../middleware/authMiddleware');
+const { validateUserCreate, validateUserUpdate } = require('../middleware/validationMiddleware');
 
-// Tất cả các route đều yêu cầu đăng nhập và quyền admin
 router.route('/')
   .get(protect, authorize('admin'), getUsers)
-  .post(protect, authorize('admin'), createUser);
+  .post(protect, authorize('admin'), validateUserCreate, createUser);
 
 router.route('/:id')
-  .put(protect, authorize('admin'), updateUser)
+  .put(protect, authorize('admin'), validateUserUpdate, updateUser)
   .delete(protect, authorize('admin'), deleteUser);
 
 module.exports = router;

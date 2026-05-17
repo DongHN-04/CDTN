@@ -14,6 +14,9 @@ import RoleBasedRoute from './components/RoleBasedRoute';
 import HomePage from './pages/customer/HomePage';
 import MenuPage from './pages/customer/MenuPage';
 import CartPage from './pages/customer/CartPage';
+import PromotionsPage from './pages/customer/PromotionsPage';
+import AboutPage from './pages/customer/AboutPage';
+import ContactPage from './pages/customer/ContactPage';
 import LoginPage from './pages/LoginPage';
 import RegisterPage from './pages/RegisterPage';
 import NotFoundPage from './pages/NotFoundPage';
@@ -49,6 +52,9 @@ function App() {
             <Route element={<CustomerLayout />}>
               <Route path="/" element={<HomePage />} />
               <Route path="/menu" element={<MenuPage />} />
+              <Route path="/promotions" element={<PromotionsPage />} />
+              <Route path="/about" element={<AboutPage />} />
+              <Route path="/contact" element={<ContactPage />} />
               <Route path="/cart" element={<CartPage />} />
               <Route path="/login" element={<LoginPage />} />
               <Route path="/register" element={<RegisterPage />} />

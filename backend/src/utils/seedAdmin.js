@@ -2,23 +2,32 @@ const User = require('../models/User');
 
 const seedAdmin = async () => {
   try {
-    // Kiểm tra xem đã có admin chưa
     const adminExists = await User.findOne({ role: 'admin' });
 
-    if (!adminExists) {
-      // Tạo admin mặc định
-      await User.create({
-        name: 'Admin',
-        email: 'admin@gmail.com',
-        password: '123456',
-        role: 'admin',
-      });
-      console.log('✅ Tài khoản admin mặc định đã được tạo: admin@gmail.com / 123456');
-    } else {
-      console.log('✅ Admin đã tồn tại, không cần tạo mới.');
+    if (adminExists) {
+      console.log('Admin da ton tai, khong can tao moi.');
+      return;
     }
+
+    const adminEmail = process.env.ADMIN_EMAIL;
+    const adminPassword = process.env.ADMIN_PASSWORD;
+
+    // Khong hard-code mat khau admin trong source code.
+    if (!adminEmail || !adminPassword) {
+      console.warn('Chua tao admin mac dinh vi thieu ADMIN_EMAIL hoac ADMIN_PASSWORD trong .env');
+      return;
+    }
+
+    await User.create({
+      name: process.env.ADMIN_NAME || 'Admin',
+      email: adminEmail,
+      password: adminPassword,
+      role: 'admin',
+    });
+
+    console.log(`Da tao tai khoan admin mac dinh: ${adminEmail}`);
   } catch (error) {
-    console.error('❌ Lỗi khi seed admin:', error.message);
+    console.error('Loi khi seed admin:', error.message);
   }
 };
 

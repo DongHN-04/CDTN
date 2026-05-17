@@ -1,9 +1,11 @@
 import React, { useState, useEffect } from 'react';
+import { ErrorBox } from '../utils/apiError';
 
-const SupplierForm = ({ supplier, onSubmit, onCancel }) => {
+const SupplierForm = ({ supplier, onSubmit, onCancel, error }) => {
   const [form, setForm] = useState({
     name: '', contactPerson: '', phone: '', email: '', address: '', notes: ''
   });
+  const [localError, setLocalError] = useState('');
 
   useEffect(() => {
     if (supplier) {
@@ -15,30 +17,36 @@ const SupplierForm = ({ supplier, onSubmit, onCancel }) => {
         address: supplier.address || '',
         notes: supplier.notes || ''
       });
+    } else {
+      setForm({ name: '', contactPerson: '', phone: '', email: '', address: '', notes: '' });
     }
+    setLocalError('');
   }, [supplier]);
 
   const handleChange = e => setForm({ ...form, [e.target.name]: e.target.value });
 
   const handleSubmit = e => {
     e.preventDefault();
+    setLocalError('');
+    if (!form.name.trim()) return setLocalError('name: Ten nha cung cap la bat buoc');
     onSubmit(form);
   };
 
   return (
     <div style={overlayStyle}>
       <div style={modalStyle}>
-        <h3>{supplier ? 'Sửa nhà cung cấp' : 'Thêm nhà cung cấp'}</h3>
+        <h3>{supplier ? 'Sua nha cung cap' : 'Them nha cung cap'}</h3>
+        <ErrorBox message={localError || error} />
         <form onSubmit={handleSubmit}>
-          <input name="name" placeholder="Tên *" value={form.name} onChange={handleChange} required style={inputStyle} />
-          <input name="contactPerson" placeholder="Người liên hệ" value={form.contactPerson} onChange={handleChange} style={inputStyle} />
-          <input name="phone" placeholder="SĐT" value={form.phone} onChange={handleChange} style={inputStyle} />
+          <input name="name" placeholder="Ten *" value={form.name} onChange={handleChange} style={inputStyle} />
+          <input name="contactPerson" placeholder="Nguoi lien he" value={form.contactPerson} onChange={handleChange} style={inputStyle} />
+          <input name="phone" placeholder="SDT" value={form.phone} onChange={handleChange} style={inputStyle} />
           <input name="email" placeholder="Email" value={form.email} onChange={handleChange} style={inputStyle} />
-          <input name="address" placeholder="Địa chỉ" value={form.address} onChange={handleChange} style={inputStyle} />
-          <textarea name="notes" placeholder="Ghi chú" value={form.notes} onChange={handleChange} style={inputStyle} rows={2} />
+          <input name="address" placeholder="Dia chi" value={form.address} onChange={handleChange} style={inputStyle} />
+          <textarea name="notes" placeholder="Ghi chu" value={form.notes} onChange={handleChange} style={inputStyle} rows={2} />
           <div style={{ textAlign: 'right', marginTop: 10 }}>
-            <button type="submit" style={btnPrimary}>Lưu</button>
-            <button type="button" onClick={onCancel} style={btnSecondary}>Hủy</button>
+            <button type="submit" style={btnPrimary}>Luu</button>
+            <button type="button" onClick={onCancel} style={btnSecondary}>Huy</button>
           </div>
         </form>
       </div>

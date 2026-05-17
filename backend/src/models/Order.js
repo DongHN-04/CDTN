@@ -19,6 +19,8 @@ const orderSchema = new mongoose.Schema({
   discount: { type: Number, default: 0 },
   total: { type: Number, required: true },
   paymentMethod: { type: String, enum: ['cash', 'card', 'qr'], default: 'cash' },
+  paymentStatus: { type: String, enum: ['unpaid', 'paid', 'failed'], default: 'unpaid' },
+  txnRef: { type: String, default: '' },
   status: {
     type: String,
     enum: ['pending', 'confirmed', 'completed', 'cancelled'],

@@ -2,10 +2,8 @@ const multer = require('multer');
 const path = require('path');
 const fs = require('fs');
 
-// Xác định đường dẫn tuyệt đối đến thư mục uploads (cùng cấp với src)
 const uploadDir = path.join(__dirname, '..', '..', 'uploads');
 
-// Tự động tạo thư mục nếu chưa tồn tại
 if (!fs.existsSync(uploadDir)) {
   fs.mkdirSync(uploadDir, { recursive: true });
 }
@@ -16,16 +14,21 @@ const storage = multer.diskStorage({
   },
   filename: (req, file, cb) => {
     const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
-    const ext = path.extname(file.originalname);
+    const ext = path.extname(file.originalname).toLowerCase();
     cb(null, uniqueSuffix + ext);
   }
 });
 
 const fileFilter = (req, file, cb) => {
-  if (file.mimetype.startsWith('image/')) {
+  const allowedMimeTypes = ['image/jpeg', 'image/png', 'image/webp'];
+  const allowedExts = ['.jpg', '.jpeg', '.png', '.webp'];
+  const ext = path.extname(file.originalname).toLowerCase();
+
+  // Chi cho phep dinh dang bitmap an toan; khong nhan SVG/file gia mimetype.
+  if (allowedMimeTypes.includes(file.mimetype) && allowedExts.includes(ext)) {
     cb(null, true);
   } else {
-    cb(new Error('Chỉ chấp nhận file ảnh'), false);
+    cb(new Error('Chi chap nhan anh JPG, PNG hoac WEBP'), false);
   }
 };
 
@@ -39,8 +42,9 @@ const uploadImage = upload.single('image');
 
 const uploadMenuItemImage = (req, res) => {
   if (!req.file) {
-    return res.status(400).json({ message: 'Vui lòng chọn file ảnh' });
+    return res.status(400).json({ message: 'Vui long chon file anh' });
   }
+
   const imageUrl = `/uploads/${req.file.filename}`;
   res.json({ image: imageUrl });
 };

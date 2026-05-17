@@ -10,24 +10,24 @@ const {
   closeShift,
   deleteShift
 } = require('../controllers/shiftController');
+const {
+  validateShiftCreate,
+  validateShiftUpdate,
+  validateAssignStaff,
+  validateCloseShift
+} = require('../middleware/validationMiddleware');
 
-// 1. Route cho nhân viên xem ca của mình (đặt trước tất cả)
 router.get('/mine', protect, authorize('admin', 'staff'), getMyShifts);
 
-// 2. Route chính cho Admin (GET và POST)
 router.route('/')
   .get(protect, authorize('admin'), getShifts)
-  .post(protect, authorize('admin'), createShift);
+  .post(protect, authorize('admin'), validateShiftCreate, createShift);
 
-// 3. Route phân ca (PUT /:id/assign)
-router.put('/:id/assign', protect, authorize('admin'), assignStaff);
+router.put('/:id/assign', protect, authorize('admin'), validateAssignStaff, assignStaff);
+router.put('/:id/close', protect, validateCloseShift, closeShift);
 
-// 4. Route đóng ca (PUT /:id/close)
-router.put('/:id/close', protect, closeShift);
-
-// 5. Route với :id (phải đặt cuối cùng)
 router.route('/:id')
-  .put(protect, authorize('admin'), updateShift)
+  .put(protect, authorize('admin'), validateShiftUpdate, updateShift)
   .delete(protect, authorize('admin'), deleteShift);
 
 module.exports = router;
