@@ -102,10 +102,11 @@ const HomePage = () => {
       .catch(() => {});
   }, []);
 
-  // Lấy 4 món đầu tiên làm best sellers
   const bestSellers = featured.slice(0, 4).map((item, idx) => ({
     ...item,
-    image: item.image || defaultImages[item.category] || '/images/home/product-burger.png',
+    image: item.image 
+      ? (item.image.startsWith('data:image') || item.image.startsWith('/images') ? item.image : `http://localhost:5000${item.image}`) 
+      : defaultImages[item.category] || '/images/home/product-burger.png',
     badge: autoBadges[idx] || null,
     rating: [4.8, 4.9, 4.7, 4.6][idx] || 4.5,
     oldPrice: idx === 2 ? Math.round(item.price * 1.25) : null,
