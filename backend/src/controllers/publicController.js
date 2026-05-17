@@ -28,7 +28,7 @@ const getMenu = async (req, res) => {
 // @access  Public
 const createOrder = async (req, res) => {
   try {
-    const { customer, items, tableNumber, notes } = req.body;
+    const { customer, items, tableNumber, notes, paymentMethod, discount } = req.body;
     if (!items || items.length === 0) {
       return res.status(400).json({ message: 'Giỏ hàng trống' });
     }
@@ -62,11 +62,21 @@ const createOrder = async (req, res) => {
       }
     }
 
+    // Ánh xạ paymentMethod gửi lên sang enum trong DB: ['cash', 'card', 'qr']
+    let dbPaymentMethod = 'cash';
+    if (paymentMethod === 'vnpay') dbPaymentMethod = 'card';
+    else if (paymentMethod === 'momo') dbPaymentMethod = 'qr';
+
+    const orderDiscount = Number(discount) || 0;
+    const finalTotal = Math.max(0, subtotal - orderDiscount);
+
     const order = await Order.create({
-      customer: customer || { name: 'Khách lẻ', phone: '' },
+      customer: customer || { name: 'Khách lẻ', phone: '', address: '' },
       items: orderItems,
       subtotal,
-      total: subtotal,
+      discount: orderDiscount,
+      total: finalTotal,
+      paymentMethod: dbPaymentMethod,
       tableNumber: tableNumber || '',
       notes: notes || '',
       isCustomerOrder: true,

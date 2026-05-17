@@ -14,6 +14,7 @@ import RoleBasedRoute from './components/RoleBasedRoute';
 import HomePage from './pages/customer/HomePage';
 import MenuPage from './pages/customer/MenuPage';
 import CartPage from './pages/customer/CartPage';
+import CheckoutPage from './pages/customer/CheckoutPage';
 import PromotionsPage from './pages/customer/PromotionsPage';
 import AboutPage from './pages/customer/AboutPage';
 import ContactPage from './pages/customer/ContactPage';
@@ -60,6 +61,9 @@ function App() {
               <Route path="/register" element={<RegisterPage />} />
               <Route path="/payment-result" element={<PaymentResultPage />} />
             </Route>
+
+            {/* Route thanh toán với giao diện tối giản, bảo mật */}
+            <Route path="/checkout" element={<CheckoutPage />} />
 
             {/* ========== PROTECTED ROUTES (ADMIN & STAFF) ========== */}
             <Route

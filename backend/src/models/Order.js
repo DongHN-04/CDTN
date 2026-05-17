@@ -11,7 +11,8 @@ const orderItemSchema = new mongoose.Schema({
 const orderSchema = new mongoose.Schema({
   customer: {
     name: { type: String, default: 'Khách lẻ' },
-    phone: { type: String, default: '' }
+    phone: { type: String, default: '' },
+    address: { type: String, default: '' }
   },
   staff: { type: mongoose.Schema.Types.ObjectId, ref: 'User' }, // không bắt buộc (vì khách tự đặt)
   items: [orderItemSchema],
