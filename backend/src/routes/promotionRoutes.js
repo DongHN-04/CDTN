@@ -5,10 +5,26 @@ const {
   getPromotions,
   createPromotion,
   updatePromotion,
-  deletePromotion
+  deletePromotion,
+  getBanners,
+  createBanner,
+  deleteBanner,
+  setActiveBanner
 } = require('../controllers/promotionController');
 const { validatePromotionCreate, validatePromotionUpdate } = require('../middleware/validationMiddleware');
 
+// Banner routes
+router.route('/banners')
+  .get(protect, authorize('admin', 'staff'), getBanners)
+  .post(protect, authorize('admin'), createBanner);
+
+router.route('/banners/:id')
+  .delete(protect, authorize('admin'), deleteBanner);
+
+router.route('/banners/:id/active')
+  .put(protect, authorize('admin'), setActiveBanner);
+
+// Promotion routes
 router.route('/')
   .get(protect, authorize('admin', 'staff'), getPromotions)
   .post(protect, authorize('admin'), validatePromotionCreate, createPromotion);

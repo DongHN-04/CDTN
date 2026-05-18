@@ -63,14 +63,8 @@ const PromotionManagementPage = () => {
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
   const [error, setError] = useState('');
-  const [banners, setBanners] = useState(() => {
-    try {
-      return JSON.parse(localStorage.getItem('promotionBanners')) || [defaultBanner];
-    } catch (err) {
-      return [defaultBanner];
-    }
-  });
-  const [activeBannerIndex, setActiveBannerIndex] = useState(() => Number(localStorage.getItem('activePromotionBannerIndex') || 0));
+  const [banners, setBanners] = useState([defaultBanner]);
+  const [activeBannerIndex, setActiveBannerIndex] = useState(0);
   const [uploadingBanner, setUploadingBanner] = useState(false);
   const bannerInputRef = useRef(null);
 
@@ -87,8 +81,25 @@ const PromotionManagementPage = () => {
     }
   };
 
+  const fetchBanners = async () => {
+    try {
+      const data = await promotionService.getBanners();
+      if (data && data.length > 0) {
+        setBanners(data);
+        const activeIdx = data.findIndex(b => b.isActive);
+        setActiveBannerIndex(activeIdx !== -1 ? activeIdx : 0);
+      } else {
+        setBanners([defaultBanner]);
+        setActiveBannerIndex(0);
+      }
+    } catch (err) {
+      console.error('Không thể tải banner:', err);
+    }
+  };
+
   useEffect(() => {
     fetchPromotions();
+    fetchBanners();
   }, []);
 
   const openCreate = () => {
@@ -164,16 +175,16 @@ const PromotionManagementPage = () => {
 
   const activeBanner = banners[activeBannerIndex] || defaultBanner;
 
-  const saveBanners = (nextBanners) => {
-    setBanners(nextBanners);
-    localStorage.setItem('promotionBanners', JSON.stringify(nextBanners));
-    window.dispatchEvent(new Event('promotion-banner-updated'));
-  };
-
-  const selectBanner = (index) => {
-    setActiveBannerIndex(index);
-    localStorage.setItem('activePromotionBannerIndex', String(index));
-    window.dispatchEvent(new Event('promotion-banner-updated'));
+  const selectBanner = async (index) => {
+    const targetBanner = banners[index];
+    if (!targetBanner?._id) return;
+    try {
+      await promotionService.setActiveBanner(targetBanner._id);
+      setActiveBannerIndex(index);
+      window.dispatchEvent(new Event('promotion-banner-updated'));
+    } catch (err) {
+      setError(err.response?.data?.message || 'Không thể kích hoạt banner');
+    }
   };
 
   const handleBannerUpload = async (event) => {
@@ -183,15 +194,10 @@ const PromotionManagementPage = () => {
     setUploadingBanner(true);
     setError('');
     try {
-      const image = await uploadService.uploadImage(file);
-      const nextBanner = {
-        image,
-        title: featuredPromotion?.name || 'Banner khuyến mãi',
-        uploadedAt: new Date().toISOString(),
-      };
-      const nextBanners = [nextBanner, ...banners];
-      saveBanners(nextBanners);
-      selectBanner(0);
+      const imageUrl = await uploadService.uploadImage(file);
+      const title = featuredPromotion?.name || 'Banner khuyến mãi';
+      await promotionService.createBanner({ image: imageUrl, title });
+      await fetchBanners();
     } catch (err) {
       setError(err.response?.data?.message || 'Không thể tải banner mới');
     } finally {
@@ -200,16 +206,21 @@ const PromotionManagementPage = () => {
     }
   };
 
-  const handleDeleteBanner = (index) => {
-    if (banners.length === 1) {
-      saveBanners([defaultBanner]);
-      selectBanner(0);
+  const handleDeleteBanner = async (index) => {
+    const targetBanner = banners[index];
+    if (!targetBanner?._id) {
+      // Nếu là default mock banner, không thể xóa khỏi DB
       return;
     }
 
-    const nextBanners = banners.filter((_, bannerIndex) => bannerIndex !== index);
-    saveBanners(nextBanners);
-    selectBanner(0);
+    if (!window.confirm('Bạn có chắc muốn xóa banner này?')) return;
+
+    try {
+      await promotionService.deleteBanner(targetBanner._id);
+      await fetchBanners();
+    } catch (err) {
+      setError(err.response?.data?.message || 'Không thể xóa banner');
+    }
   };
 
   return (

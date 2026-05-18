@@ -2,6 +2,7 @@ const MenuItem = require('../models/MenuItem');
 const Order = require('../models/Order');
 const Combo = require('../models/Combo');
 const Promotion = require('../models/Promotion');
+const Banner = require('../models/Banner');
 
 // @desc    Lấy thực đơn công khai
 // @route   GET /api/public/menu
@@ -160,16 +161,16 @@ const getPromotions = async (req, res) => {
 // @access  Public
 const getHomepageData = async (req, res) => {
   try {
-    const Promotion = require('../models/Promotion');
     const now = new Date();
 
-    const [menuItems, combos, promotions] = await Promise.all([
+    const [menuItems, combos, promotions, banners] = await Promise.all([
       MenuItem.find({ isActive: { $ne: false } }),
       Combo.find({ isActive: true }).populate('items.menuItem', 'name price image'),
       Promotion.find({
         startDate: { $lte: now },
         endDate: { $gte: now },
       }),
+      Banner.find({}),
     ]);
 
     // Lấy danh sách category duy nhất
@@ -190,6 +191,7 @@ const getHomepageData = async (req, res) => {
       categories,
       combos,
       promotions,
+      banners,
       totalMenuItems: menuItems.length,
     });
   } catch (error) {

@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { Bell, Flame, Search, ShoppingCart, TrendingUp, Users, WalletCards } from 'lucide-react';
+import { Flame, Search, ShoppingCart, TrendingUp, Users, WalletCards } from 'lucide-react';
 import {
   Bar,
   BarChart,

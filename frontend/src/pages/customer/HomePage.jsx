@@ -110,6 +110,15 @@ const HomePage = () => {
     publicService.getHomepageData()
       .then(data => {
         setFeatured(data.featured || []);
+        if (data.banners && data.banners.length > 0) {
+          const activeBanner = data.banners.find(b => b.isActive) || data.banners[0];
+          setHomeBanner(activeBanner.image);
+
+          // Update local cache to match the database
+          localStorage.setItem('promotionBanners', JSON.stringify(data.banners));
+          const activeIndex = data.banners.findIndex(b => b.isActive);
+          localStorage.setItem('activePromotionBannerIndex', String(activeIndex !== -1 ? activeIndex : 0));
+        }
       })
       .catch(() => {});
   }, []);
