@@ -1,8 +1,9 @@
 const dns = require('dns');
 dns.setServers(['8.8.8.8', '8.8.4.4']);
 
+require('dotenv').config();
+
 const express = require('express');
-const dotenv = require('dotenv');
 const cors = require('cors');
 const path = require('path');
 const connectDB = require('./config/db');
@@ -23,8 +24,6 @@ const shiftRoutes = require('./routes/shiftRoutes');
 const supplierRoutes = require('./routes/supplierRoutes');
 const paymentRoutes = require('./routes/paymentRoutes');
 const { notFound, errorHandler } = require('./middleware/errorMiddleware');
-
-dotenv.config();
 
 const app = express();
 
