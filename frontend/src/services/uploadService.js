@@ -1,6 +1,6 @@
 import axios from 'axios';
 
-const API_URL = `${process.env.REACT_APP_API_URL}/upload/`;
+const API_URL = `${process.env.REACT_APP_API_URL || 'http://localhost:5000/api'}/upload/`;
 
 const getAuthHeader = () => {
   const user = JSON.parse(localStorage.getItem('user'));

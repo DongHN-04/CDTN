@@ -221,6 +221,7 @@ const HomePage = () => {
           </h2>
           <div className="flex justify-center gap-6 flex-wrap">
             {categories.map((cat) => {
+
               const IconComp = cat.icon;
               return (
                 <Link

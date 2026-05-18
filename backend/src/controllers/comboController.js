@@ -4,8 +4,8 @@ const Combo = require('../models/Combo');
 // @route   GET /api/combos
 const getCombos = async (req, res) => {
   try {
-    // populate để lấy tên và giá từng món trong combo
-    const combos = await Combo.find({}).populate('items.menuItem', 'name price');
+    // Populate thêm ảnh để frontend có đủ dữ liệu hiển thị thành phần combo.
+    const combos = await Combo.find({}).populate('items.menuItem', 'name price image');
     res.json(combos);
   } catch (error) {
     res.status(500).json({ message: 'Lỗi server' });
@@ -17,7 +17,7 @@ const getCombos = async (req, res) => {
 const createCombo = async (req, res) => {
   try {
     const combo = await Combo.create(req.body);
-    const populated = await Combo.findById(combo._id).populate('items.menuItem', 'name price');
+    const populated = await Combo.findById(combo._id).populate('items.menuItem', 'name price image');
     res.status(201).json(populated);
   } catch (error) {
     res.status(400).json({ message: 'Dữ liệu không hợp lệ' });
@@ -30,7 +30,7 @@ const updateCombo = async (req, res) => {
   try {
     const combo = await Combo.findByIdAndUpdate(req.params.id, req.body, {
       new: true
-    }).populate('items.menuItem', 'name price');
+    }).populate('items.menuItem', 'name price image');
     if (!combo) return res.status(404).json({ message: 'Không tìm thấy' });
     res.json(combo);
   } catch (error) {

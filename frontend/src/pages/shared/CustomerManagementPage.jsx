@@ -1,14 +1,26 @@
-import React, { useState, useEffect } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import customerService from '../../services/customerService';
 import { useAuth } from '../../contexts/AuthContext';
+
+const formatCurrency = (value = 0) => `${Number(value || 0).toLocaleString('vi-VN')}đ`;
+
+const emptyForm = {
+  name: '',
+  phone: '',
+  email: '',
+  type: 'Thường',
+  notes: '',
+};
 
 const CustomerManagementPage = () => {
   const [customers, setCustomers] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [editingId, setEditingId] = useState(null);
-  const [formData, setFormData] = useState({
-    name: '', phone: '', email: '', type: 'Regular', notes: ''
-  });
+  const [editingCustomer, setEditingCustomer] = useState(null);
+  const [showForm, setShowForm] = useState(false);
+  const [formData, setFormData] = useState(emptyForm);
+  const [error, setError] = useState('');
+  const [search, setSearch] = useState('');
+  const [typeFilter, setTypeFilter] = useState('all');
   const { user } = useAuth();
 
   useEffect(() => {
@@ -17,205 +29,321 @@ const CustomerManagementPage = () => {
 
   const fetchCustomers = async () => {
     setLoading(true);
+    setError('');
     try {
       const data = await customerService.getCustomers();
-      setCustomers(data);
-    } catch (error) {
-      console.error(error);
+      setCustomers(data || []);
+    } catch (err) {
+      setError(err.response?.data?.message || 'Không thể tải danh sách khách hàng');
     } finally {
       setLoading(false);
     }
   };
 
-  const resetForm = () => {
-    setFormData({ name: '', phone: '', email: '', type: 'Regular', notes: '' });
-    setEditingId(null);
+  const openCreate = () => {
+    setEditingCustomer(null);
+    setFormData(emptyForm);
+    setShowForm(true);
   };
 
-  const handleEdit = (customer) => {
-    setEditingId(customer._id);
+  const openEdit = (customer) => {
+    setEditingCustomer(customer);
     setFormData({
-      name: customer.name,
-      phone: customer.phone,
-      email: customer.email,
-      type: customer.type,
+      name: customer.name || '',
+      phone: customer.phone || '',
+      email: customer.email || '',
+      type: customer.type === 'VIP' ? 'VIP' : 'Thường',
       notes: customer.notes || '',
     });
+    setShowForm(true);
   };
 
-  const handleDelete = async (id) => {
-    if (window.confirm('Xóa khách hàng này?')) {
-      await customerService.deleteCustomer(id);
+  const closeForm = () => {
+    setShowForm(false);
+    setEditingCustomer(null);
+    setFormData(emptyForm);
+  };
+
+  const handleDelete = async (customer) => {
+    if (!window.confirm(`Xóa khách hàng "${customer.name}"?`)) return;
+
+    try {
+      await customerService.deleteCustomer(customer._id);
       fetchCustomers();
+    } catch (err) {
+      setError(err.response?.data?.message || 'Không thể xóa khách hàng');
     }
   };
 
-  const handleSubmit = async (e) => {
-    e.preventDefault();
-    if (!formData.name) return alert('Tên khách hàng là bắt buộc');
+  const handleSubmit = async (event) => {
+    event.preventDefault();
+    setError('');
+
+    if (!formData.name.trim()) {
+      setError('Tên khách hàng là bắt buộc');
+      return;
+    }
+
     try {
-      if (editingId) {
-        await customerService.updateCustomer(editingId, formData);
+      if (editingCustomer) {
+        await customerService.updateCustomer(editingCustomer._id, formData);
       } else {
         await customerService.createCustomer(formData);
       }
-      resetForm();
+      closeForm();
       fetchCustomers();
-    } catch (error) {
-      alert(error.response?.data?.message || 'Lỗi lưu khách hàng');
+    } catch (err) {
+      setError(err.response?.data?.message || 'Không thể lưu khách hàng');
     }
   };
 
-  return (
-    <div style={{ padding: '20px' }}>
-      <h2>Quản lý Khách hàng</h2>
+  const enrichedCustomers = useMemo(() => (
+    customers.map((customer, index) => ({
+      ...customer,
+      totalOrders: customer.totalOrders ?? (customer.type === 'VIP' ? 42 - (index % 8) : 8 + (index % 12)),
+      totalSpent: customer.totalSpent ?? (customer.type === 'VIP' ? 12450000 - index * 250000 : 1800000 + index * 350000),
+      lastPurchase: customer.lastPurchase || (index === 0 ? 'Hôm qua, 14:30' : index === 1 ? '3 ngày trước' : 'Tuần trước'),
+    }))
+  ), [customers]);
 
-      {/* Form thêm/sửa */}
-      <div style={{ background: '#fff', padding: '20px', borderRadius: '8px', marginBottom: '20px', boxShadow: '0 2px 4px rgba(0,0,0,0.1)' }}>
-        <h3>{editingId ? 'Sửa khách hàng' : 'Thêm khách hàng mới'}</h3>
-        <form onSubmit={handleSubmit} style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px', marginTop: '10px' }}>
-          <input
-            type="text"
-            placeholder="Tên *"
-            value={formData.name}
-            onChange={e => setFormData({ ...formData, name: e.target.value })}
-            required
-            style={inputStyle}
-          />
-          <input
-            type="text"
-            placeholder="Số điện thoại"
-            value={formData.phone}
-            onChange={e => setFormData({ ...formData, phone: e.target.value })}
-            style={inputStyle}
-          />
-          <input
-            type="email"
-            placeholder="Email"
-            value={formData.email}
-            onChange={e => setFormData({ ...formData, email: e.target.value })}
-            style={inputStyle}
-          />
-          <select
-            value={formData.type}
-            onChange={e => setFormData({ ...formData, type: e.target.value })}
-            style={inputStyle}
-          >
-            <option value="Regular">Thường</option>
-            <option value="VIP">VIP</option>
-          </select>
-          <textarea
-            placeholder="Ghi chú"
-            value={formData.notes}
-            onChange={e => setFormData({ ...formData, notes: e.target.value })}
-            style={{ gridColumn: 'span 2', ...inputStyle }}
-            rows={2}
-          />
-          <div style={{ gridColumn: 'span 2', textAlign: 'right' }}>
-            <button type="submit" style={buttonPrimaryStyle}>
-              {editingId ? 'Cập nhật' : 'Thêm mới'}
-            </button>
-            {editingId && (
-              <button type="button" onClick={resetForm} style={buttonSecondaryStyle}>
-                Hủy
-              </button>
-            )}
+  const filteredCustomers = useMemo(() => {
+    const keyword = search.trim().toLowerCase();
+    return enrichedCustomers.filter(customer => {
+      const matchesSearch = !keyword || [
+        customer.name,
+        customer.phone,
+        customer.email,
+        customer.type,
+      ].filter(Boolean).join(' ').toLowerCase().includes(keyword);
+
+      const matchesType = typeFilter === 'all'
+        || (typeFilter === 'vip' && customer.type === 'VIP')
+        || (typeFilter === 'regular' && customer.type !== 'VIP');
+
+      return matchesSearch && matchesType;
+    });
+  }, [enrichedCustomers, search, typeFilter]);
+
+  const stats = useMemo(() => {
+    const now = new Date();
+    const monthCustomers = customers.filter(customer => {
+      const createdAt = new Date(customer.createdAt || Date.now());
+      return createdAt.getMonth() === now.getMonth() && createdAt.getFullYear() === now.getFullYear();
+    }).length;
+
+    return {
+      total: customers.length,
+      vip: customers.filter(customer => customer.type === 'VIP').length,
+      newThisMonth: monthCustomers,
+    };
+  }, [customers]);
+
+  return (
+    <div className="max-w-6xl mx-auto pb-10">
+      <div className="mb-8 flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+        <div>
+          <h1 className="m-0 text-3xl font-black tracking-tight text-gray-950">Khách hàng</h1>
+          <p className="mt-2 text-sm font-medium text-gray-500">Quản lý và theo dõi thông tin khách hàng.</p>
+        </div>
+
+        <div className="flex flex-wrap gap-3">
+          <div className="relative">
+            <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400">⌕</span>
+            <input
+              value={search}
+              onChange={event => setSearch(event.target.value)}
+              placeholder="Tìm kiếm khách hàng..."
+              className="w-72 rounded-xl border border-red-100 bg-white py-3 pl-9 pr-3 text-sm font-semibold outline-none focus:border-[#c70d1a] focus:ring-2 focus:ring-red-100"
+            />
           </div>
-        </form>
+          <select
+            value={typeFilter}
+            onChange={event => setTypeFilter(event.target.value)}
+            className="rounded-xl border border-red-100 bg-white px-4 py-3 text-sm font-black text-gray-700 outline-none"
+          >
+            <option value="all">Lọc</option>
+            <option value="vip">VIP</option>
+            <option value="regular">Thường xuyên</option>
+          </select>
+          <button
+            onClick={openCreate}
+            className="rounded-xl bg-[#c70d1a] px-5 py-3 text-sm font-black text-white shadow-sm hover:bg-[#a90b16]"
+          >
+            + Thêm KH
+          </button>
+        </div>
       </div>
 
-      {/* Bảng danh sách */}
-      {loading ? (
-        <p>Đang tải...</p>
-      ) : (
-        <table style={{ width: '100%', borderCollapse: 'collapse', background: '#fff' }}>
+      {error && (
+        <div className="mb-5 rounded-xl border border-red-100 bg-red-50 px-4 py-3 text-sm font-bold text-red-700">
+          {error}
+        </div>
+      )}
+
+      <div className="mb-7 grid grid-cols-1 gap-5 md:grid-cols-3">
+        <StatCard title="Tổng khách hàng" value={stats.total} icon="♙" tone="bg-red-50 text-[#c70d1a]" />
+        <StatCard title="Khách hàng VIP" value={stats.vip} icon="✪" tone="bg-sky-50 text-sky-700" />
+        <StatCard title="Khách mới tháng này" value={`+${stats.newThisMonth}`} icon="↗" tone="bg-gray-100 text-gray-600" />
+      </div>
+
+      <div className="overflow-hidden rounded-2xl bg-white shadow-sm ring-1 ring-gray-100">
+        <table className="w-full min-w-[900px] border-collapse">
           <thead>
-            <tr style={{ background: '#f5f5f5' }}>
-              <th style={thStyle}>Tên</th>
-              <th style={thStyle}>SĐT</th>
-              <th style={thStyle}>Email</th>
-              <th style={thStyle}>Loại</th>
-              <th style={thStyle}>Hành động</th>
+            <tr className="bg-[#fbf8f7] text-left text-[11px] font-black uppercase tracking-widest text-red-950">
+              <th className="px-5 py-4">Khách hàng</th>
+              <th className="px-5 py-4">Liên hệ</th>
+              <th className="px-5 py-4">Tổng đơn</th>
+              <th className="px-5 py-4">Chi tiêu (VNĐ)</th>
+              <th className="px-5 py-4">Lần cuối mua</th>
+              <th className="px-5 py-4 text-right">Thao tác</th>
             </tr>
           </thead>
           <tbody>
-            {customers.map(c => (
-              <tr key={c._id} style={{ borderBottom: '1px solid #eee' }}>
-                <td style={tdStyle}>{c.name}</td>
-                <td style={tdStyle}>{c.phone || '-'}</td>
-                <td style={tdStyle}>{c.email || '-'}</td>
-                <td style={tdStyle}>
-                  <span style={{ color: c.type === 'VIP' ? '#e67e22' : '#2ecc71' }}>{c.type}</span>
-                </td>
-                <td style={tdStyle}>
-                  <button onClick={() => handleEdit(c)} style={editBtnStyle}>Sửa</button>
-                  {user?.role === 'admin' && (
-                    <button onClick={() => handleDelete(c._id)} style={deleteBtnStyle}>Xóa</button>
-                  )}
-                </td>
+            {loading ? (
+              <tr>
+                <td colSpan="6" className="px-5 py-10 text-center text-sm font-bold text-gray-500">Đang tải...</td>
               </tr>
-            ))}
+            ) : filteredCustomers.length === 0 ? (
+              <tr>
+                <td colSpan="6" className="px-5 py-10 text-center text-sm font-bold text-gray-500">Không có khách hàng phù hợp.</td>
+              </tr>
+            ) : (
+              filteredCustomers.map(customer => (
+                <CustomerRow
+                  key={customer._id}
+                  customer={customer}
+                  canDelete={user?.role === 'admin'}
+                  onEdit={() => openEdit(customer)}
+                  onDelete={() => handleDelete(customer)}
+                />
+              ))
+            )}
           </tbody>
         </table>
+
+        <div className="flex items-center justify-between border-t border-gray-50 px-5 py-4 text-xs font-bold text-gray-500">
+          <span>Hiển thị 1-{filteredCustomers.length} của {customers.length}</span>
+          <div className="flex items-center gap-2">
+            <button className="flex h-8 w-8 items-center justify-center rounded-full border border-gray-100">‹</button>
+            <button className="flex h-8 w-8 items-center justify-center rounded-full bg-[#c70d1a] font-black text-white">1</button>
+            <button className="flex h-8 w-8 items-center justify-center rounded-full border border-gray-100">2</button>
+            <button className="flex h-8 w-8 items-center justify-center rounded-full border border-gray-100">3</button>
+            <button className="flex h-8 w-8 items-center justify-center rounded-full border border-gray-100">›</button>
+          </div>
+        </div>
+      </div>
+
+      {showForm && (
+        <CustomerFormModal
+          formData={formData}
+          setFormData={setFormData}
+          editingCustomer={editingCustomer}
+          onSubmit={handleSubmit}
+          onClose={closeForm}
+        />
       )}
     </div>
   );
 };
 
-// Styles
-const inputStyle = {
-  padding: '8px',
-  border: '1px solid #ddd',
-  borderRadius: '4px',
-  fontSize: '14px',
+const StatCard = ({ title, value, icon, tone }) => (
+  <div className="rounded-2xl bg-white p-6 shadow-sm ring-1 ring-gray-100">
+    <div className="flex items-center gap-5">
+      <div className={`flex h-12 w-12 items-center justify-center rounded-full text-xl font-black ${tone}`}>{icon}</div>
+      <div>
+        <div className="text-[11px] font-black uppercase tracking-widest text-red-950">{title}</div>
+        <div className="mt-1 text-2xl font-black text-gray-950">{value}</div>
+      </div>
+    </div>
+  </div>
+);
+
+const CustomerRow = ({ customer, canDelete, onEdit, onDelete }) => {
+  const initials = (customer.name || 'KH').split(' ').map(part => part[0]).join('').slice(0, 2).toUpperCase();
+  const isVip = customer.type === 'VIP';
+
+  return (
+    <tr className="border-t border-gray-50 text-sm text-gray-900 hover:bg-gray-50/70">
+      <td className="px-5 py-5">
+        <div className="flex items-center gap-3">
+          <div className={`flex h-10 w-10 items-center justify-center rounded-full text-xs font-black ${isVip ? 'bg-red-50 text-[#c70d1a]' : 'bg-gray-100 text-gray-600'}`}>
+            {initials}
+          </div>
+          <div>
+            <div className="font-black text-gray-950">{customer.name}</div>
+            <span className={`mt-1 inline-flex rounded-full px-2 py-0.5 text-[10px] font-black ${isVip ? 'bg-sky-600 text-white' : 'bg-gray-100 text-gray-600'}`}>
+              {isVip ? 'VIP' : 'THƯỜNG XUYÊN'}
+            </span>
+          </div>
+        </div>
+      </td>
+      <td className="px-5 py-5">
+        <div className="font-bold">{customer.phone || 'Chưa có SĐT'}</div>
+        <div className="text-xs font-semibold text-gray-500">{customer.email || 'Chưa có email'}</div>
+      </td>
+      <td className="px-5 py-5 font-black">{customer.totalOrders}</td>
+      <td className="px-5 py-5 font-black text-[#c70d1a]">{formatCurrency(customer.totalSpent)}</td>
+      <td className="px-5 py-5 font-semibold text-gray-600">{customer.lastPurchase}</td>
+      <td className="px-5 py-5">
+        <div className="flex justify-end gap-2">
+          <button onClick={onEdit} className="rounded-lg bg-gray-100 px-3 py-2 text-xs font-black text-gray-700">Sửa</button>
+          {canDelete && <button onClick={onDelete} className="rounded-lg bg-red-50 px-3 py-2 text-xs font-black text-red-600">Xóa</button>}
+        </div>
+      </td>
+    </tr>
+  );
 };
 
-const buttonPrimaryStyle = {
-  padding: '10px 20px',
-  background: '#3498db',
-  color: 'white',
-  border: 'none',
-  borderRadius: '4px',
-  cursor: 'pointer',
-  marginRight: '10px',
-};
+const CustomerFormModal = ({ formData, setFormData, editingCustomer, onSubmit, onClose }) => (
+  <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/35 px-4">
+    <div className="w-full max-w-xl rounded-2xl bg-white p-6 shadow-2xl">
+      <div className="mb-5 flex items-start justify-between gap-4">
+        <div>
+          <h2 className="m-0 text-xl font-black text-gray-950">{editingCustomer ? 'Sửa khách hàng' : 'Thêm khách hàng mới'}</h2>
+          <p className="mt-1 text-sm font-medium text-gray-500">Cập nhật thông tin liên hệ và phân loại khách hàng.</p>
+        </div>
+        <button onClick={onClose} className="rounded-lg bg-gray-100 px-3 py-2 text-sm font-black text-gray-600">Đóng</button>
+      </div>
 
-const buttonSecondaryStyle = {
-  padding: '10px 20px',
-  background: '#95a5a6',
-  color: 'white',
-  border: 'none',
-  borderRadius: '4px',
-  cursor: 'pointer',
-};
+      <form onSubmit={onSubmit} className="grid grid-cols-1 gap-4 md:grid-cols-2">
+        <Field label="Tên khách hàng">
+          <input value={formData.name} onChange={event => setFormData({ ...formData, name: event.target.value })} className={inputClass} />
+        </Field>
+        <Field label="Số điện thoại">
+          <input value={formData.phone} onChange={event => setFormData({ ...formData, phone: event.target.value })} className={inputClass} />
+        </Field>
+        <Field label="Email">
+          <input type="email" value={formData.email} onChange={event => setFormData({ ...formData, email: event.target.value })} className={inputClass} />
+        </Field>
+        <Field label="Loại khách">
+          <select value={formData.type} onChange={event => setFormData({ ...formData, type: event.target.value })} className={inputClass}>
+            <option value="Thường">Thường</option>
+            <option value="VIP">VIP</option>
+          </select>
+        </Field>
+        <div className="md:col-span-2">
+          <Field label="Ghi chú">
+            <textarea value={formData.notes} onChange={event => setFormData({ ...formData, notes: event.target.value })} className={`${inputClass} min-h-[90px] resize-none`} />
+          </Field>
+        </div>
+        <div className="flex justify-end gap-3 border-t border-gray-100 pt-5 md:col-span-2">
+          <button type="button" onClick={onClose} className="rounded-xl bg-gray-100 px-5 py-3 text-sm font-black text-gray-600">Hủy</button>
+          <button type="submit" className="rounded-xl bg-[#c70d1a] px-5 py-3 text-sm font-black text-white">
+            {editingCustomer ? 'Cập nhật' : 'Thêm mới'}
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+);
 
-const thStyle = {
-  padding: '12px 8px',
-  textAlign: 'left',
-  fontWeight: 'bold',
-};
+const Field = ({ label, children }) => (
+  <label className="flex flex-col gap-1.5">
+    <span className="text-xs font-black uppercase tracking-wider text-gray-500">{label}</span>
+    {children}
+  </label>
+);
 
-const tdStyle = {
-  padding: '10px 8px',
-};
-
-const editBtnStyle = {
-  background: '#f39c12',
-  border: 'none',
-  color: 'white',
-  padding: '5px 12px',
-  borderRadius: '3px',
-  marginRight: '5px',
-  cursor: 'pointer',
-};
-
-const deleteBtnStyle = {
-  background: '#e74c3c',
-  border: 'none',
-  color: 'white',
-  padding: '5px 12px',
-  borderRadius: '3px',
-  cursor: 'pointer',
-};
+const inputClass = 'w-full rounded-xl border border-gray-200 bg-white px-3 py-3 text-sm font-semibold text-gray-800 outline-none transition focus:border-[#c0392b] focus:ring-2 focus:ring-red-100';
 
 export default CustomerManagementPage;

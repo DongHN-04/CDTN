@@ -1,346 +1,428 @@
-import React, { useState, useEffect } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import userService from '../../services/userService';
+
+const emptyForm = {
+  name: '',
+  email: '',
+  password: '',
+  role: 'Nhân viên',
+  phone: '',
+  salary: '',
+  status: 'Đang làm việc',
+};
+
+const positions = [
+  { value: 'admin', label: 'Quản trị viên' },
+  { value: 'Nhân viên', label: 'Nhân viên' },
+];
+
+const statusOptions = ['Đang làm việc', 'Đang nghỉ phép', 'Đã nghỉ việc'];
+
+const getPosition = (employee) => {
+  if (employee.role === 'admin') return 'Quản trị viên';
+  return 'Nhân viên';
+};
+
+const formatCurrency = (value) => `${Number(value || 0).toLocaleString('vi-VN')} đ`;
+
+const getInitials = (name = '') => {
+  const parts = name.trim().split(/\s+/).filter(Boolean);
+  if (parts.length >= 2) return `${parts[0][0]}${parts[parts.length - 1][0]}`.toUpperCase();
+  return (name || 'NV').slice(0, 2).toUpperCase();
+};
 
 const EmployeeManagementPage = () => {
   const [employees, setEmployees] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [showForm, setShowForm] = useState(false);
   const [error, setError] = useState('');
-  
-  // State quản lý form
-  const [editingId, setEditingId] = useState(null);
-  const [formData, setFormData] = useState({
-    name: '',
-    email: '',
-    password: '', 
-    role: 'Nhân viên phục vụ',
-    phone: '',
-    salary: ''
-  });
-
-  // State quản lý Hộp thoại Xác nhận Xóa (Message Box)
-  const [deleteModal, setDeleteModal] = useState({
-    isOpen: false,
-    employeeId: null
-  });
-
-  const fetchEmployees = async () => {
-    try {
-      setLoading(true);
-      const data = await userService.getUsers();
-      setEmployees(data);
-      setError('');
-    } catch (err) {
-      setError('Không thể tải danh sách nhân viên');
-      console.error(err);
-    } finally {
-      setLoading(false);
-    }
-  };
+  const [search, setSearch] = useState('');
+  const [positionFilter, setPositionFilter] = useState('all');
+  const [statusFilter, setStatusFilter] = useState('all');
+  const [showForm, setShowForm] = useState(false);
+  const [editingEmployee, setEditingEmployee] = useState(null);
+  const [formData, setFormData] = useState(emptyForm);
+  const [deleteModal, setDeleteModal] = useState({ isOpen: false, employee: null });
 
   useEffect(() => {
     fetchEmployees();
   }, []);
 
-  // Hàm mở hộp thoại xác nhận xóa
-  const handleDeleteClick = (id) => {
-    setDeleteModal({ isOpen: true, employeeId: id });
-  };
-
-  // Hàm đóng hộp thoại xóa
-  const closeDeleteModal = () => {
-    setDeleteModal({ isOpen: false, employeeId: null });
-  };
-
-  // Hàm thực thi việc xóa sau khi đã xác nhận
-  const confirmDelete = async () => {
+  const fetchEmployees = async () => {
+    setLoading(true);
+    setError('');
     try {
-      await userService.deleteUser(deleteModal.employeeId);
-      setEmployees(employees.filter(emp => emp._id !== deleteModal.employeeId));
-      closeDeleteModal(); // Xóa xong thì đóng form
+      const data = await userService.getUsers();
+      setEmployees(data || []);
     } catch (err) {
-      alert('Xóa thất bại');
-      closeDeleteModal();
+      setError(err.response?.data?.message || 'Không thể tải danh sách nhân viên');
+    } finally {
+      setLoading(false);
     }
   };
 
-  const handleAddNew = () => {
-    setEditingId(null);
-    setFormData({ name: '', email: '', password: '', role: 'Nhân viên phục vụ', phone: '', salary: '' });
+  const enrichedEmployees = useMemo(() => (
+    employees.map(employee => ({
+      ...employee,
+      positionLabel: getPosition(employee),
+      status: employee.status || 'Đang làm việc',
+    }))
+  ), [employees]);
+
+  const filteredEmployees = useMemo(() => {
+    const keyword = search.trim().toLowerCase();
+    return enrichedEmployees.filter(employee => {
+      const matchesSearch = !keyword || [
+        employee.name,
+        employee.email,
+        employee.phone,
+        employee.positionLabel,
+      ].filter(Boolean).join(' ').toLowerCase().includes(keyword);
+
+      const matchesPosition = positionFilter === 'all' || employee.positionLabel === positionFilter;
+      const matchesStatus = statusFilter === 'all' || employee.status === statusFilter;
+
+      return matchesSearch && matchesPosition && matchesStatus;
+    });
+  }, [enrichedEmployees, search, positionFilter, statusFilter]);
+
+  const stats = useMemo(() => ({
+    total: employees.length,
+    working: enrichedEmployees.filter(employee => employee.status === 'Đang làm việc').length,
+    leave: enrichedEmployees.filter(employee => employee.status === 'Đang nghỉ phép').length,
+    resigned: enrichedEmployees.filter(employee => employee.status === 'Đã nghỉ việc').length,
+  }), [employees.length, enrichedEmployees]);
+
+  const openCreate = () => {
+    setEditingEmployee(null);
+    setFormData(emptyForm);
     setShowForm(true);
   };
 
-  const handleEdit = (user) => {
-    setEditingId(user._id);
-    setFormData({ 
-      name: user.name, 
-      email: user.email, 
-      password: '', 
-      role: user.role || 'Nhân viên phục vụ', 
-      phone: user.phone || '', 
-      salary: user.salary || '' 
+  const openEdit = (employee) => {
+    setEditingEmployee(employee);
+    setFormData({
+      name: employee.name || '',
+      email: employee.email || '',
+      password: '',
+      role: employee.role === 'admin' ? 'admin' : 'Nhân viên',
+      phone: employee.phone || '',
+      salary: employee.salary || '',
+      status: employee.status || 'Đang làm việc',
     });
     setShowForm(true);
   };
 
-  const handleInputChange = (e) => {
-    setFormData({ ...formData, [e.target.name]: e.target.value });
+  const closeForm = () => {
+    setShowForm(false);
+    setEditingEmployee(null);
+    setFormData(emptyForm);
   };
 
-  const handleFormSubmit = async (e) => {
-    e.preventDefault();
+  const handleSubmit = async (event) => {
+    event.preventDefault();
+    setError('');
+
+    if (!formData.name.trim() || !formData.email.trim()) {
+      setError('Tên và email là bắt buộc');
+      return;
+    }
+
+    if (!editingEmployee && formData.password.length < 6) {
+      setError('Mật khẩu phải có ít nhất 6 ký tự');
+      return;
+    }
+
     try {
-      if (editingId) {
-        const updateData = { ...formData };
-        if (!updateData.password) {
-          delete updateData.password;
-        }
-        const updated = await userService.updateUser(editingId, updateData);
-        setEmployees(employees.map(emp => (emp._id === updated._id ? updated : emp)));
+      const payload = {
+        ...formData,
+        name: formData.name.trim(),
+        email: formData.email.trim(),
+        phone: formData.phone.trim(),
+        salary: formData.salary === '' ? 0 : Number(formData.salary),
+      };
+      if (editingEmployee && !payload.password) delete payload.password;
+
+      if (editingEmployee) {
+        const updated = await userService.updateUser(editingEmployee._id, payload);
+        setEmployees(current => current.map(employee => employee._id === updated._id ? updated : employee));
       } else {
-        const newUser = await userService.createUser(formData);
-        setEmployees([newUser, ...employees]);
+        const created = await userService.createUser(payload);
+        setEmployees(current => [created, ...current]);
       }
-      setShowForm(false);
-      setEditingId(null);
+      closeForm();
     } catch (err) {
-      alert(err.response?.data?.message || 'Có lỗi xảy ra khi lưu thông tin');
+      const details = err.response?.data?.details;
+      setError(details?.[0]?.message || err.response?.data?.message || 'Không thể lưu thông tin nhân viên');
     }
   };
 
-  const getInitials = (name) => {
-    if (!name) return 'NV';
-    const parts = name.trim().split(' ');
-    if (parts.length >= 2) return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase();
-    return name.substring(0, 2).toUpperCase();
+  const confirmDelete = async () => {
+    if (!deleteModal.employee) return;
+
+    try {
+      await userService.deleteUser(deleteModal.employee._id);
+      setEmployees(current => current.filter(employee => employee._id !== deleteModal.employee._id));
+      setDeleteModal({ isOpen: false, employee: null });
+    } catch (err) {
+      setError(err.response?.data?.message || 'Không thể xóa nhân viên');
+      setDeleteModal({ isOpen: false, employee: null });
+    }
   };
 
   return (
-    <div className="font-sans text-gray-800 pb-20 relative">
-      
-      {/* ===== HEADER ===== */}
-      <div className="flex justify-between items-end mb-6">
+    <div className="max-w-6xl mx-auto pb-10">
+      <div className="mb-8 flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
         <div>
-          <h1 className="text-2xl font-bold text-gray-900">Hồ sơ Nhân viên</h1>
+          <h1 className="m-0 text-3xl font-black tracking-tight text-gray-950">Quản lý nhân sự</h1>
+          <p className="mt-2 text-sm font-medium text-gray-500">Quản lý đội ngũ nhân viên, mức lương và trạng thái làm việc.</p>
         </div>
-        <div className="bg-red-50 text-[#c0392b] px-4 py-2 rounded-lg text-sm font-semibold flex items-center gap-2 border border-red-100">
-          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
-          {employees.length} Nhân viên đang làm việc
-        </div>
+
+        <button
+          onClick={openCreate}
+          className="rounded-xl bg-[#c70d1a] px-5 py-3 text-sm font-black text-white shadow-sm hover:bg-[#a90b16]"
+        >
+          + Thêm nhân viên
+        </button>
       </div>
 
-      {error && <div className="bg-red-50 text-red-600 p-3 rounded-lg mb-4 text-sm font-semibold border-l-4 border-red-500">{error}</div>}
-
-      {/* ===== FORM NHẬP LIỆU ===== */}
-      {showForm && (
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-8 transition-all">
-          <div className="lg:col-span-2 bg-white rounded-xl shadow-sm border border-gray-100 p-8">
-            <div className="flex justify-between items-center mb-6">
-              <h3 className="text-lg font-bold text-gray-900">
-                {editingId ? 'Cập nhật thông tin nhân viên' : 'Thêm nhân viên mới'}
-              </h3>
-              <button onClick={() => setShowForm(false)} className="text-gray-400 hover:text-red-500 transition-colors">
-                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
-              </button>
-            </div>
-
-            <form onSubmit={handleFormSubmit}>
-              <div className="grid grid-cols-2 gap-x-8 gap-y-6">
-                <div className="flex flex-col gap-2">
-                  <label className="text-[11px] font-bold text-gray-500 uppercase tracking-wide">Họ và tên</label>
-                  <div className="flex items-center border-b border-gray-300 py-2">
-                    <input type="text" name="name" value={formData.name} onChange={handleInputChange} required placeholder="Nhập tên nhân viên" className="w-full bg-transparent outline-none text-sm font-semibold" />
-                  </div>
-                </div>
-
-                <div className="flex flex-col gap-2">
-                  <label className="text-[11px] font-bold text-gray-500 uppercase tracking-wide">Tên đăng nhập</label>
-                  <div className="flex items-center border-b border-gray-300 py-2">
-                    <input type="email" name="email" value={formData.email} onChange={handleInputChange} required placeholder="email@sondong.com" className="w-full bg-transparent outline-none text-sm font-semibold" />
-                  </div>
-                </div>
-
-                <div className="flex flex-col gap-2">
-                  <label className="text-[11px] font-bold text-gray-500 uppercase tracking-wide">Mật khẩu</label>
-                  <div className="flex items-center border-b border-gray-300 py-2">
-                    <input 
-                      type="password" 
-                      name="password" 
-                      value={formData.password} 
-                      onChange={handleInputChange} 
-                      placeholder={editingId ? "Bỏ trống nếu không đổi mật khẩu" : "Nhập mật khẩu cho tài khoản"} 
-                      required={!editingId} 
-                      className="w-full bg-transparent outline-none text-sm font-semibold placeholder:font-normal placeholder:text-gray-400" 
-                    />
-                  </div>
-                </div>
-
-                <div className="flex flex-col gap-2">
-                  <label className="text-[11px] font-bold text-gray-500 uppercase tracking-wide">Chức vụ</label>
-                  <div className="flex items-center border-b border-gray-300 py-2">
-                    <select name="role" value={formData.role} onChange={handleInputChange} className="w-full bg-transparent outline-none text-sm font-semibold text-gray-800 cursor-pointer">
-                      <option value="Nhân viên phục vụ">Nhân viên phục vụ</option>
-                      <option value="Thu ngân">Thu ngân</option>
-                      <option value="Đầu bếp">Đầu bếp</option>
-                      <option value="Quản lý ca">Quản lý ca</option>
-                      <option value="admin">Quản trị viên (Admin)</option>
-                    </select>
-                  </div>
-                </div>
-
-                <div className="flex flex-col gap-2">
-                  <label className="text-[11px] font-bold text-gray-500 uppercase tracking-wide">Số điện thoại</label>
-                  <div className="flex items-center border-b border-gray-300 py-2">
-                    <input type="tel" name="phone" value={formData.phone} onChange={handleInputChange} placeholder="090x xxx xxx" className="w-full bg-transparent outline-none text-sm font-semibold" />
-                  </div>
-                </div>
-
-                <div className="flex flex-col gap-2 col-span-2 sm:col-span-1">
-                  <label className="text-[11px] font-bold text-gray-500 uppercase tracking-wide">Mức lương (VNĐ)</label>
-                  <div className="flex items-center border-b border-gray-300 py-2">
-                    <input type="number" name="salary" value={formData.salary} onChange={handleInputChange} placeholder="Ví dụ: 7500000" className="w-full bg-transparent outline-none text-sm font-semibold text-[#c0392b]" />
-                  </div>
-                </div>
-              </div>
-
-              <div className="mt-8 flex gap-3 justify-end">
-                <button type="button" onClick={() => setShowForm(false)} className="px-6 py-2.5 rounded-lg text-sm font-bold text-gray-600 bg-gray-100 hover:bg-gray-200 transition-colors">
-                  Hủy bỏ
-                </button>
-                <button type="submit" className="px-6 py-2.5 rounded-lg text-sm font-bold text-white bg-[#c0392b] hover:bg-red-800 transition-colors shadow-md shadow-red-200">
-                  Lưu thông tin
-                </button>
-              </div>
-            </form>
-          </div>
-
-          <div className="lg:col-span-1 bg-[#c0392b] rounded-xl text-white p-8 relative overflow-hidden shadow-md">
-            <div className="bg-white/20 w-max px-3 py-1 rounded-full text-[10px] font-bold tracking-widest mb-4 backdrop-blur-sm">
-              SƠN ĐÔNG EXCELLENCE
-            </div>
-            <h3 className="text-2xl font-bold mb-4 leading-tight">Thông tin nhân viên chính thức</h3>
-            <p className="text-sm opacity-90 leading-relaxed">
-              Đảm bảo thông tin được cập nhật chính xác để đồng bộ với hệ thống kế toán và bảo hiểm xã hội. Mật khẩu cần được bảo mật.
-            </p>
-          </div>
+      {error && (
+        <div className="mb-5 rounded-xl border border-red-100 bg-red-50 px-4 py-3 text-sm font-bold text-red-700">
+          {error}
         </div>
       )}
 
-      {/* ===== TOOLBAR & BẢNG DỮ LIỆU ===== */}
-      <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
-        <div className="flex flex-wrap justify-between items-center p-4 bg-gray-50/50 border-b border-gray-100 gap-4">
-          <div className="flex gap-2">
-            <button onClick={handleAddNew} className="bg-[#c0392b] text-white px-5 py-2.5 rounded-lg text-[13px] font-bold flex items-center gap-2 hover:bg-red-800 transition-colors shadow-sm shadow-red-200">
-              <span className="text-lg leading-none mb-0.5">+</span> Thêm
-            </button>
+      <div className="mb-7 grid grid-cols-1 gap-5 md:grid-cols-2 xl:grid-cols-4">
+        <StatCard title="Tổng nhân sự" value={stats.total} icon="♟" tone="bg-red-50 text-[#c70d1a]" />
+        <StatCard title="Đang làm việc" value={stats.working} icon="▣" tone="bg-sky-50 text-sky-700" />
+        <StatCard title="Đang nghỉ phép" value={stats.leave} icon="▤" tone="bg-gray-100 text-gray-600" />
+        <StatCard title="Đã nghỉ việc" value={stats.resigned} icon="⌧" tone="bg-red-50 text-red-500" />
+      </div>
+
+      <div className="mb-7 rounded-2xl bg-white p-5 shadow-sm ring-1 ring-gray-100">
+        <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+          <div className="relative flex-1">
+            <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400">⌕</span>
+            <input
+              value={search}
+              onChange={event => setSearch(event.target.value)}
+              placeholder="Tìm kiếm nhân viên theo tên, email..."
+              className="w-full rounded-xl border border-red-100 bg-white py-3 pl-9 pr-3 text-sm font-semibold outline-none focus:border-[#c70d1a] focus:ring-2 focus:ring-red-100"
+            />
           </div>
-          <div className="flex gap-2 w-full md:w-auto">
-            <div className="relative flex-1 md:w-64">
-              <svg className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
-              <input type="text" placeholder="Tìm kiếm theo tên..." className="w-full bg-white border border-gray-200 pl-9 pr-4 py-2.5 rounded-lg text-sm outline-none focus:border-[#c0392b] transition-colors" />
-            </div>
+          <div className="flex flex-wrap gap-3">
+            <select value={positionFilter} onChange={event => setPositionFilter(event.target.value)} className={selectClass}>
+              <option value="all">Chức vụ</option>
+              <option value="Quản trị viên">Quản trị viên</option>
+              <option value="Nhân viên">Nhân viên</option>
+            </select>
+            <select value={statusFilter} onChange={event => setStatusFilter(event.target.value)} className={selectClass}>
+              <option value="all">Trạng thái</option>
+              {statusOptions.map(status => (
+                <option key={status} value={status}>{status}</option>
+              ))}
+            </select>
           </div>
         </div>
+      </div>
 
-        <div className="overflow-x-auto">
-          <table className="w-full text-left border-collapse">
-            <thead>
-              <tr className="bg-gray-100/50">
-                <th className="px-6 py-4 text-[10px] font-bold text-gray-500 uppercase tracking-wider">Nhân viên</th>
-                <th className="px-6 py-4 text-[10px] font-bold text-gray-500 uppercase tracking-wider">Email</th>
-                <th className="px-6 py-4 text-[10px] font-bold text-gray-500 uppercase tracking-wider">Chức vụ / Role</th>
-                <th className="px-6 py-4 text-[10px] font-bold text-gray-500 uppercase tracking-wider">Điện thoại</th>
-                <th className="px-6 py-4 text-[10px] font-bold text-gray-500 uppercase tracking-wider">Mức lương</th>
-                <th className="px-6 py-4 text-[10px] font-bold text-gray-500 uppercase tracking-wider text-right">Hành động</th>
+      <div className="overflow-hidden rounded-2xl bg-white shadow-sm ring-1 ring-gray-100">
+        <table className="w-full min-w-[900px] border-collapse">
+          <thead>
+            <tr className="bg-[#fbf8f7] text-left text-[11px] font-black uppercase tracking-widest text-red-950">
+              <th className="px-5 py-4">Nhân viên</th>
+              <th className="px-5 py-4">Chức vụ</th>
+              <th className="px-5 py-4">Số điện thoại</th>
+              <th className="px-5 py-4">Mức lương</th>
+              <th className="px-5 py-4">Trạng thái</th>
+              <th className="px-5 py-4 text-right">Thao tác</th>
+            </tr>
+          </thead>
+          <tbody>
+            {loading ? (
+              <tr>
+                <td colSpan="6" className="px-5 py-10 text-center text-sm font-bold text-gray-500">Đang tải dữ liệu...</td>
               </tr>
-            </thead>
-            <tbody className="text-sm">
-              {loading ? (
-                <tr>
-                  <td colSpan="6" className="text-center py-10 text-gray-500 font-medium">Đang tải dữ liệu...</td>
-                </tr>
-              ) : employees.length === 0 ? (
-                <tr>
-                  <td colSpan="6" className="text-center py-10 text-gray-500 font-medium">Chưa có nhân viên nào trên hệ thống.</td>
-                </tr>
-              ) : (
-                employees.map((emp) => (
-                  <tr key={emp._id} className="border-b border-gray-100 hover:bg-gray-50 transition-colors border-l-4 border-l-transparent">
-                    <td className="px-6 py-4">
-                      <div className="flex items-center gap-3">
-                        <div className="w-8 h-8 rounded-full bg-gray-200 text-gray-600 flex items-center justify-center text-xs font-bold">
-                          {getInitials(emp.name)}
-                        </div>
-                        <span className="font-semibold text-gray-800">{emp.name}</span>
-                      </div>
-                    </td>
-                    <td className="px-6 py-4 text-gray-600">{emp.email}</td>
-                    <td className="px-6 py-4">
-                      <span className="text-[10px] font-bold px-2.5 py-1 rounded-md tracking-wider bg-blue-100 text-[#005f7b] uppercase">
-                        {emp.role}
-                      </span>
-                    </td>
-                    <td className="px-6 py-4 text-gray-500 font-medium">{emp.phone || '-'}</td>
-                    <td className="px-6 py-4 font-bold text-gray-900">
-                      {emp.salary ? Number(emp.salary).toLocaleString('vi-VN') + ' đ' : '-'}
-                    </td>
-                    <td className="px-6 py-4 text-right flex justify-end gap-3">
-                      <button onClick={() => handleEdit(emp)} className="text-gray-400 hover:text-[#005f7b] transition-colors text-xs font-bold uppercase tracking-wider">
-                        Sửa
-                      </button>
-                      <button onClick={() => handleDeleteClick(emp._id)} className="text-gray-400 hover:text-[#c0392b] transition-colors text-xs font-bold uppercase tracking-wider">
-                        Xóa
-                      </button>
-                    </td>
-                  </tr>
-                ))
-              )}
-            </tbody>
-          </table>
+            ) : filteredEmployees.length === 0 ? (
+              <tr>
+                <td colSpan="6" className="px-5 py-10 text-center text-sm font-bold text-gray-500">Không có nhân viên phù hợp.</td>
+              </tr>
+            ) : (
+              filteredEmployees.map(employee => (
+                <EmployeeRow
+                  key={employee._id}
+                  employee={employee}
+                  onEdit={() => openEdit(employee)}
+                  onDelete={() => setDeleteModal({ isOpen: true, employee })}
+                />
+              ))
+            )}
+          </tbody>
+        </table>
+
+        <div className="flex items-center justify-between border-t border-gray-50 px-5 py-4 text-xs font-bold text-gray-500">
+          <span>Hiển thị {filteredEmployees.length} trong số {employees.length} nhân viên</span>
+          <div className="flex items-center gap-2">
+            <button className="flex h-8 w-8 items-center justify-center rounded-full border border-gray-100">‹</button>
+            <button className="flex h-8 w-8 items-center justify-center rounded-full bg-[#c70d1a] font-black text-white">1</button>
+            <button className="flex h-8 w-8 items-center justify-center rounded-full border border-gray-100">2</button>
+            <button className="flex h-8 w-8 items-center justify-center rounded-full border border-gray-100">3</button>
+            <button className="flex h-8 w-8 items-center justify-center rounded-full border border-gray-100">›</button>
+          </div>
         </div>
       </div>
 
-      {/* ===== MESSAGE BOX XÁC NHẬN XÓA ===== */}
-      {deleteModal.isOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm transition-all">
-          <div className="bg-white w-full max-w-sm rounded-2xl p-6 shadow-2xl animate-fade-in-down">
-            <div className="flex flex-col items-center text-center">
-              {/* Icon Cảnh báo */}
-              <div className="w-16 h-16 bg-red-100 text-red-600 rounded-full flex items-center justify-center mb-4">
-                <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                  <path d="M3 6h18"/><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"/><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"/><line x1="10" y1="11" x2="10" y2="17"/><line x1="14" y1="11" x2="14" y2="17"/>
-                </svg>
-              </div>
-              <h3 className="text-xl font-bold text-gray-900 mb-2">Xác nhận xóa?</h3>
-              <p className="text-sm text-gray-500 mb-6">
-                Bạn có chắc chắn muốn xóa nhân viên này khỏi hệ thống không? Hành động này không thể hoàn tác.
-              </p>
-              
-              {/* Nút bấm */}
-              <div className="flex gap-3 w-full">
-                <button onClick={closeDeleteModal} className="flex-1 py-3 bg-gray-100 text-gray-700 font-bold rounded-xl hover:bg-gray-200 transition-colors">
-                  Hủy bỏ
-                </button>
-                <button onClick={confirmDelete} className="flex-1 py-3 bg-red-600 text-white font-bold rounded-xl shadow-md shadow-red-200 hover:bg-red-700 transition-colors">
-                  Xóa nhân viên
-                </button>
-              </div>
-            </div>
-          </div>
-        </div>
+      {showForm && (
+        <EmployeeFormModal
+          formData={formData}
+          setFormData={setFormData}
+          editingEmployee={editingEmployee}
+          onSubmit={handleSubmit}
+          onClose={closeForm}
+        />
       )}
 
-      <style>{`
-        @keyframes fadeInDown {
-          from { opacity: 0; transform: translateY(-20px) scale(0.95); }
-          to { opacity: 1; transform: translateY(0) scale(1); }
-        }
-        .animate-fade-in-down {
-          animation: fadeInDown 0.2s ease-out forwards;
-        }
-      `}</style>
+      {deleteModal.isOpen && (
+        <ConfirmDeleteModal
+          employee={deleteModal.employee}
+          onCancel={() => setDeleteModal({ isOpen: false, employee: null })}
+          onConfirm={confirmDelete}
+        />
+      )}
     </div>
   );
 };
+
+const StatCard = ({ title, value, icon, tone }) => (
+  <div className="rounded-2xl bg-white p-6 shadow-sm ring-1 ring-gray-100">
+    <div className="flex items-center gap-5">
+      <div className={`flex h-12 w-12 items-center justify-center rounded-full text-xl font-black ${tone}`}>{icon}</div>
+      <div>
+        <div className="text-[11px] font-black uppercase tracking-widest text-red-950">{title}</div>
+        <div className="mt-1 text-2xl font-black text-gray-950">{value}</div>
+      </div>
+    </div>
+  </div>
+);
+
+const EmployeeRow = ({ employee, onEdit, onDelete }) => {
+  const statusClass = employee.status === 'Đang làm việc'
+    ? 'bg-emerald-50 text-emerald-700'
+    : employee.status === 'Đang nghỉ phép'
+      ? 'bg-amber-50 text-amber-700'
+      : 'bg-gray-100 text-gray-600';
+
+  return (
+    <tr className="border-t border-gray-50 text-sm text-gray-900 hover:bg-gray-50/70">
+      <td className="px-5 py-5">
+        <div className="flex items-center gap-3">
+          <div className="flex h-10 w-10 items-center justify-center rounded-full bg-gray-200 text-xs font-black text-gray-700">
+            {getInitials(employee.name)}
+          </div>
+          <div>
+            <div className="font-black text-gray-950">{employee.name}</div>
+            <div className="text-xs font-semibold text-gray-500">{employee.email}</div>
+          </div>
+        </div>
+      </td>
+      <td className="px-5 py-5 font-bold">{employee.positionLabel}</td>
+      <td className="px-5 py-5 font-semibold text-gray-700">{employee.phone || '-'}</td>
+      <td className="px-5 py-5 font-black text-[#c70d1a]">{formatCurrency(employee.salary)}</td>
+      <td className="px-5 py-5">
+        <span className={`rounded-full px-3 py-1 text-xs font-black ${statusClass}`}>{employee.status}</span>
+      </td>
+      <td className="px-5 py-5">
+        <div className="flex justify-end gap-2">
+          <button onClick={onEdit} className="rounded-lg bg-gray-100 px-3 py-2 text-xs font-black text-gray-700">Sửa</button>
+          <button onClick={onDelete} className="rounded-lg bg-red-50 px-3 py-2 text-xs font-black text-red-600">Xóa</button>
+        </div>
+      </td>
+    </tr>
+  );
+};
+
+const EmployeeFormModal = ({ formData, setFormData, editingEmployee, onSubmit, onClose }) => (
+  <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/35 px-4">
+    <div className="w-full max-w-2xl rounded-2xl bg-white p-6 shadow-2xl">
+      <div className="mb-5 flex items-start justify-between gap-4">
+        <div>
+          <h2 className="m-0 text-xl font-black text-gray-950">{editingEmployee ? 'Sửa nhân viên' : 'Thêm nhân viên'}</h2>
+          <p className="mt-1 text-sm font-medium text-gray-500">Cập nhật thông tin đăng nhập và hồ sơ nhân sự.</p>
+        </div>
+        <button onClick={onClose} className="rounded-lg bg-gray-100 px-3 py-2 text-sm font-black text-gray-600">Đóng</button>
+      </div>
+
+      <form onSubmit={onSubmit} className="grid grid-cols-1 gap-4 md:grid-cols-2">
+        <Field label="Họ và tên">
+          <input value={formData.name} onChange={event => setFormData({ ...formData, name: event.target.value })} className={inputClass} />
+        </Field>
+        <Field label="Email đăng nhập">
+          <input type="email" value={formData.email} onChange={event => setFormData({ ...formData, email: event.target.value })} className={inputClass} />
+        </Field>
+        <Field label={editingEmployee ? 'Mật khẩu mới' : 'Mật khẩu'}>
+          <input
+            type="password"
+            value={formData.password}
+            onChange={event => setFormData({ ...formData, password: event.target.value })}
+            placeholder={editingEmployee ? 'Bỏ trống nếu không đổi' : 'Tối thiểu 6 ký tự'}
+            autoComplete="new-password"
+            className={inputClass}
+            required={!editingEmployee}
+          />
+        </Field>
+        <Field label="Chức vụ">
+          <select value={formData.role} onChange={event => setFormData({ ...formData, role: event.target.value })} className={inputClass}>
+            {positions.map(position => (
+              <option key={position.value} value={position.value}>{position.label}</option>
+            ))}
+          </select>
+        </Field>
+        <Field label="Số điện thoại">
+          <input value={formData.phone} onChange={event => setFormData({ ...formData, phone: event.target.value })} className={inputClass} />
+        </Field>
+        <Field label="Mức lương">
+          <input type="number" value={formData.salary} onChange={event => setFormData({ ...formData, salary: event.target.value })} className={inputClass} />
+        </Field>
+        <Field label="Trạng thái">
+          <select value={formData.status} onChange={event => setFormData({ ...formData, status: event.target.value })} className={inputClass}>
+            {statusOptions.map(status => (
+              <option key={status} value={status}>{status}</option>
+            ))}
+          </select>
+        </Field>
+
+        <div className="flex justify-end gap-3 border-t border-gray-100 pt-5 md:col-span-2">
+          <button type="button" onClick={onClose} className="rounded-xl bg-gray-100 px-5 py-3 text-sm font-black text-gray-600">Hủy</button>
+          <button type="submit" className="rounded-xl bg-[#c70d1a] px-5 py-3 text-sm font-black text-white">
+            {editingEmployee ? 'Cập nhật' : 'Thêm mới'}
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+);
+
+const ConfirmDeleteModal = ({ employee, onCancel, onConfirm }) => (
+  <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/35 px-4">
+    <div className="w-full max-w-sm rounded-2xl bg-white p-6 text-center shadow-2xl">
+      <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-full bg-red-50 text-2xl font-black text-red-600">!</div>
+      <h2 className="m-0 text-xl font-black text-gray-950">Xóa nhân viên?</h2>
+      <p className="mt-2 text-sm font-medium text-gray-500">Bạn có chắc chắn muốn xóa {employee?.name} khỏi hệ thống không?</p>
+      <div className="mt-6 flex gap-3">
+        <button onClick={onCancel} className="flex-1 rounded-xl bg-gray-100 px-4 py-3 text-sm font-black text-gray-600">Hủy</button>
+        <button onClick={onConfirm} className="flex-1 rounded-xl bg-[#c70d1a] px-4 py-3 text-sm font-black text-white">Xóa</button>
+      </div>
+    </div>
+  </div>
+);
+
+const Field = ({ label, children }) => (
+  <label className="flex flex-col gap-1.5">
+    <span className="text-xs font-black uppercase tracking-wider text-gray-500">{label}</span>
+    {children}
+  </label>
+);
+
+const inputClass = 'w-full rounded-xl border border-gray-200 bg-white px-3 py-3 text-sm font-semibold text-gray-800 outline-none transition focus:border-[#c0392b] focus:ring-2 focus:ring-red-100';
+const selectClass = 'rounded-xl border border-red-100 bg-white px-4 py-3 text-sm font-black text-gray-700 outline-none';
 
 export default EmployeeManagementPage;

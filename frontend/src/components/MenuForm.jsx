@@ -5,7 +5,7 @@ import { ErrorBox } from '../utils/apiError';
 import { getImageUrl } from '../utils/imageUrl';
 
 const MenuForm = ({ menuItem, onSubmit, onCancel, error }) => {
-  const [form, setForm] = useState({ name: '', price: 0, description: '', category: 'Mon chinh', image: '' });
+  const [form, setForm] = useState({ name: '', price: 0, description: '', category: 'Burger', image: '', isActive: true });
   const [ingredientsList, setIngredientsList] = useState([]);
   const [selectedIngredients, setSelectedIngredients] = useState([]);
   const [imageFile, setImageFile] = useState(null);
@@ -21,8 +21,9 @@ const MenuForm = ({ menuItem, onSubmit, onCancel, error }) => {
         name: menuItem.name || '',
         price: menuItem.price ?? 0,
         description: menuItem.description || '',
-        category: menuItem.category || 'Mon chinh',
-        image: menuItem.image || ''
+        category: menuItem.category || 'Burger',
+        image: menuItem.image || '',
+        isActive: menuItem.isActive !== false,
       });
       setSelectedIngredients(
         (menuItem.ingredients || [])
@@ -31,7 +32,7 @@ const MenuForm = ({ menuItem, onSubmit, onCancel, error }) => {
       );
       setImagePreview(getImageUrl(menuItem.image));
     } else {
-      setForm({ name: '', price: 0, description: '', category: 'Mon chinh', image: '' });
+      setForm({ name: '', price: 0, description: '', category: 'Burger', image: '', isActive: true });
       setSelectedIngredients([]);
       setImagePreview('');
     }
@@ -100,54 +101,61 @@ const MenuForm = ({ menuItem, onSubmit, onCancel, error }) => {
   return (
     <div style={overlayStyle}>
       <div style={modalStyle}>
-        <h3>{menuItem ? 'Sua' : 'Them'} mon</h3>
+        <h3>{menuItem ? 'Sửa' : 'Thêm'} món</h3>
         <ErrorBox message={localError || error} />
         <form onSubmit={handleSubmit}>
-          <label>Ten mon:</label>
+          <label>Tên món:</label>
           <input value={form.name} onChange={e => setForm({ ...form, name: e.target.value })} style={inputStyle} />
 
-          <label>Gia:</label>
+          <label>Giá:</label>
           <input type="number" value={form.price} onChange={e => setForm({ ...form, price: e.target.value })} style={inputStyle} />
 
-          <label>Mo ta:</label>
+          <label>Mô tả:</label>
           <textarea value={form.description} onChange={e => setForm({ ...form, description: e.target.value })} style={inputStyle} />
 
-          <label>Danh muc:</label>
+          <label>Danh mục:</label>
           <select value={form.category} onChange={e => setForm({ ...form, category: e.target.value })} style={inputStyle}>
-            <option>Khai vi</option>
-            <option>Mon chinh</option>
-            <option>Do uong</option>
-            <option>Trang mieng</option>
+            <option>Burger</option>
+            <option>Gà rán</option>
+            <option>Đồ uống</option>
+            <option>Combo</option>
+            <option>Tráng miệng</option>
           </select>
 
-          <label>Anh mon an:</label>
+          <label>Trạng thái:</label>
+          <select value={form.isActive ? 'active' : 'inactive'} onChange={e => setForm({ ...form, isActive: e.target.value === 'active' })} style={inputStyle}>
+            <option value="active">Còn hàng</option>
+            <option value="inactive">Hết hàng</option>
+          </select>
+
+          <label>Ảnh món ăn:</label>
           <input type="file" accept=".jpg,.jpeg,.png,.webp" onChange={handleImageChange} style={inputStyle} />
           {imagePreview && <img src={imagePreview} alt="Preview" style={{ maxWidth: 200, display: 'block', marginTop: 5 }} />}
 
           <fieldset style={{ marginTop: 12 }}>
-            <legend>Nguyen lieu</legend>
+            <legend>Nguyên liệu</legend>
             {selectedIngredients.map((ing, idx) => (
               <div key={idx} style={{ display: 'flex', gap: 8, marginBottom: 8 }}>
                 <select value={ing.ingredient} onChange={e => handleIngredientChange(idx, 'ingredient', e.target.value)} style={inputStyle}>
-                  <option value="">-- Chon --</option>
+                  <option value="">-- Chọn --</option>
                   {ingredientsList.map(i => <option key={i._id} value={i._id}>{i.name} ({i.unit})</option>)}
                 </select>
                 <input
                   type="number"
-                  placeholder="So luong"
+                  placeholder="Số lượng"
                   value={ing.quantity}
                   onChange={e => handleIngredientChange(idx, 'quantity', e.target.value)}
                   style={inputStyle}
                 />
-                <button type="button" onClick={() => removeRow(idx)}>Xoa</button>
+                <button type="button" onClick={() => removeRow(idx)}>Xóa</button>
               </div>
             ))}
-            <button type="button" onClick={addRow}>+ Them nguyen lieu</button>
+            <button type="button" onClick={addRow}>+ Thêm nguyên liệu</button>
           </fieldset>
 
           <div style={{ marginTop: 10 }}>
-            <button type="submit" disabled={uploading}>{uploading ? 'Dang upload anh...' : 'Luu'}</button>
-            <button type="button" onClick={onCancel}>Huy</button>
+            <button type="submit" disabled={uploading}>{uploading ? 'Đang upload ảnh...' : 'Lưu'}</button>
+            <button type="button" onClick={onCancel}>Hủy</button>
           </div>
         </form>
       </div>

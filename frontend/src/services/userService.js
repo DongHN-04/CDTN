@@ -1,7 +1,6 @@
 import axios from 'axios';
 
-// Thay đổi tùy theo việc dùng Create React App hay Vite
-const API_URL = `${process.env.REACT_APP_API_URL}/users/`; 
+const API_URL = `${process.env.REACT_APP_API_URL || 'http://localhost:5000/api'}/users/`;
 
 const getAuthHeader = () => {
   const user = JSON.parse(localStorage.getItem('user'));

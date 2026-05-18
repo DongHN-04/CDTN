@@ -19,7 +19,7 @@ const getUsers = async (req, res) => {
 // @access  Private/Admin
 const createUser = async (req, res) => {
   // Thay address thành salary để khớp với giao diện Frontend mới
-  const { name, email, password, role, phone, salary } = req.body;
+  const { name, email, password, role, phone, salary, status } = req.body;
 
   try {
     const userExists = await User.findOne({ email });
@@ -29,7 +29,7 @@ const createUser = async (req, res) => {
 
     // Tách role tiếng Việt từ Frontend thành role hệ thống và chức vụ hiển thị
     const systemRole = role === 'admin' ? 'admin' : 'staff';
-    const displayPosition = role === 'admin' ? 'Quản trị viên' : role;
+    const displayPosition = role === 'admin' ? 'Quản trị viên' : 'Nhân viên';
 
     const user = await User.create({
       name,
@@ -39,6 +39,7 @@ const createUser = async (req, res) => {
       position: displayPosition,
       phone,
       salary, // Lưu mức lương
+      status: status || 'Đang làm việc',
     });
 
     if (user) {
@@ -50,6 +51,7 @@ const createUser = async (req, res) => {
         position: user.position,
         phone: user.phone,
         salary: user.salary,
+        status: user.status,
         token: generateToken(user._id, user.role), // trả token nếu cần dùng ngay
       });
     }
@@ -77,10 +79,14 @@ const updateUser = async (req, res) => {
       user.salary = req.body.salary;
     }
 
+    if (req.body.status !== undefined) {
+      user.status = req.body.status;
+    }
+
     // Xử lý cập nhật chức vụ
     if (req.body.role) {
       const systemRole = req.body.role === 'admin' ? 'admin' : 'staff';
-      const displayPosition = req.body.role === 'admin' ? 'Quản trị viên' : req.body.role;
+      const displayPosition = req.body.role === 'admin' ? 'Quản trị viên' : 'Nhân viên';
       user.role = systemRole;
       user.position = displayPosition;
     }
@@ -99,6 +105,7 @@ const updateUser = async (req, res) => {
       position: updatedUser.position,
       phone: updatedUser.phone,
       salary: updatedUser.salary,
+      status: updatedUser.status,
     });
   } catch (error) {
     res.status(400).json({ message: 'Cập nhật thất bại', error: error.message });

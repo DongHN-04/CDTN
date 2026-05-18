@@ -18,7 +18,7 @@ const getMenuItems = async (req, res) => {
 // Tạo món mới
 const createMenuItem = async (req, res) => {
     try {
-        const { name, price, description, category, image, ingredients } = req.body;
+        const { name, price, description, category, image, ingredients, isActive, soldCount } = req.body;
         // Kiểm tra xem tất cả ingredient id có tồn tại không
         if (ingredients && ingredients.length > 0) {
             for (let item of ingredients) {
@@ -29,7 +29,9 @@ const createMenuItem = async (req, res) => {
             }
         }
         const menuItem = await MenuItem.create({
-            name, price, description, category, image, ingredients
+            name, price, description, category, image, ingredients,
+            isActive: isActive !== undefined ? isActive : true,
+            soldCount: soldCount || 0,
         });
         const populated = await MenuItem.findById(menuItem._id).populate('ingredients.ingredient', 'name unit');
         res.status(201).json(populated);
@@ -50,6 +52,12 @@ const updateMenuItem = async (req, res) => {
         menuItem.description = req.body.description || menuItem.description;
         menuItem.category = req.body.category || menuItem.category;
         menuItem.image = req.body.image || menuItem.image;
+        if (req.body.isActive !== undefined) {
+            menuItem.isActive = req.body.isActive;
+        }
+        if (req.body.soldCount !== undefined) {
+            menuItem.soldCount = req.body.soldCount;
+        }
 
         if (req.body.ingredients) {
             for (let item of req.body.ingredients) {

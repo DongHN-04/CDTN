@@ -23,7 +23,7 @@ const AdminLayout = () => {
   ];
 
   const menuItems = [
-    { label: 'Dashboard', path: '/admin/dashboard', roles: ['admin', 'staff'], iconSrc: '/images/ICON/ICDashboard.png' },
+    { label: 'Tổng quan', path: '/admin/dashboard', roles: ['admin', 'staff'], iconSrc: '/images/ICON/ICDashboard.png' },
     { label: 'Bán hàng (POS)', path: '/staff/pos', roles: ['staff'], iconSrc: '/images/ICON/ICOrder.png' },
     { label: 'Quản lý nhân sự', path: '/admin/employees', roles: ['admin'], iconSrc: '/images/ICON/ICEmployee.png' },
     { label: 'Quản lý thực đơn', path: '/admin/menu', roles: ['admin'], iconSrc: '/images/ICON/ICMenu.png' },
@@ -35,6 +35,7 @@ const AdminLayout = () => {
     { label: 'Quản lý ca làm việc', path: '/admin/shifts', roles: ['admin', 'staff'], iconSrc: '/images/ICON/ICQrPhone.png' },
     { label: 'Nhà cung cấp', path: '/admin/suppliers', roles: ['admin'], iconSrc: '/images/ICON/restaurant.png' },
     { label: 'Lịch sử nhập hàng', path: '/admin/purchases', roles: ['admin'], iconSrc: '/images/ICON/ICKho.png' },
+    { label: 'Báo cáo doanh thu', path: '/admin/revenue', roles: ['admin'], iconSrc: '/images/ICON/ICDoanhThu.png' },
   ];
 
   const filteredMenu = menuItems.filter(item => item.roles.includes(user?.role || 'admin'));

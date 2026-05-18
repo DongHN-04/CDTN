@@ -287,6 +287,10 @@ const normalizeMenuItem = (body, errors, { partial = false } = {}) => {
   }
 
   if (hasField(body, 'image')) payload.image = trimString(body.image || '');
+  if (hasField(body, 'isActive')) payload.isActive = Boolean(body.isActive);
+  if (hasField(body, 'soldCount')) {
+    payload.soldCount = normalizeNonNegativeNumber(errors, 'soldCount', body.soldCount || 0, 'So luong da ban phai >= 0', { integer: true });
+  }
   if (hasField(body, 'ingredients')) payload.ingredients = normalizeMenuIngredients(body.ingredients, errors);
 
   return payload;
@@ -446,11 +450,23 @@ const normalizeUser = (body, errors, { partial = false } = {}) => {
 
   if (!partial || hasField(body, 'role')) {
     const role = trimString(body.role || 'staff');
+    if (!['admin', 'staff', 'Nhân viên'].includes(role)) {
+      errors.push({ field: 'role', message: 'Chuc vu nhan vien khong hop le' });
+    }
     payload.role = role === 'admin' ? 'admin' : role;
   }
 
   if (hasField(body, 'phone')) payload.phone = trimString(body.phone || '');
-  if (hasField(body, 'salary')) payload.salary = normalizeNonNegativeNumber(errors, 'salary', body.salary, 'Luong phai >= 0');
+  if (hasField(body, 'salary')) {
+    payload.salary = normalizeNonNegativeNumber(errors, 'salary', body.salary || 0, 'Luong phai >= 0');
+  }
+  if (hasField(body, 'status')) {
+    const status = trimString(body.status || 'Đang làm việc');
+    if (!['Đang làm việc', 'Đang nghỉ phép', 'Đã nghỉ việc'].includes(status)) {
+      errors.push({ field: 'status', message: 'Trang thai nhan vien khong hop le' });
+    }
+    payload.status = status;
+  }
 
   return payload;
 };

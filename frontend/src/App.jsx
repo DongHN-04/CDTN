@@ -32,6 +32,7 @@ import PromotionManagementPage from './pages/admin/PromotionManagementPage';
 import ComboManagementPage from './pages/admin/ComboManagementPage';
 import SupplierManagementPage from './pages/admin/SupplierManagementPage';
 import PurchaseHistoryPage from './pages/admin/PurchaseHistoryPage';
+import RevenueReportPage from './pages/admin/RevenueReportPage';
 
 // Staff Pages
 import POSPage from './pages/staff/POSPage';
@@ -134,6 +135,14 @@ function App() {
                 element={
                   <RoleBasedRoute allowedRoles={['admin']}>
                     <PurchaseHistoryPage />
+                  </RoleBasedRoute>
+                }
+              />
+              <Route
+                path="/admin/revenue"
+                element={
+                  <RoleBasedRoute allowedRoles={['admin']}>
+                    <RevenueReportPage />
                   </RoleBasedRoute>
                 }
               />

@@ -67,7 +67,13 @@ const EmployeeForm = ({ user, onSubmit, onCancel }) => {
           <input name="email" type="email" value={formData.email} onChange={handleChange} required /><br />
 
           <label>Mật khẩu {user && '(để trống nếu không đổi)'}:</label>
-          <input name="password" type="password" value={formData.password} onChange={handleChange} /><br />
+          <input
+            name="password"
+            type="password"
+            value={formData.password}
+            onChange={handleChange}
+            autoComplete="new-password"
+          /><br />
 
           <label>Vai trò:</label>
           <select name="role" value={formData.role} onChange={handleChange}>

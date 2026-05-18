@@ -6,6 +6,14 @@ const menuItemSchema = new mongoose.Schema({
   description: String,                                    // mô tả món
   category: { type: String, required: true },             // danh mục (Khai vị, Món chính...)
   image: String,                                          // URL ảnh (có thể để tạm)
+  isActive: {
+    type: Boolean,
+    default: true,
+  },
+  soldCount: {
+    type: Number,
+    default: 0,
+  },
   ingredients: [                                          // danh sách nguyên liệu cần cho 1 món
     {
       ingredient: {

@@ -8,7 +8,7 @@ const Promotion = require('../models/Promotion');
 // @access  Public
 const getMenu = async (req, res) => {
   try {
-    const menuItems = await MenuItem.find({});
+    const menuItems = await MenuItem.find({ isActive: { $ne: false } });
     // Chỉ trả về thông tin cơ bản, không cần populate nguyên liệu
     const publicMenu = menuItems.map(item => ({
       _id: item._id,
@@ -17,6 +17,7 @@ const getMenu = async (req, res) => {
       description: item.description,
       category: item.category,
       image: item.image,
+      isActive: item.isActive,
     }));
     res.json(publicMenu);
   } catch (error) {
@@ -51,7 +52,7 @@ const createOrder = async (req, res) => {
         subtotal += combo.price * item.quantity;
       } else if (item.menuItem) {
         const menuItem = await MenuItem.findById(item.menuItem);
-        if (!menuItem) throw new Error(`Món không tồn tại: ${item.menuItem}`);
+        if (!menuItem || menuItem.isActive === false) throw new Error(`Món không tồn tại hoặc đã ngừng bán: ${item.menuItem}`);
         orderItems.push({
           menuItem: menuItem._id,
           quantity: item.quantity,
@@ -163,7 +164,7 @@ const getHomepageData = async (req, res) => {
     const now = new Date();
 
     const [menuItems, combos, promotions] = await Promise.all([
-      MenuItem.find({}),
+      MenuItem.find({ isActive: { $ne: false } }),
       Combo.find({ isActive: true }).populate('items.menuItem', 'name price image'),
       Promotion.find({
         startDate: { $lte: now },

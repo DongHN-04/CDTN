@@ -38,6 +38,11 @@ const userSchema = mongoose.Schema(
     salary: {
       type: Number, 
     },
+    status: {
+      type: String,
+      enum: ['Đang làm việc', 'Đang nghỉ phép', 'Đã nghỉ việc'],
+      default: 'Đang làm việc',
+    },
   },
   {
     timestamps: true,
