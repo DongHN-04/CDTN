@@ -8,7 +8,10 @@ const getReports = async (req, res) => {
     try {
         // Lấy tham số ngày (nếu có)
         const { startDate, endDate } = req.query;
-        const matchFilter = {};
+        const matchFilter = {
+            status: { $in: ['confirmed', 'delivering', 'completed'] },
+            paymentStatus: 'paid',
+        };
 
         if (startDate && endDate) {
             // Tạo ngày bắt đầu bằng 00:00:00 và ngày kết thúc bằng 23:59:59
@@ -37,7 +40,12 @@ const getReports = async (req, res) => {
             { $unwind: '$items' },
             {
                 $group: {
-                    _id: '$items.menuItem',
+                    _id: {
+                        id: { $ifNull: ['$items.menuItem', '$items.comboId'] },
+                        type: {
+                            $cond: [{ $ifNull: ['$items.menuItem', false] }, 'menuItem', 'combo']
+                        }
+                    },
                     totalQuantity: { $sum: '$items.quantity' },
                     totalRevenue: { $sum: { $multiply: ['$items.price', '$items.quantity'] } }
                 }
@@ -47,17 +55,27 @@ const getReports = async (req, res) => {
             {
                 $lookup: {
                     from: 'menuitems',
-                    localField: '_id',
+                    localField: '_id.id',
                     foreignField: '_id',
                     as: 'menuItem'
                 }
             },
-            { $unwind: '$menuItem' },
+            {
+                $lookup: {
+                    from: 'combos',
+                    localField: '_id.id',
+                    foreignField: '_id',
+                    as: 'combo'
+                }
+            },
+            { $unwind: { path: '$menuItem', preserveNullAndEmptyArrays: true } },
+            { $unwind: { path: '$combo', preserveNullAndEmptyArrays: true } },
             {
                 $project: {
                     _id: 0,
-                    menuItemId: '$_id',
-                    name: '$menuItem.name',
+                    itemId: '$_id.id',
+                    type: '$_id.type',
+                    name: { $ifNull: ['$menuItem.name', '$combo.name'] },
                     totalQuantity: 1,
                     totalRevenue: 1
                 }

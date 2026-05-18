@@ -1,5 +1,5 @@
 import axios from 'axios';
-const API_URL = `${process.env.REACT_APP_API_URL}/orders/`;
+const API_URL = `${process.env.REACT_APP_API_URL || 'http://localhost:5000/api'}/orders/`;
 
 const getAuthHeader = () => {
   const user = JSON.parse(localStorage.getItem('user'));
@@ -14,7 +14,6 @@ const orderService = {
   // Tạo đơn hàng (cho POS)
   createOrder: async (orderData) => {
     const headers = getAuthHeader();
-    console.log('Headers gửi đi:', headers);
     const response = await axios.post(API_URL, orderData, { headers });
     return response.data;
   },
@@ -40,6 +39,11 @@ const orderService = {
   // 🆕 Xác nhận đơn hàng từ khách (trừ kho)
   confirmOrder: async (id) => {
     const response = await axios.put(API_URL + id + '/confirm', {}, { headers: getAuthHeader() });
+    return response.data;
+  },
+
+  updateOrderStatus: async (id, status) => {
+    const response = await axios.put(API_URL + id + '/status', { status }, { headers: getAuthHeader() });
     return response.data;
   }
 };

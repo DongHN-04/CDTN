@@ -38,7 +38,6 @@ import POSPage from './pages/staff/POSPage';
 
 // Shared Pages
 import CustomerManagementPage from './pages/shared/CustomerManagementPage.jsx';
-import InvoiceListPage from './pages/shared/InvoiceListPage';
 import InvoiceDetailPage from './pages/shared/InvoiceDetailPage.jsx';
 import CustomerOrdersPage from './pages/shared/CustomerOrdersPage';
 import ShiftManagementPage from './pages/shared/ShiftManagementPage.jsx';
@@ -160,7 +159,7 @@ function App() {
                 path="/admin/invoices"
                 element={
                   <RoleBasedRoute allowedRoles={['admin', 'staff']}>
-                    <InvoiceListPage />
+                    <CustomerOrdersPage />
                   </RoleBasedRoute>
                 }
               />

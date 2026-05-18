@@ -1,6 +1,9 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { useCart } from '../../contexts/CartContext';
+import publicService from '../../services/publicService';
+import { getImageUrl } from '../../utils/imageUrl';
+import { findUsablePromotion, normalizePromoCode } from '../../utils/promotionUtils';
 
 // Định nghĩa defaultImages
 const defaultImages = {
@@ -15,10 +18,11 @@ const defaultImages = {
 const formatPrice = (val) => val.toLocaleString('vi-VN') + ' VNĐ';
 
 const CartPage = () => {
-  const { items, removeItem, updateQuantity, getCartTotal, getItemCount } = useCart();
+  const { items, removeItem, updateQuantity, getCartTotal } = useCart();
   const [promoInput, setPromoInput] = useState('');
   const [appliedPromo, setAppliedPromo] = useState('');
   const [discountAmount, setDiscountAmount] = useState(0);
+  const [promotions, setPromotions] = useState([]);
   const [toast, setToast] = useState({ show: false, message: '', type: 'success' });
   const navigate = useNavigate();
 
@@ -32,21 +36,43 @@ const CartPage = () => {
     }
   }, []);
 
+  useEffect(() => {
+    publicService.getPromotions()
+      .then(data => setPromotions(data || []))
+      .catch(() => setPromotions([]));
+  }, []);
+
+  useEffect(() => {
+    if (!appliedPromo) return;
+
+    const { discount, error } = findUsablePromotion(promotions, appliedPromo, getCartTotal());
+    if (error || discount <= 0) {
+      setAppliedPromo('');
+      setDiscountAmount(0);
+      localStorage.removeItem('appliedPromo');
+      localStorage.removeItem('discountAmount');
+      return;
+    }
+
+    setDiscountAmount(discount);
+    localStorage.setItem('discountAmount', String(discount));
+  }, [items, promotions, appliedPromo, getCartTotal]);
+
   const handleApplyPromo = () => {
-    const code = promoInput.trim().toUpperCase();
+    const code = normalizePromoCode(promoInput);
     if (!code) return;
 
-    if (code === 'SONDONG2026' || code === 'FASTFOOD10') {
-      const subtotal = getCartTotal();
-      const discount = Math.round(subtotal * 0.1); // Giảm 10%
-      setDiscountAmount(discount);
-      setAppliedPromo(code);
-      localStorage.setItem('appliedPromo', code);
-      localStorage.setItem('discountAmount', String(discount));
-      showToast(`✓ Áp dụng mã "${code}" thành công! Giảm giá 10%`, 'success');
-    } else {
-      showToast('❌ Mã giảm giá không hợp lệ hoặc đã hết hạn!', 'error');
+    const { promotion, discount, error } = findUsablePromotion(promotions, code, getCartTotal());
+    if (error) {
+      showToast(error, 'error');
+      return;
     }
+
+    setDiscountAmount(discount);
+    setAppliedPromo(promotion.name);
+    localStorage.setItem('appliedPromo', promotion.name);
+    localStorage.setItem('discountAmount', String(discount));
+    showToast(`Áp dụng mã "${promotion.name}" thành công.`, 'success');
   };
 
   const showToast = (message, type = 'success') => {
@@ -58,10 +84,10 @@ const CartPage = () => {
 
   const handleCheckoutRedirect = () => {
     if (items.length === 0) {
-      showToast('❌ Giỏ hàng đang trống!', 'error');
+      showToast('Giỏ hàng đang trống.', 'error');
       return;
     }
-    // Chuyển hướng sang /checkout kèm theo state giảm giá
+    // Chuyển mã khuyến mãi sang checkout; backend sẽ tự tính lại số tiền giảm để chống sửa dữ liệu.
     navigate('/checkout', { 
       state: { 
         discount: discountAmount, 
@@ -70,17 +96,14 @@ const CartPage = () => {
     });
   };
 
-  // Hàm phân giải ảnh thông minh
+  // Chuẩn hóa URL ảnh để chạy được cả local và khi deploy.
   const getResolvedImage = (item) => {
     const rawImg = item.type === 'combo' ? item.image : item.menuItem?.image;
     if (!rawImg) {
       const cat = item.type === 'combo' ? 'Burger' : (item.menuItem?.category || 'Burger');
       return defaultImages[cat] || '/images/home/product-burger.png';
     }
-    if (rawImg.startsWith('http://') || rawImg.startsWith('https://') || rawImg.startsWith('data:image') || rawImg.startsWith('/images')) {
-      return rawImg;
-    }
-    return `http://localhost:5000${rawImg}`;
+    return getImageUrl(rawImg, defaultImages[item.menuItem?.category] || '/images/home/product-burger.png');
   };
 
   const getItemName = (item) => {
@@ -97,9 +120,8 @@ const CartPage = () => {
 
   // Tính toán các thông số tiền tệ
   const subtotal = getCartTotal();
-  const deliveryFee = subtotal > 0 ? 30000 : 0; // Phí giao hàng cố định 30k
-  const tax = Math.round(subtotal * 0.1); // Thuế 10%
-  const total = Math.max(0, subtotal + deliveryFee + tax - discountAmount);
+  const deliveryFee = subtotal > 0 ? 15000 : 0; // Đồng bộ với phí giao hàng backend đang tính cho đơn giao tận nơi.
+  const total = Math.max(0, subtotal + deliveryFee - discountAmount);
 
   return (
     <div className="max-w-[1200px] mx-auto px-5 py-12 font-sans">
@@ -230,7 +252,7 @@ const CartPage = () => {
               <div className="flex gap-2">
                 <input 
                   type="text" 
-                  placeholder="Nhập mã (Ví dụ: SONDONG2026)" 
+                  placeholder="Nhập mã khuyến mãi" 
                   value={promoInput}
                   onChange={(e) => setPromoInput(e.target.value)}
                   className="flex-1 bg-gray-50 border border-gray-100 rounded-xl px-4 py-2.5 text-[13px] font-semibold text-gray-700 outline-none focus:border-[#c0392b] focus:bg-white transition-all"
@@ -258,10 +280,6 @@ const CartPage = () => {
               <div className="flex justify-between items-center text-sm font-semibold text-gray-500">
                 <span>Phí giao hàng</span>
                 <span className="text-gray-800">{formatPrice(deliveryFee)}</span>
-              </div>
-              <div className="flex justify-between items-center text-sm font-semibold text-gray-500">
-                <span>Thuế (10%)</span>
-                <span className="text-gray-800">{formatPrice(tax)}</span>
               </div>
               {discountAmount > 0 && (
                 <div className="flex justify-between items-center text-sm font-semibold text-red-500">

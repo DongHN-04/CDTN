@@ -111,6 +111,16 @@ const checkAndDecreaseStock = async (requirements, session = null) => {
   }
 };
 
+const restoreStock = async (requirements, session = null) => {
+  for (const requirement of requirements) {
+    await Ingredient.updateOne(
+      { _id: requirement.ingredientId },
+      { $inc: { stock: requirement.requiredQty } },
+      { session }
+    );
+  }
+};
+
 const getBestPromotionDiscount = async (subtotal) => {
   const activePromotions = await Promotion.find({
     isActive: true,
@@ -161,6 +171,7 @@ const createOrder = async (req, res) => {
         total,
         paymentMethod: paymentMethod || 'cash',
         paymentStatus: 'paid',
+        inventoryDeducted: true,
         status: 'confirmed',
       }], { session });
 
@@ -233,6 +244,30 @@ const getPendingOrders = async (req, res) => {
   }
 };
 
+const preparePendingOrder = async (order, userId, session = null) => {
+  if (order.status !== 'pending') return;
+
+  if (order.paymentMethod === 'qr' && order.paymentStatus !== 'paid') {
+    throw new Error('Don hang QR chua thanh toan thanh cong');
+  }
+
+  if (!order.inventoryDeducted) {
+    const items = order.items.map((item) => ({
+      menuItem: item.menuItem,
+      comboId: item.comboId,
+      quantity: item.quantity,
+    }));
+    const { requirements } = await collectOrderDetails(items, session);
+    await checkAndDecreaseStock(requirements, session);
+    order.inventoryDeducted = true;
+  }
+
+  order.staff = userId;
+  if (order.paymentMethod === 'cash' || order.paymentMethod === 'card') {
+    order.paymentStatus = 'paid';
+  }
+};
+
 // @desc    Xac nhan don hang tu khach va tru kho
 // @route   PUT /api/orders/:id/confirm
 // @access  Private (Admin, Staff)
@@ -248,20 +283,8 @@ const confirmOrder = async (req, res) => {
         throw new Error('Don hang khong o trang thai cho xac nhan');
       }
 
-      const items = order.items.map((item) => ({
-        menuItem: item.menuItem,
-        comboId: item.comboId,
-        quantity: item.quantity,
-      }));
-      const { requirements } = await collectOrderDetails(items, session);
-      await checkAndDecreaseStock(requirements, session);
-
+      await preparePendingOrder(order, req.user._id, session);
       order.status = 'confirmed';
-      order.staff = req.user._id;
-      if (order.paymentMethod === 'cash' || order.paymentMethod === 'card') {
-        // Don tien mat/the duoc xem la da thu khi nhan vien xac nhan don.
-        order.paymentStatus = 'paid';
-      }
       await order.save({ session });
       confirmedOrderId = order._id;
     });
@@ -278,4 +301,78 @@ const confirmOrder = async (req, res) => {
   }
 };
 
-module.exports = { createOrder, getOrders, getOrderById, getPendingOrders, confirmOrder };
+// @desc    Cap nhat trang thai don hang
+// @route   PUT /api/orders/:id/status
+// @access  Private (Admin, Staff)
+const updateOrderStatus = async (req, res) => {
+  const session = await mongoose.startSession();
+  try {
+    const allowedStatuses = ['pending', 'confirmed', 'delivering', 'completed', 'cancelled'];
+    const { status } = req.body;
+
+    if (!allowedStatuses.includes(status)) {
+      return res.status(400).json({ message: 'Trang thai don hang khong hop le' });
+    }
+
+    let updatedOrderId;
+
+    await session.withTransaction(async () => {
+      const order = await Order.findById(req.params.id).session(session);
+      if (!order) throw new Error('Khong tim thay don hang');
+      if (order.status === 'cancelled' || order.status === 'completed') {
+        throw new Error('Don hang da ket thuc, khong the cap nhat');
+      }
+
+      if (status === 'pending') {
+        throw new Error('Khong the dua don hang ve trang thai cho xac nhan');
+      }
+
+      if (status === 'cancelled') {
+        if (order.inventoryDeducted) {
+          const items = order.items.map((item) => ({
+            menuItem: item.menuItem,
+            comboId: item.comboId,
+            quantity: item.quantity,
+          }));
+          const { requirements } = await collectOrderDetails(items, session);
+          await restoreStock(requirements, session);
+          order.inventoryDeducted = false;
+        }
+        order.status = 'cancelled';
+        await order.save({ session });
+        updatedOrderId = order._id;
+        return;
+      }
+
+      if (order.status === 'pending') {
+        await preparePendingOrder(order, req.user._id, session);
+      }
+
+      order.status = status;
+      await order.save({ session });
+      updatedOrderId = order._id;
+    });
+
+    const populatedOrder = await Order.findById(updatedOrderId)
+      .populate('staff', 'name')
+      .populate('items.menuItem', 'name price');
+
+    res.json(populatedOrder);
+  } catch (error) {
+    res.status(400).json({ message: error.message });
+  } finally {
+    session.endSession();
+  }
+};
+
+module.exports = {
+  createOrder,
+  getOrders,
+  getOrderById,
+  getPendingOrders,
+  confirmOrder,
+  updateOrderStatus,
+  collectOrderDetails,
+  checkAndDecreaseStock,
+  restoreStock,
+};

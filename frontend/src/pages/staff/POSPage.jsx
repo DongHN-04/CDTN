@@ -4,6 +4,7 @@ import menuService from '../../services/menuService';
 import orderService from '../../services/orderService';
 import comboService from '../../services/comboService';
 import promotionService from '../../services/promotionService';
+import { getImageUrl } from '../../utils/imageUrl';
 
 const POSPage = () => {
   const [menuItems, setMenuItems] = useState([]);
@@ -133,7 +134,6 @@ const POSPage = () => {
         promotionId: selectedPromoId !== 'auto' ? selectedPromoId : null
       };
 
-      console.log('Dữ liệu thanh toán:', orderData);
       const order = await orderService.createOrder(orderData);
       setMessage(`Đơn hàng #${order._id.slice(-6)} đã được tạo thành công. Tổng: ${order.total.toLocaleString()}₫`);
       clearCart();
@@ -213,7 +213,7 @@ const POSPage = () => {
                 padding: '10px', cursor: 'pointer', transition: 'transform 0.2s', textAlign: 'center',
               }}>
               {item.image ? (
-                <img src={item.image.startsWith('data:image') ? item.image : `http://localhost:5000${item.image}`}
+                <img src={getImageUrl(item.image)}
                   alt={item.name} style={{ width: '100%', height: '120px', objectFit: 'cover', borderRadius: '4px' }}
                   onError={(e) => { e.target.style.display = 'none'; }} />
               ) : (

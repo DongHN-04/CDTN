@@ -7,6 +7,10 @@ const User = require('../models/User');
 const protect = async (req, res, next) => {
   let token;
 
+  if (!process.env.JWT_SECRET) {
+    return res.status(500).json({ message: 'JWT_SECRET is not configured' });
+  }
+
   // Kiểm tra header Authorization có dạng "Bearer <token>"
   if (
     req.headers.authorization &&

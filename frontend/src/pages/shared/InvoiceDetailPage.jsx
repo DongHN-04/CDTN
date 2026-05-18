@@ -24,6 +24,7 @@ const InvoiceDetailPage = () => {
       <div style={{ background: '#fff', padding: '20px', borderRadius: '8px', marginBottom: '20px' }}>
         <p><strong>Ngày tạo:</strong> {new Date(order.createdAt).toLocaleString('vi-VN')}</p>
         <p><strong>Khách hàng:</strong> {order.customer?.name || 'Khách lẻ'} {order.customer?.phone && `- ${order.customer.phone}`}</p>
+        {order.customer?.address && <p><strong>Địa chỉ:</strong> {order.customer.address}</p>}
         <p><strong>Nhân viên:</strong> {order.staff?.name}</p>
         <p><strong>Phương thức:</strong> {order.paymentMethod === 'cash' ? 'Tiền mặt' : order.paymentMethod === 'card' ? 'Thẻ' : 'QR'}</p>
       </div>
@@ -40,7 +41,7 @@ const InvoiceDetailPage = () => {
         <tbody>
           {order.items.map((item, idx) => (
             <tr key={idx} style={{ borderBottom: '1px solid #eee' }}>
-              <td style={tdStyle}>{item.menuItem?.name}</td>
+              <td style={tdStyle}>{item.menuItem?.name || item.name || 'Combo'}</td>
               <td style={tdStyle}>{item.quantity}</td>
               <td style={tdStyle}>{item.price?.toLocaleString()}₫</td>
               <td style={tdStyle}>{(item.price * item.quantity).toLocaleString()}₫</td>
@@ -51,7 +52,8 @@ const InvoiceDetailPage = () => {
 
       <div style={{ background: '#fff', padding: '20px', marginTop: '20px', borderRadius: '8px', textAlign: 'right' }}>
         <p>Tạm tính: {order.subtotal?.toLocaleString()}₫</p>
-        <p>Giảm giá: {order.discount?.toLocaleString()}₫</p>
+        {(order.deliveryFee || 0) > 0 && <p>Phí giao hàng: {order.deliveryFee?.toLocaleString()}₫</p>}
+        <p>Giảm giá{order.promoCode ? ` (${order.promoCode})` : ''}: {order.discount?.toLocaleString()}₫</p>
         <p style={{ fontWeight: 'bold', fontSize: '18px' }}>Tổng: {order.total?.toLocaleString()}₫</p>
       </div>
     </div>

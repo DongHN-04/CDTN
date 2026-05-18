@@ -17,14 +17,17 @@ const orderSchema = new mongoose.Schema({
   staff: { type: mongoose.Schema.Types.ObjectId, ref: 'User' }, // không bắt buộc (vì khách tự đặt)
   items: [orderItemSchema],
   subtotal: { type: Number, required: true },
+  deliveryFee: { type: Number, default: 0 },
   discount: { type: Number, default: 0 },
+  promoCode: { type: String, default: '' },
   total: { type: Number, required: true },
   paymentMethod: { type: String, enum: ['cash', 'card', 'qr'], default: 'cash' },
   paymentStatus: { type: String, enum: ['unpaid', 'paid', 'failed'], default: 'unpaid' },
   txnRef: { type: String, default: '' },
+  inventoryDeducted: { type: Boolean, default: false },
   status: {
     type: String,
-    enum: ['pending', 'confirmed', 'completed', 'cancelled'],
+    enum: ['pending', 'confirmed', 'delivering', 'completed', 'cancelled'],
     default: 'pending' // mặc định là chờ xác nhận khi khách đặt
   },
   // Dành cho đơn từ khách:

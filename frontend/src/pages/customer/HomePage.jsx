@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import publicService from '../../services/publicService';
 import { useCart } from '../../contexts/CartContext';
+import { getImageUrl } from '../../utils/imageUrl';
 
 /* ───────── SVG Icon Components ───────── */
 const BurgerIcon = () => (
@@ -86,6 +87,16 @@ const autoBadges = [
 
 const formatPrice = (val) => val.toLocaleString('vi-VN') + ' VNĐ';
 
+const getHomeBannerImage = () => {
+  try {
+    const banners = JSON.parse(localStorage.getItem('promotionBanners')) || [];
+    const activeIndex = Number(localStorage.getItem('activePromotionBannerIndex') || 0);
+    return banners[activeIndex]?.image || banners[0]?.image || '/images/home/hero-burger.png';
+  } catch (err) {
+    return '/images/home/hero-burger.png';
+  }
+};
+
 /* ═══════════════════════════════════════════════
    HOMEPAGE COMPONENT
    ═══════════════════════════════════════════════ */
@@ -93,6 +104,7 @@ const HomePage = () => {
   const { addItem } = useCart();
   const [featured, setFeatured] = useState([]);
   const [toast, setToast] = useState({ show: false, message: '' });
+  const [homeBanner, setHomeBanner] = useState(getHomeBannerImage);
 
   useEffect(() => {
     publicService.getHomepageData()
@@ -102,10 +114,22 @@ const HomePage = () => {
       .catch(() => {});
   }, []);
 
+  useEffect(() => {
+    const syncBanner = () => setHomeBanner(getHomeBannerImage());
+
+    window.addEventListener('storage', syncBanner);
+    window.addEventListener('promotion-banner-updated', syncBanner);
+
+    return () => {
+      window.removeEventListener('storage', syncBanner);
+      window.removeEventListener('promotion-banner-updated', syncBanner);
+    };
+  }, []);
+
   const bestSellers = featured.slice(0, 4).map((item, idx) => ({
     ...item,
     image: item.image 
-      ? (item.image.startsWith('data:image') || item.image.startsWith('/images') ? item.image : `http://localhost:5000${item.image}`) 
+      ? getImageUrl(item.image, defaultImages[item.category] || '/images/home/product-burger.png') 
       : defaultImages[item.category] || '/images/home/product-burger.png',
     badge: autoBadges[idx] || null,
     rating: [4.8, 4.9, 4.7, 4.6][idx] || 4.5,
@@ -168,7 +192,7 @@ const HomePage = () => {
               {/* Main large image */}
               <div className="absolute top-0 right-0 w-[280px] h-[280px] rounded-3xl overflow-hidden shadow-2xl border-4 border-white transform rotate-2 hover:rotate-0 transition-transform duration-500 z-20">
                 <img 
-                  src="/images/home/hero-burger.png" 
+                  src={getImageUrl(homeBanner, '/images/home/hero-burger.png')}
                   alt="Burger ngon" 
                   className="w-full h-full object-cover"
                 />

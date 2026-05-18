@@ -41,6 +41,18 @@ const normalizePositiveNumber = (errors, field, value, message, { integer = fals
   return number;
 };
 
+const startOfDay = (date) => {
+  const normalized = new Date(date);
+  normalized.setHours(0, 0, 0, 0);
+  return normalized;
+};
+
+const endOfDay = (date) => {
+  const normalized = new Date(date);
+  normalized.setHours(23, 59, 59, 999);
+  return normalized;
+};
+
 const validateAuthRegister = validateBody((body, errors) => {
   const name = trimString(body.name);
   const email = trimString(body.email)?.toLowerCase();
@@ -106,13 +118,13 @@ const normalizePromotion = (body, errors, { partial = false } = {}) => {
   if (!partial || hasField(body, 'startDate')) {
     const startDate = new Date(body.startDate);
     if (Number.isNaN(startDate.getTime())) errors.push({ field: 'startDate', message: 'Ngay bat dau khong hop le' });
-    payload.startDate = startDate;
+    payload.startDate = startOfDay(startDate);
   }
 
   if (!partial || hasField(body, 'endDate')) {
     const endDate = new Date(body.endDate);
     if (Number.isNaN(endDate.getTime())) errors.push({ field: 'endDate', message: 'Ngay ket thuc khong hop le' });
-    payload.endDate = endDate;
+    payload.endDate = endOfDay(endDate);
   }
 
   if (payload.startDate && payload.endDate && payload.endDate < payload.startDate) {
@@ -166,12 +178,13 @@ const normalizeOrderItems = (items, errors) => {
 
 const normalizeCustomer = (customer) => {
   if (!isPlainObject(customer)) {
-    return { name: 'Khach le', phone: '' };
+    return { name: 'Khach le', phone: '', address: '' };
   }
 
   return {
     name: trimString(customer.name || 'Khach le'),
     phone: trimString(customer.phone || ''),
+    address: trimString(customer.address || ''),
   };
 };
 
@@ -191,12 +204,22 @@ const validateOrderCreate = validateBody((body, errors) => {
   };
 });
 
-const validatePublicOrderCreate = validateBody((body, errors) => ({
-  customer: normalizeCustomer(body.customer),
-  items: normalizeOrderItems(body.items, errors),
-  tableNumber: trimString(body.tableNumber || ''),
-  notes: trimString(body.notes || ''),
-}));
+const validatePublicOrderCreate = validateBody((body, errors) => {
+  const paymentMethod = trimString(body.paymentMethod || 'cash');
+
+  if (!['cash', 'vnpay', 'momo'].includes(paymentMethod)) {
+    errors.push({ field: 'paymentMethod', message: 'Phuong thuc thanh toan khong hop le' });
+  }
+
+  return {
+    customer: normalizeCustomer(body.customer),
+    items: normalizeOrderItems(body.items, errors),
+    tableNumber: trimString(body.tableNumber || ''),
+    notes: trimString(body.notes || ''),
+    paymentMethod,
+    promoCode: trimString(body.promoCode || '').toUpperCase(),
+  };
+});
 
 const normalizeIngredient = (body, errors, { partial = false } = {}) => {
   const payload = {};
@@ -289,10 +312,10 @@ const normalizeCustomerRecord = (body, errors, { partial = false } = {}) => {
   }
   if (hasField(body, 'type')) {
     const type = trimString(body.type);
-    if (!['VIP', 'Regular', 'Thuong', 'ThÆ°á»ng'].includes(type)) {
+    if (!['VIP', 'Regular', 'Thuong', 'Thường'].includes(type)) {
       errors.push({ field: 'type', message: 'Loai khach hang khong hop le' });
     }
-    payload.type = type === 'VIP' ? 'VIP' : 'ThÆ°á»ng';
+    payload.type = type === 'VIP' ? 'VIP' : 'Thường';
   }
   if (hasField(body, 'notes')) payload.notes = trimString(body.notes || '');
 

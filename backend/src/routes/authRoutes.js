@@ -11,6 +11,19 @@ const authLimiter = rateLimit({
 });
 
 router.post('/register', authLimiter, validateAuthRegister, registerUser);
-router.post('/login', authLimiter, validateAuthLogin, loginUser);
+router
+  .route('/login')
+  .post(authLimiter, validateAuthLogin, loginUser)
+  .all((req, res) => {
+    res.status(405).json({
+      message: 'Dang nhap phai dung phuong thuc POST',
+      method: 'POST',
+      path: '/api/auth/login',
+      body: {
+        email: 'admin@example.com',
+        password: 'your-password',
+      },
+    });
+  });
 
 module.exports = router;

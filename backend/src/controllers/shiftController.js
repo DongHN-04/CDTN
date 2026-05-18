@@ -156,16 +156,27 @@ const closeShift = async (req, res) => {
         }
 
         // Tính tổng tiền mặt từ các đơn hàng trong khoảng thời gian ca
-        const orders = await Order.find({
+        const shiftEndTime = req.body.endTime || new Date();
+
+        const cashOrders = await Order.find({
             paymentMethod: 'cash',
-            status: { $in: ['confirmed', 'completed'] },
-            createdAt: { $gte: shift.startTime, $lte: req.body.endTime || new Date() },
+            status: { $in: ['confirmed', 'delivering', 'completed'] },
+            paymentStatus: 'paid',
+            createdAt: { $gte: shift.startTime, $lte: shiftEndTime },
         });
 
-        const totalCash = orders.reduce((sum, order) => sum + order.total, 0);
+        const revenueOrders = await Order.find({
+            status: { $in: ['confirmed', 'delivering', 'completed'] },
+            paymentStatus: 'paid',
+            createdAt: { $gte: shift.startTime, $lte: shiftEndTime },
+        });
 
-        shift.endTime = req.body.endTime || new Date();
+        const totalCash = cashOrders.reduce((sum, order) => sum + order.total, 0);
+        const totalRevenue = revenueOrders.reduce((sum, order) => sum + order.total, 0);
+
+        shift.endTime = shiftEndTime;
         shift.totalCash = totalCash;
+        shift.totalRevenue = totalRevenue;
         shift.actualCash = req.body.actualCash || 0;
         shift.difference = shift.actualCash - totalCash;
         shift.status = 'closed';

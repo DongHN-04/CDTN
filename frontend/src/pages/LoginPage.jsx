@@ -69,12 +69,12 @@ const LoginPage = () => {
                 <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#9ca3af" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
               </span>
               <input
-                type="text"
+                type="email"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 required
                 style={inputStyle}
-                placeholder="admin_sondong"
+                placeholder="admin@example.com"
               />
             </div>
           </div>

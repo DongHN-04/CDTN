@@ -3,6 +3,8 @@ import { useNavigate, useLocation, Link } from 'react-router-dom';
 import { useCart } from '../../contexts/CartContext';
 import publicService from '../../services/publicService';
 import paymentService from '../../services/paymentService';
+import { getImageUrl } from '../../utils/imageUrl';
+import { findUsablePromotion, normalizePromoCode } from '../../utils/promotionUtils';
 
 // Định nghĩa defaultImages
 const defaultImages = {
@@ -35,6 +37,7 @@ const CheckoutPage = () => {
   const [paymentMethod, setPaymentMethod] = useState('cash'); // 'cash' (COD), 'vnpay', 'momo'
   const [promoCode, setPromoCode] = useState(initialPromo);
   const [discount, setDiscount] = useState(initialDiscount);
+  const [promotions, setPromotions] = useState([]);
   
   // UI states
   const [loading, setLoading] = useState(false);
@@ -55,6 +58,12 @@ const CheckoutPage = () => {
     }
   }, [items, navigate]);
 
+  useEffect(() => {
+    publicService.getPromotions()
+      .then(data => setPromotions(data || []))
+      .catch(() => setPromotions([]));
+  }, []);
+
   const showToast = (message, type = 'success') => {
     setToast({ show: true, message, type });
     setTimeout(() => {
@@ -63,19 +72,20 @@ const CheckoutPage = () => {
   };
 
   const handleApplyPromo = () => {
-    const code = promoCode.trim().toUpperCase();
+    const code = normalizePromoCode(promoCode);
     if (!code) return;
 
-    if (code === 'SONDONG2026' || code === 'FASTFOOD10') {
-      const subtotal = getCartTotal();
-      const newDiscount = Math.round(subtotal * 0.1); // Giảm 10%
-      setDiscount(newDiscount);
-      localStorage.setItem('appliedPromo', code);
-      localStorage.setItem('discountAmount', String(newDiscount));
-      showToast(`✓ Áp dụng mã "${code}" thành công! Giảm giá 10%`, 'success');
-    } else {
-      showToast('❌ Mã giảm giá không hợp lệ!', 'error');
+    const { promotion, discount: promoDiscount, error } = findUsablePromotion(promotions, code, getCartTotal());
+    if (error) {
+      showToast(error, 'error');
+      return;
     }
+
+    setPromoCode(promotion.name);
+    setDiscount(promoDiscount);
+    localStorage.setItem('appliedPromo', promotion.name);
+    localStorage.setItem('discountAmount', String(promoDiscount));
+    showToast(`Áp dụng mã "${promotion.name}" thành công.`, 'success');
   };
 
   // Nộp đơn hàng
@@ -102,7 +112,7 @@ const CheckoutPage = () => {
         customer: { name, phone, address: fullAddress },
         notes: notes || '',
         paymentMethod,
-        discount,
+        promoCode: normalizePromoCode(promoCode),
         items: items.map(item => ({
           menuItem: item.menuItem?._id,
           comboId: item.comboId,
@@ -152,17 +162,14 @@ const CheckoutPage = () => {
     }
   };
 
-  // Phân giải ảnh
+  // Chuẩn hóa URL ảnh để chạy được cả local và khi deploy.
   const getResolvedImage = (item) => {
     const rawImg = item.type === 'combo' ? item.image : item.menuItem?.image;
     if (!rawImg) {
       const cat = item.type === 'combo' ? 'Burger' : (item.menuItem?.category || 'Burger');
       return defaultImages[cat] || '/images/home/product-burger.png';
     }
-    if (rawImg.startsWith('http://') || rawImg.startsWith('https://') || rawImg.startsWith('data:image') || rawImg.startsWith('/images')) {
-      return rawImg;
-    }
-    return `http://localhost:5000${rawImg}`;
+    return getImageUrl(rawImg, defaultImages[item.menuItem?.category] || '/images/home/product-burger.png');
   };
 
   const getItemName = (item) => {

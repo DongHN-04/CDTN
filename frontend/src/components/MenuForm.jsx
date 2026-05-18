@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import inventoryService from '../services/inventoryService';
 import uploadService from '../services/uploadService';
 import { ErrorBox } from '../utils/apiError';
+import { getImageUrl } from '../utils/imageUrl';
 
 const MenuForm = ({ menuItem, onSubmit, onCancel, error }) => {
   const [form, setForm] = useState({ name: '', price: 0, description: '', category: 'Mon chinh', image: '' });
@@ -28,7 +29,7 @@ const MenuForm = ({ menuItem, onSubmit, onCancel, error }) => {
           .filter(ing => ing.ingredient)
           .map(ing => ({ ingredient: ing.ingredient._id, quantity: ing.quantity }))
       );
-      setImagePreview(menuItem.image ? 'http://localhost:5000' + menuItem.image : '');
+      setImagePreview(getImageUrl(menuItem.image));
     } else {
       setForm({ name: '', price: 0, description: '', category: 'Mon chinh', image: '' });
       setSelectedIngredients([]);

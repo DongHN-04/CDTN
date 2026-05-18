@@ -1,5 +1,11 @@
 const { VNPay, ignoreLogger, ProductCode, VnpLocale, dateFormat } = require('vnpay');
+const mongoose = require('mongoose');
 const Order = require('../models/Order');
+const {
+  collectOrderDetails,
+  checkAndDecreaseStock,
+  restoreStock,
+} = require('./orderController');
 
 const getVNPay = () => new VNPay({
   tmnCode: process.env.VNPAY_TMN_CODE,
@@ -12,6 +18,7 @@ const getVNPay = () => new VNPay({
 });
 
 const createPayment = async (req, res) => {
+  const session = await mongoose.startSession();
   try {
     if (!process.env.VNPAY_TMN_CODE || !process.env.VNPAY_HASH_SECRET || !process.env.VNPAY_RETURN_URL) {
       return res.status(500).json({ message: 'Cau hinh VNPAY chua dung' });
@@ -52,16 +59,60 @@ const createPayment = async (req, res) => {
       vnp_ExpireDate: dateFormat(tomorrow),
     });
 
-    await Order.findByIdAndUpdate(orderId, {
-      txnRef,
-      paymentMethod: 'qr',
-      paymentStatus: 'unpaid',
+    await session.withTransaction(async () => {
+      const orderInTx = await Order.findById(orderId).session(session);
+      if (!orderInTx) throw new Error('Khong tim thay don hang');
+      if (orderInTx.status !== 'pending') throw new Error('Chi thanh toan online cho don dang cho xac nhan');
+      if (orderInTx.paymentStatus === 'paid') throw new Error('Don hang da duoc thanh toan');
+
+      if (!orderInTx.inventoryDeducted) {
+        const items = orderInTx.items.map((item) => ({
+          menuItem: item.menuItem,
+          comboId: item.comboId,
+          quantity: item.quantity,
+        }));
+        const { requirements } = await collectOrderDetails(items, session);
+        await checkAndDecreaseStock(requirements, session);
+        orderInTx.inventoryDeducted = true;
+      }
+
+      orderInTx.txnRef = txnRef;
+      orderInTx.paymentMethod = 'qr';
+      orderInTx.paymentStatus = 'unpaid';
+      await orderInTx.save({ session });
     });
 
     res.json({ paymentUrl });
   } catch (error) {
     console.error('Loi createPayment:', error);
-    res.status(500).json({ message: 'Loi server' });
+    res.status(400).json({ message: error.message || 'Loi server' });
+  } finally {
+    session.endSession();
+  }
+};
+
+const releaseReservedStock = async (order) => {
+  if (!order || !order.inventoryDeducted || order.status !== 'pending') return;
+
+  const session = await mongoose.startSession();
+  try {
+    await session.withTransaction(async () => {
+      const orderInTx = await Order.findById(order._id).session(session);
+      if (!orderInTx || !orderInTx.inventoryDeducted || orderInTx.status !== 'pending') return;
+
+      const items = orderInTx.items.map((item) => ({
+        menuItem: item.menuItem,
+        comboId: item.comboId,
+        quantity: item.quantity,
+      }));
+      const { requirements } = await collectOrderDetails(items, session);
+      await restoreStock(requirements, session);
+
+      orderInTx.inventoryDeducted = false;
+      await orderInTx.save({ session });
+    });
+  } finally {
+    session.endSession();
   }
 };
 
@@ -79,10 +130,12 @@ const paymentReturn = async (req, res) => {
     }
 
     if (!verify.isSuccess) {
-      await Order.findOneAndUpdate(
-        { txnRef: verify.vnp_TxnRef },
-        { paymentStatus: 'failed' }
-      );
+      const order = await Order.findOne({ txnRef: verify.vnp_TxnRef });
+      if (order) {
+        order.paymentStatus = 'failed';
+        await order.save();
+        await releaseReservedStock(order);
+      }
 
       return res.redirect(
         `${process.env.CLIENT_URL}/payment-result?status=failed&code=${verify.vnp_ResponseCode}`
@@ -98,6 +151,7 @@ const paymentReturn = async (req, res) => {
     if (Number(verify.vnp_Amount) !== Number(order.total)) {
       order.paymentStatus = 'failed';
       await order.save();
+      await releaseReservedStock(order);
       return res.redirect(`${process.env.CLIENT_URL}/payment-result?status=invalid-amount`);
     }
 

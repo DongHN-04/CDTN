@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useCart } from '../../contexts/CartContext';
 import publicService from '../../services/publicService';
 import { useLocation } from 'react-router-dom';
+import { getImageUrl } from '../../utils/imageUrl';
 
 // Định nghĩa defaultImages
 const defaultImages = {
@@ -117,9 +118,9 @@ const MenuPage = () => {
       status = 'HẾT HÀNG';
     }
 
-    // Gán ảnh chuẩn hoặc fallback
+    // Chuẩn hóa URL ảnh để tránh phụ thuộc cứng vào localhost.
     const resolvedImage = item.image 
-      ? (item.image.startsWith('data:image') || item.image.startsWith('/images') ? item.image : `http://localhost:5000${item.image}`) 
+      ? getImageUrl(item.image, defaultImages[item.category] || '/images/home/product-burger.png') 
       : defaultImages[item.category] || '/images/home/product-burger.png';
 
     return {
