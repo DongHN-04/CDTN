@@ -147,6 +147,7 @@ const getPromotions = async (req, res) => {
     const Promotion = require('../models/Promotion');
     const now = new Date();
     const promotions = await Promotion.find({
+      isActive: true,
       startDate: { $lte: now },
       endDate: { $gte: now },
     });
@@ -167,6 +168,7 @@ const getHomepageData = async (req, res) => {
       MenuItem.find({ isActive: { $ne: false } }),
       Combo.find({ isActive: true }).populate('items.menuItem', 'name price image'),
       Promotion.find({
+        isActive: true,
         startDate: { $lte: now },
         endDate: { $gte: now },
       }),

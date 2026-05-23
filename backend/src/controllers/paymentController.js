@@ -17,6 +17,8 @@ const getVNPay = () => new VNPay({
   loggerFn: ignoreLogger,
 });
 
+const PAYMENT_RESERVATION_MINUTES = Number(process.env.PAYMENT_RESERVATION_MINUTES || 30);
+
 const createPayment = async (req, res) => {
   const session = await mongoose.startSession();
   try {
@@ -27,6 +29,19 @@ const createPayment = async (req, res) => {
     const { orderId } = req.body;
     const order = await Order.findById(orderId);
     if (!order) return res.status(404).json({ message: 'Khong tim thay don hang' });
+
+    if (
+      order.status === 'pending' &&
+      order.paymentStatus === 'unpaid' &&
+      order.inventoryDeducted &&
+      order.txnRef &&
+      Date.now() - new Date(order.updatedAt).getTime() > PAYMENT_RESERVATION_MINUTES * 60 * 1000
+    ) {
+      // Neu khach bo qua cong thanh toan, lan tao thanh toan tiep theo se giai phong ton kho cu truoc.
+      await releaseReservedStock(order);
+      order.inventoryDeducted = false;
+    }
+
     if (order.total <= 0) return res.status(400).json({ message: 'Gia tri don hang khong hop le' });
     if (order.status !== 'pending') return res.status(400).json({ message: 'Chi thanh toan online cho don dang cho xac nhan' });
     if (order.paymentStatus === 'paid') return res.status(400).json({ message: 'Don hang da duoc thanh toan' });

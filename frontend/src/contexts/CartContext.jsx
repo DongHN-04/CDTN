@@ -1,4 +1,5 @@
-import React, { createContext, useContext, useReducer } from 'react';
+import React, { createContext, useContext, useEffect, useReducer } from 'react';
+import { useAuth } from './AuthContext';
 
 const CartContext = createContext();
 
@@ -94,13 +95,59 @@ const cartReducer = (state, action) => {
     case 'CLEAR_CART':
       return { ...state, items: [] };
 
+    case 'REPLACE_CART':
+      return {
+        items: Array.isArray(action.payload?.items) ? action.payload.items : [],
+        storageKey: action.payload?.storageKey,
+      };
+
     default:
       return state;
   }
 };
 
 export const CartProvider = ({ children }) => {
-  const [state, dispatch] = useReducer(cartReducer, { items: [] });
+  const { user, loading } = useAuth();
+  const cartStorageKey = user?._id ? `cart:${user._id}` : 'cart:guest';
+
+  const [state, dispatch] = useReducer(cartReducer, { items: [], storageKey: 'cart:guest' }, () => {
+    try {
+      // Xoa key cu dung chung de tranh lay lai gio hang cua tai khoan khac.
+      localStorage.removeItem('cart');
+      const saved = JSON.parse(localStorage.getItem('cart:guest'));
+      return saved && Array.isArray(saved.items)
+        ? { items: saved.items, storageKey: 'cart:guest' }
+        : { items: [], storageKey: 'cart:guest' };
+    } catch {
+      localStorage.removeItem('cart:guest');
+      return { items: [], storageKey: 'cart:guest' };
+    }
+  });
+
+  useEffect(() => {
+    if (loading) return;
+
+    try {
+      // Moi tai khoan co gio hang rieng; guest cung co gio rieng khi chua dang nhap.
+      const saved = JSON.parse(localStorage.getItem(cartStorageKey));
+      dispatch({
+        type: 'REPLACE_CART',
+        payload: {
+          items: saved && Array.isArray(saved.items) ? saved.items : [],
+          storageKey: cartStorageKey,
+        },
+      });
+    } catch {
+      localStorage.removeItem(cartStorageKey);
+      dispatch({ type: 'REPLACE_CART', payload: { items: [], storageKey: cartStorageKey } });
+    }
+  }, [cartStorageKey, loading]);
+
+  useEffect(() => {
+    if (loading) return;
+    if (state.storageKey !== cartStorageKey) return;
+    localStorage.setItem(cartStorageKey, JSON.stringify(state));
+  }, [cartStorageKey, loading, state]);
 
   const addItem = (menuItem, quantity = 1) => {
     if (!menuItem?._id) return;

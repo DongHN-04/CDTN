@@ -142,7 +142,14 @@ const AdminLayout = () => {
               </div>
 
               {/* Nút Cài đặt */}
-              <button className="bg-transparent border-none p-1 cursor-pointer flex items-center justify-center hover:bg-gray-100 rounded-full transition-colors" title="Cài đặt">
+              <button
+                onClick={() => {
+                  setShowNotifications(false);
+                  navigate('/admin/profile');
+                }}
+                className="bg-transparent border-none p-1 cursor-pointer flex items-center justify-center hover:bg-gray-100 rounded-full transition-colors"
+                title="Hồ sơ"
+              >
                 <img src="/images/ICON/ICsetting.png" alt="Settings" className="w-6 h-6 object-contain opacity-70" />
               </button>
 

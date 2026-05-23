@@ -18,6 +18,7 @@ import CheckoutPage from './pages/customer/CheckoutPage';
 import PromotionsPage from './pages/customer/PromotionsPage';
 import AboutPage from './pages/customer/AboutPage';
 import ContactPage from './pages/customer/ContactPage';
+import CustomerProfilePage from './pages/customer/CustomerProfilePage';
 import LoginPage from './pages/LoginPage';
 import RegisterPage from './pages/RegisterPage';
 import NotFoundPage from './pages/NotFoundPage';
@@ -42,6 +43,7 @@ import CustomerManagementPage from './pages/shared/CustomerManagementPage.jsx';
 import InvoiceDetailPage from './pages/shared/InvoiceDetailPage.jsx';
 import CustomerOrdersPage from './pages/shared/CustomerOrdersPage';
 import ShiftManagementPage from './pages/shared/ShiftManagementPage.jsx';
+import ProfilePage from './pages/shared/ProfilePage.jsx';
 
 function App() {
   return (
@@ -56,6 +58,14 @@ function App() {
               <Route path="/promotions" element={<PromotionsPage />} />
               <Route path="/about" element={<AboutPage />} />
               <Route path="/contact" element={<ContactPage />} />
+              <Route
+                path="/profile"
+                element={
+                  <RoleBasedRoute allowedRoles={['customer']}>
+                    <CustomerProfilePage />
+                  </RoleBasedRoute>
+                }
+              />
               <Route path="/cart" element={<CartPage />} />
               <Route path="/login" element={<LoginPage />} />
               <Route path="/register" element={<RegisterPage />} />
@@ -193,6 +203,14 @@ function App() {
                 element={
                   <RoleBasedRoute allowedRoles={['admin', 'staff']}>
                     <ShiftManagementPage />
+                  </RoleBasedRoute>
+                }
+              />
+              <Route
+                path="/admin/profile"
+                element={
+                  <RoleBasedRoute allowedRoles={['admin', 'staff']}>
+                    <ProfilePage />
                   </RoleBasedRoute>
                 }
               />

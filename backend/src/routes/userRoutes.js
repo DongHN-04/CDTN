@@ -1,6 +1,7 @@
 const express = require('express');
 const router = express.Router();
 const {
+  getMe,
   getUsers,
   createUser,
   updateUser,
@@ -8,6 +9,8 @@ const {
 } = require('../controllers/userController');
 const { protect, authorize } = require('../middleware/authMiddleware');
 const { validateUserCreate, validateUserUpdate } = require('../middleware/validationMiddleware');
+
+router.get('/me', protect, getMe);
 
 router.route('/')
   .get(protect, authorize('admin'), getUsers)

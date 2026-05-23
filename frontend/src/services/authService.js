@@ -1,6 +1,6 @@
 import axios from 'axios';
 
-const API_URL = `${process.env.REACT_APP_API_URL}/auth/`;
+const API_URL = `${process.env.REACT_APP_API_URL || 'http://localhost:5000/api'}/auth/`;
 
 // Đăng ký
 const register = async (userData) => {
@@ -27,7 +27,13 @@ const logout = () => {
 
 // Lấy thông tin user hiện tại từ localStorage
 const getCurrentUser = () => {
-  return JSON.parse(localStorage.getItem('user'));
+  try {
+    // LocalStorage có thể bị người dùng/sandbox ghi sai JSON, nên cần fallback an toàn.
+    return JSON.parse(localStorage.getItem('user'));
+  } catch {
+    localStorage.removeItem('user');
+    return null;
+  }
 };
 
 const authService = {

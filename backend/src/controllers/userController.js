@@ -1,6 +1,22 @@
 const User = require('../models/User');
 const generateToken = require('../utils/generateToken');
 
+// @desc    Lay ho so cua nguoi dung dang dang nhap
+// @route   GET /api/users/me
+// @access  Private
+const getMe = async (req, res) => {
+  try {
+    // Luon lay lai tu DB de frontend khong phu thuoc vao user cu trong localStorage.
+    const user = await User.findById(req.user._id).select('-password');
+    if (!user) {
+      return res.status(404).json({ message: 'Khong tim thay nguoi dung' });
+    }
+    res.json(user);
+  } catch (error) {
+    res.status(500).json({ message: 'Loi server' });
+  }
+};
+
 // @desc    Lấy danh sách người dùng (Admin và Staff)
 // @route   GET /api/users
 // @access  Private/Admin
@@ -134,4 +150,4 @@ const deleteUser = async (req, res) => {
   }
 };
 
-module.exports = { getUsers, createUser, updateUser, deleteUser };
+module.exports = { getMe, getUsers, createUser, updateUser, deleteUser };

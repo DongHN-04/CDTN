@@ -1,347 +1,436 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
+import {
+  Banknote,
+  Minus,
+  Plus,
+  Printer,
+  Search,
+  ShoppingCart,
+  SlidersHorizontal,
+  TicketPercent,
+  Trash2,
+  UserRound,
+  WalletCards,
+} from 'lucide-react';
 import { useCart } from '../../contexts/CartContext';
+import comboService from '../../services/comboService';
 import menuService from '../../services/menuService';
 import orderService from '../../services/orderService';
-import comboService from '../../services/comboService';
 import promotionService from '../../services/promotionService';
 import { getImageUrl } from '../../utils/imageUrl';
 
+const ALL_CATEGORY = 'Tất cả';
+const categories = ['Tất cả', 'Burger', 'Gà rán', 'Đồ uống', 'Combo', 'Tráng miệng'];
+
+const formatCurrency = value =>
+  new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND' }).format(Math.max(0, Math.round(value || 0)));
+
+const getCartLineId = item => (item.type === 'combo' ? item.comboId : item.menuItem?._id);
+
 const POSPage = () => {
-  const [menuItems, setMenuItems] = useState([]);
-  const [categories, setCategories] = useState(['Tất cả']);
-  const [selectedCategory, setSelectedCategory] = useState('Tất cả');
-  const [search, setSearch] = useState('');
   const { items, addItem, addCombo, removeItem, updateQuantity, clearCart, getCartTotal, getItemCount } = useCart();
+
+  const [menuItems, setMenuItems] = useState([]);
+  const [combos, setCombos] = useState([]);
+  const [promotions, setPromotions] = useState([]);
+  const [selectedCategory, setSelectedCategory] = useState(ALL_CATEGORY);
+  const [search, setSearch] = useState('');
   const [customer, setCustomer] = useState({ name: '', phone: '' });
+  const [selectedPromoId, setSelectedPromoId] = useState('auto');
   const [discount, setDiscount] = useState(0);
   const [paymentMethod, setPaymentMethod] = useState('cash');
   const [loading, setLoading] = useState(false);
+  const [dataLoading, setDataLoading] = useState(true);
   const [message, setMessage] = useState('');
-  const [combos, setCombos] = useState([]);
-  const [promotions, setPromotions] = useState([]);
-  const [selectedPromoId, setSelectedPromoId] = useState('auto');
 
   useEffect(() => {
     const fetchData = async () => {
+      setDataLoading(true);
       try {
         const [menuData, comboData, promoData] = await Promise.all([
           menuService.getMenuItems(),
           comboService.getCombos(),
-          promotionService.getPromotions()
+          promotionService.getPromotions(),
         ]);
-        setMenuItems(menuData);
-        setCombos(comboData.filter(c => c.isActive));
-        setPromotions(promoData.filter(p => p.isActive));
-        const cats = ['Tất cả', ...new Set(menuData.map(item => item.category))];
-        setCategories(cats);
+
+        const activeMenu = menuData.filter(item => item.isActive !== false);
+        const activeCombos = comboData.filter(combo => combo.isActive !== false);
+        setMenuItems(activeMenu);
+        setCombos(activeCombos);
+        setPromotions(promoData.filter(promo => promo.isActive !== false));
       } catch (error) {
-        console.error('Lỗi tải dữ liệu:', error);
+        console.error('Lỗi tải dữ liệu POS:', error);
+        setMessage('Không thể tải dữ liệu quầy bán hàng. Vui lòng thử lại.');
+      } finally {
+        setDataLoading(false);
       }
     };
+
     fetchData();
   }, []);
 
-  const filteredMenu = menuItems.filter(item => {
-    const matchCategory = selectedCategory === 'Tất cả' || item.category === selectedCategory;
-    const matchSearch = item.name.toLowerCase().includes(search.toLowerCase());
-    return matchCategory && matchSearch;
-  });
+  const cartTotal = getCartTotal();
+  const grandTotal = Math.max(cartTotal - discount, 0);
 
-  // Danh sách khuyến mãi khả dụng cho giỏ hàng hiện tại
   const applicablePromotions = useMemo(() => {
-    // Tính subtotal trực tiếp từ items (không dùng getCartTotal để tránh dependency sai)
-    const subtotal = items.reduce((total, item) => {
-      if (item.type === 'combo') {
-        return total + (item.price * item.quantity);
-      }
-      if (item.menuItem?.price) {
-        return total + (item.menuItem.price * item.quantity);
-      }
-      return total;
-    }, 0);
-
     const now = new Date();
-    const validPromos = promotions.filter(p => {
-      if (!p.isActive) return false;
-      if (new Date(p.startDate) > now || new Date(p.endDate) < now) return false;
-      if (subtotal < p.minOrderValue) return false;
-      return true;
-    });
 
-    const promoWithDiscount = validPromos.map(p => {
-      let discountValue = 0;
-      if (p.type === 'percent') {
-        discountValue = subtotal * (p.value / 100);
-      } else if (p.type === 'fixed') {
-        discountValue = p.value;
-      }
-      if (discountValue > subtotal) discountValue = subtotal;
-      return { ...p, discountValue };
-    });
+    return promotions
+      .filter(promo => {
+        if (!promo.isActive) return false;
+        if (promo.startDate && new Date(promo.startDate) > now) return false;
+        if (promo.endDate && new Date(promo.endDate) < now) return false;
+        if (cartTotal < (promo.minOrderValue || 0)) return false;
+        return true;
+      })
+      .map(promo => {
+        const rawDiscount = promo.type === 'percent' ? cartTotal * (promo.value / 100) : promo.value;
+        return { ...promo, discountValue: Math.min(rawDiscount || 0, cartTotal) };
+      })
+      .sort((a, b) => b.discountValue - a.discountValue);
+  }, [cartTotal, promotions]);
 
-    // Sắp xếp giảm dần, mã giảm nhiều nhất lên đầu
-    return promoWithDiscount.sort((a, b) => b.discountValue - a.discountValue);
-  }, [items, promotions]); // ✅ Đúng dependency, không còn cảnh báo
-
-  // Tự động cập nhật discount dựa trên lựa chọn
   useEffect(() => {
     if (selectedPromoId === 'auto') {
-      if (applicablePromotions.length > 0) {
-        setDiscount(applicablePromotions[0].discountValue);
-      } else {
-        setDiscount(0);
-      }
-    } else {
-      const promo = applicablePromotions.find(p => p._id === selectedPromoId);
-      if (promo) {
-        setDiscount(promo.discountValue);
-      } else {
-        setSelectedPromoId('auto'); // Mã đã chọn không còn khả dụng
-      }
-    }
-  }, [selectedPromoId, applicablePromotions]);
-
-  const handleAddToCart = (menuItem) => {
-    if (menuItem && menuItem._id) addItem(menuItem, 1);
-  };
-
-  const handleAddComboToCart = (combo) => {
-    if (!combo.items || combo.items.length === 0) {
-      alert('Combo này chưa có món nào.');
+      setDiscount(applicablePromotions[0]?.discountValue || 0);
       return;
     }
-    addCombo(combo, 1);
+
+    const promo = applicablePromotions.find(item => item._id === selectedPromoId);
+    if (promo) {
+      setDiscount(promo.discountValue);
+    } else {
+      setSelectedPromoId('auto');
+    }
+  }, [applicablePromotions, selectedPromoId]);
+
+  const filteredProducts = useMemo(() => {
+    const keyword = search.trim().toLowerCase();
+    const normalizedMenu = menuItems
+      .filter(item => selectedCategory === ALL_CATEGORY || item.category === selectedCategory)
+      .map(item => ({ ...item, productType: 'item' }));
+
+    const normalizedCombos = combos
+      .filter(() => selectedCategory === ALL_CATEGORY || selectedCategory === 'Combo')
+      .map(combo => ({ ...combo, category: 'Combo', productType: 'combo' }));
+
+    return [...normalizedMenu, ...normalizedCombos].filter(product => {
+      const text = `${product.name || ''} ${product.description || ''} ${product.category || ''}`.toLowerCase();
+      return !keyword || text.includes(keyword);
+    });
+  }, [combos, menuItems, search, selectedCategory]);
+
+  const handleProductClick = product => {
+    setMessage('');
+    if (product.productType === 'combo') {
+      if (!product.items || product.items.length === 0) {
+        setMessage('Combo này chưa có món, không thể thêm vào giỏ.');
+        return;
+      }
+      addCombo(product, 1);
+      return;
+    }
+    addItem(product, 1);
   };
 
   const handleCheckout = async () => {
-    if (!items || items.length === 0) return alert('Giỏ hàng trống');
+    if (!items.length) {
+      setMessage('Giỏ hàng đang trống.');
+      return;
+    }
+
     setLoading(true);
     setMessage('');
     try {
       const orderItems = items.map(item => {
-        if (item.type === 'combo') {
-          return { comboId: item.comboId, quantity: item.quantity };
-        } else {
-          return { menuItem: item.menuItem._id, quantity: item.quantity };
-        }
+        if (item.type === 'combo') return { comboId: item.comboId, quantity: item.quantity };
+        return { menuItem: item.menuItem._id, quantity: item.quantity };
       });
 
-      const orderData = {
+      const order = await orderService.createOrder({
         customer,
         items: orderItems,
-        discount: discount,
+        discount,
         paymentMethod,
-        promotionId: selectedPromoId !== 'auto' ? selectedPromoId : null
-      };
+        promotionId: selectedPromoId !== 'auto' ? selectedPromoId : null,
+      });
 
-      const order = await orderService.createOrder(orderData);
-      setMessage(`Đơn hàng #${order._id.slice(-6)} đã được tạo thành công. Tổng: ${order.total.toLocaleString()}₫`);
+      setMessage(`Đã tạo hóa đơn #${order._id.slice(-6)} với tổng tiền ${formatCurrency(order.total || grandTotal)}.`);
       clearCart();
       setCustomer({ name: '', phone: '' });
       setSelectedPromoId('auto');
     } catch (error) {
-      const errMsg = error.response?.data?.message || error.message || 'Không thể tạo đơn';
-      setMessage('Lỗi: ' + errMsg);
-      alert('❌ ' + errMsg);
+      const errMsg = error.response?.data?.message || error.message || 'Không thể tạo đơn hàng.';
+      setMessage(errMsg);
     } finally {
       setLoading(false);
     }
   };
 
-  const cartTotal = getCartTotal();
-  const grandTotal = cartTotal - discount;
-
-  const qtyBtnStyle = {
-    background: '#ddd', borderWidth: 0, borderStyle: 'none', borderColor: 'transparent',
-    width: '25px', height: '25px', borderRadius: '4px', cursor: 'pointer',
-  };
+  const selectedPromo = selectedPromoId === 'auto'
+    ? applicablePromotions[0]
+    : applicablePromotions.find(item => item._id === selectedPromoId);
 
   return (
-    <div style={{ display: 'flex', height: 'calc(100vh - 100px)' }}>
-      {/* Cột trái: Thực đơn + Combo */}
-      <div style={{
-        flex: 2, padding: '20px', overflowY: 'auto',
-        borderRightWidth: 1, borderRightStyle: 'solid', borderRightColor: '#ddd',
-      }}>
-        <div style={{ marginBottom: '20px' }}>
-          <input type="text" placeholder="Tìm món..." value={search} onChange={e => setSearch(e.target.value)}
-            style={{ padding: '8px', width: '60%', marginRight: '10px', border: '1px solid #ccc', borderRadius: '4px' }} />
-          <select value={selectedCategory} onChange={e => setSelectedCategory(e.target.value)}
-            style={{ padding: '8px', border: '1px solid #ccc', borderRadius: '4px' }}>
-            {categories.map(cat => <option key={cat} value={cat}>{cat}</option>)}
-          </select>
-        </div>
+    <div className="min-h-full bg-[#fbf7f4] text-slate-900 -m-6 sm:-m-8">
+      <div className="flex h-[calc(100vh-70px)] min-h-[720px] overflow-hidden">
+        <section className="flex min-w-0 flex-1 flex-col overflow-hidden">
 
-        {/* Combo */}
-        {selectedCategory === 'Tất cả' && combos.length > 0 && (
-          <div style={{ marginBottom: '30px' }}>
-            <h3 style={{ color: '#e67e22', marginBottom: '10px' }}>🎁 Combo Ưu Đãi</h3>
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(180px, 1fr))', gap: '15px' }}>
-              {combos.map(combo => (
-                <div key={combo._id} onClick={() => handleAddComboToCart(combo)}
-                  style={{
-                    background: '#fff7e6', borderRadius: '8px', boxShadow: '0 2px 4px rgba(0,0,0,0.1)',
-                    padding: '10px', cursor: 'pointer', transition: 'transform 0.2s', textAlign: 'center',
-                    border: '1px solid #f39c12'
-                  }}>
-                  {combo.image ? (
-                    <img src={combo.image} alt={combo.name}
-                      style={{ width: '100%', height: '120px', objectFit: 'cover', borderRadius: '4px' }}
-                      onError={(e) => { e.target.style.display = 'none'; }} />
-                  ) : (
-                    <div style={{ width: '100%', height: '120px', backgroundColor: '#f39c12', display: 'flex', alignItems: 'center', justifyContent: 'center', borderRadius: '4px', color: 'white', fontWeight: 'bold' }}>COMBO</div>
-                  )}
-                  <div style={{ marginTop: '8px', fontWeight: 'bold', color: '#c0392b' }}>{combo.name}</div>
-                  <div style={{ fontSize: '12px', color: '#555' }}>
-                    {combo.items?.map(i => `${i.menuItem?.name || 'Món'} x${i.quantity}`).join(', ')}
-                  </div>
-                  <div style={{ color: '#e74c3c', fontSize: '16px', fontWeight: 'bold' }}>
-                    {combo.price.toLocaleString()}₫
-                  </div>
-                </div>
-              ))}
-            </div>
-          </div>
-        )}
-
-        {/* Món thường */}
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(180px, 1fr))', gap: '15px' }}>
-          {filteredMenu.map(item => (
-            <div key={item._id} onClick={() => handleAddToCart(item)}
-              style={{
-                background: '#fff', borderRadius: '8px', boxShadow: '0 2px 4px rgba(0,0,0,0.1)',
-                padding: '10px', cursor: 'pointer', transition: 'transform 0.2s', textAlign: 'center',
-              }}>
-              {item.image ? (
-                <img src={getImageUrl(item.image)}
-                  alt={item.name} style={{ width: '100%', height: '120px', objectFit: 'cover', borderRadius: '4px' }}
-                  onError={(e) => { e.target.style.display = 'none'; }} />
-              ) : (
-                <div style={{ width: '100%', height: '120px', backgroundColor: '#eee', display: 'flex', alignItems: 'center', justifyContent: 'center', borderRadius: '4px', color: '#999' }}>No Image</div>
-              )}
-              <div style={{ marginTop: '8px', fontWeight: 'bold' }}>{item.name}</div>
-              <div style={{ color: '#e74c3c', fontSize: '14px' }}>{item.price.toLocaleString()}₫</div>
-            </div>
-          ))}
-        </div>
-      </div>
-
-      {/* Cột phải: Giỏ hàng + Thanh toán */}
-      <div style={{ flex: 1, display: 'flex', flexDirection: 'column', padding: '20px' }}>
-        <h2>Giỏ hàng ({getItemCount()})</h2>
-        <div style={{ flex: 1, overflowY: 'auto', marginBottom: '20px' }}>
-          {items.length === 0 ? (
-            <p style={{ color: '#999' }}>Chưa có món nào</p>
-          ) : (
-            items.map(item => {
-              if (item.type === 'combo') {
+          <div className="flex-1 overflow-y-auto px-6 py-5">
+            <div className="mb-4 flex gap-3 overflow-x-auto pb-1">
+              {categories.map(category => {
+                const active = selectedCategory === category;
                 return (
-                  <div key={`combo-${item.comboId}`} style={{
-                    display: 'flex', justifyContent: 'space-between', alignItems: 'center',
-                    padding: '10px 0', borderBottomWidth: 1, borderBottomStyle: 'solid', borderBottomColor: '#eee',
-                  }}>
-                    <div style={{ flex: 2 }}><strong>{item.name}</strong> (Combo)</div>
-                    <div style={{ flex: 1, display: 'flex', alignItems: 'center' }}>
-                      <button onClick={() => updateQuantity(item.comboId, item.quantity - 1)} style={qtyBtnStyle}>-</button>
-                      <span style={{ margin: '0 8px' }}>{item.quantity}</span>
-                      <button onClick={() => updateQuantity(item.comboId, item.quantity + 1)} style={qtyBtnStyle}>+</button>
-                    </div>
-                    <div style={{ flex: 1, textAlign: 'right' }}>{(item.price * item.quantity).toLocaleString()}₫</div>
-                    <button onClick={() => removeItem(item.comboId)} style={{
-                      background: 'none', borderWidth: 0, color: 'red', fontSize: '16px', cursor: 'pointer',
-                    }}>×</button>
-                  </div>
+                  <button
+                    key={category}
+                    onClick={() => setSelectedCategory(category)}
+                    className={`flex h-10 shrink-0 items-center gap-2 rounded-full px-5 text-sm font-bold transition ${
+                      active ? 'bg-[#c70d18] text-white shadow-sm' : 'bg-stone-200 text-stone-600 hover:bg-stone-300'
+                    }`}
+                  >
+                    {category}
+                  </button>
                 );
-              } else {
-                return (
-                  <div key={`item-${item.menuItem._id}`} style={{
-                    display: 'flex', justifyContent: 'space-between', alignItems: 'center',
-                    padding: '10px 0', borderBottomWidth: 1, borderBottomStyle: 'solid', borderBottomColor: '#eee',
-                  }}>
-                    <div style={{ flex: 2 }}>{item.menuItem.name}</div>
-                    <div style={{ flex: 1, display: 'flex', alignItems: 'center' }}>
-                      <button onClick={() => updateQuantity(item.menuItem._id, item.quantity - 1)} style={qtyBtnStyle}>-</button>
-                      <span style={{ margin: '0 8px' }}>{item.quantity}</span>
-                      <button onClick={() => updateQuantity(item.menuItem._id, item.quantity + 1)} style={qtyBtnStyle}>+</button>
-                    </div>
-                    <div style={{ flex: 1, textAlign: 'right' }}>{(item.menuItem.price * item.quantity).toLocaleString()}₫</div>
-                    <button onClick={() => removeItem(item.menuItem._id)} style={{
-                      background: 'none', borderWidth: 0, color: 'red', fontSize: '16px', cursor: 'pointer',
-                    }}>×</button>
-                  </div>
-                );
-              }
-            })
-          )}
-        </div>
+              })}
+            </div>
 
-        {/* Khu vực mã giảm giá và thanh toán */}
-        <div style={{ borderTopWidth: 2, borderTopStyle: 'solid', borderTopColor: '#333', paddingTop: '10px' }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '5px' }}>
-            <span>Tạm tính:</span><span>{cartTotal.toLocaleString()}₫</span>
+            <div className="mb-5 grid grid-cols-[1fr_auto] gap-3">
+              <label className="relative block">
+                <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-red-500" size={18} />
+                <input
+                  value={search}
+                  onChange={event => setSearch(event.target.value)}
+                  placeholder="Tìm kiếm món ăn, combo..."
+                  className="h-12 w-full rounded-lg border border-red-100 bg-white pl-12 pr-4 text-sm outline-none transition focus:border-red-400 focus:ring-2 focus:ring-red-100"
+                />
+              </label>
+              <button className="flex h-12 items-center gap-2 rounded-lg border border-red-100 bg-white px-4 text-sm font-bold text-stone-700 hover:border-red-300">
+                <SlidersHorizontal size={18} />
+                Lọc
+              </button>
+            </div>
+
+            {dataLoading ? (
+              <div className="grid min-h-[360px] place-items-center rounded-lg border border-dashed border-red-100 bg-white text-sm font-semibold text-stone-500">
+                Đang tải thực đơn...
+              </div>
+            ) : filteredProducts.length === 0 ? (
+              <div className="grid min-h-[360px] place-items-center rounded-lg border border-dashed border-red-100 bg-white text-sm font-semibold text-stone-500">
+                Không tìm thấy món phù hợp.
+              </div>
+            ) : (
+              <div className="grid grid-cols-[repeat(auto-fill,minmax(170px,1fr))] gap-5">
+                {filteredProducts.map(product => {
+                  const isCombo = product.productType === 'combo';
+                  const image = isCombo ? product.image : getImageUrl(product.image);
+                  const soldLabel = isCombo ? 'Combo tiết kiệm' : product.description || product.category;
+
+                  return (
+                    <article
+                      key={`${product.productType}-${product._id}`}
+                      className="group overflow-hidden rounded-lg border border-red-50 bg-white shadow-sm transition hover:-translate-y-0.5 hover:shadow-lg"
+                    >
+                      <button onClick={() => handleProductClick(product)} className="block w-full text-left">
+                        <div className="relative aspect-[4/3] overflow-hidden bg-stone-100">
+                          {image ? (
+                            <img
+                              src={image}
+                              alt={product.name}
+                              className="h-full w-full object-cover transition duration-300 group-hover:scale-105"
+                              onError={event => {
+                                event.currentTarget.style.display = 'none';
+                              }}
+                            />
+                          ) : (
+                            <div className="grid h-full place-items-center text-xs font-bold text-stone-400">No image</div>
+                          )}
+                          {isCombo && (
+                            <span className="absolute right-2 top-2 rounded bg-stone-900 px-2 py-1 text-[10px] font-black text-white">
+                              COMBO
+                            </span>
+                          )}
+                        </div>
+                        <div className="p-3">
+                          <h3 className="line-clamp-1 text-sm font-bold text-slate-900">{product.name}</h3>
+                          <p className="mt-1 line-clamp-1 text-xs text-stone-500">{soldLabel}</p>
+                          <div className="mt-4 flex items-center justify-between">
+                            <span className="text-base font-black text-[#c70d18]">{formatCurrency(product.price)}</span>
+                            <span className="grid h-8 w-8 place-items-center rounded-lg bg-[#c70d18] text-white shadow-sm">
+                              <Plus size={18} strokeWidth={3} />
+                            </span>
+                          </div>
+                        </div>
+                      </button>
+                    </article>
+                  );
+                })}
+              </div>
+            )}
           </div>
+        </section>
 
-          {/* Dropdown chọn mã giảm giá */}
-          <div style={{ marginBottom: '10px' }}>
-            <label style={{ display: 'block', marginBottom: '5px' }}>Mã giảm giá:</label>
-            <select
-              value={selectedPromoId}
-              onChange={e => setSelectedPromoId(e.target.value)}
-              style={{ width: '100%', padding: '6px', border: '1px solid #ccc', borderRadius: '4px' }}
+        <aside className="flex w-[370px] shrink-0 flex-col border-l border-red-100 bg-white shadow-xl">
+          <div className="flex h-14 shrink-0 items-center justify-between border-b border-red-100 px-5">
+            <div className="flex items-center gap-2 font-black">
+              <ShoppingCart size={18} className="text-[#c70d18]" />
+              Giỏ hàng
+              <span className="rounded-full bg-red-50 px-2 py-0.5 text-xs text-[#c70d18]">{getItemCount()}</span>
+            </div>
+            <button
+              onClick={clearCart}
+              disabled={!items.length}
+              className="text-xs font-bold text-[#c70d18] disabled:cursor-not-allowed disabled:text-stone-300"
             >
-              <option value="auto">Tự động (chọn tốt nhất)</option>
-              {applicablePromotions.map(promo => (
-                <option key={promo._id} value={promo._id}>
-                  {promo.name} - Giảm {promo.discountValue.toLocaleString()}₫ ({promo.type === 'percent' ? promo.value + '%' : promo.value + '₫'})
-                </option>
-              ))}
-              {applicablePromotions.length === 0 && (
-                <option disabled>Không có mã phù hợp</option>
-              )}
-            </select>
+              Xóa tất cả
+            </button>
           </div>
 
-          <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '5px' }}>
-            <span>Giảm giá:</span>
-            <span>- {discount.toLocaleString()}₫</span>
-          </div>
-          <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '10px', fontWeight: 'bold', fontSize: '18px' }}>
-            <span>Tổng cộng:</span><span>{grandTotal.toLocaleString()}₫</span>
+          <div className="flex-1 overflow-y-auto p-4">
+            {!items.length ? (
+              <div className="grid h-full min-h-[280px] place-items-center rounded-lg border border-dashed border-red-100 text-center">
+                <div>
+                  <ShoppingCart className="mx-auto mb-3 text-red-200" size={42} />
+                  <p className="m-0 text-sm font-bold text-stone-500">Chưa có món trong giỏ</p>
+                </div>
+              </div>
+            ) : (
+              <div className="space-y-3">
+                {items.map(item => {
+                  const id = getCartLineId(item);
+                  const name = item.type === 'combo' ? item.name : item.menuItem.name;
+                  const price = item.type === 'combo' ? item.price : item.menuItem.price;
+                  const image = item.type === 'combo' ? item.image : getImageUrl(item.menuItem.image);
+
+                  return (
+                    <div key={`${item.type}-${id}`} className="grid grid-cols-[52px_1fr_auto] items-center gap-3 rounded-lg border border-red-50 bg-white p-2">
+                      <div className="h-12 w-12 overflow-hidden rounded-lg bg-stone-100">
+                        {image ? <img src={image} alt={name} className="h-full w-full object-cover" /> : null}
+                      </div>
+                      <div className="min-w-0">
+                        <p className="m-0 truncate text-sm font-bold">{name}</p>
+                        <p className="m-0 text-[11px] text-stone-500">{formatCurrency(price)}</p>
+                        <div className="mt-2 inline-flex h-7 items-center rounded-full bg-red-50">
+                          <button
+                            onClick={() => updateQuantity(id, item.quantity - 1)}
+                            className="grid h-7 w-8 place-items-center text-[#c70d18]"
+                            title="Giảm số lượng"
+                          >
+                            <Minus size={13} strokeWidth={3} />
+                          </button>
+                          <span className="min-w-7 text-center text-xs font-black">{item.quantity}</span>
+                          <button
+                            onClick={() => updateQuantity(id, item.quantity + 1)}
+                            className="grid h-7 w-8 place-items-center text-[#c70d18]"
+                            title="Tăng số lượng"
+                          >
+                            <Plus size={13} strokeWidth={3} />
+                          </button>
+                        </div>
+                      </div>
+                      <div className="text-right">
+                        <p className="m-0 text-sm font-black">{formatCurrency(price * item.quantity)}</p>
+                        <button
+                          onClick={() => removeItem(id)}
+                          className="mt-2 inline-grid h-7 w-7 place-items-center rounded-full text-red-500 hover:bg-red-50"
+                          title="Xóa món"
+                        >
+                          <Trash2 size={15} />
+                        </button>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
           </div>
 
-          <div style={{ marginBottom: '10px' }}>
-            <label>Khách hàng</label>
-            <input type="text" placeholder="Tên" value={customer.name}
-              onChange={e => setCustomer({ ...customer, name: e.target.value })}
-              style={{ width: '100%', padding: '6px', marginBottom: '5px', border: '1px solid #ccc', borderRadius: '4px' }} />
-            <input type="text" placeholder="SĐT" value={customer.phone}
-              onChange={e => setCustomer({ ...customer, phone: e.target.value })}
-              style={{ width: '100%', padding: '6px', border: '1px solid #ccc', borderRadius: '4px' }} />
-          </div>
-          <div style={{ marginBottom: '10px' }}>
-            <label>Thanh toán:</label>
-            <select value={paymentMethod} onChange={e => setPaymentMethod(e.target.value)}
-              style={{ width: '100%', padding: '6px', border: '1px solid #ccc', borderRadius: '4px' }}>
-              <option value="cash">Tiền mặt</option>
-              <option value="card">Thẻ</option>
-              <option value="qr">QR</option>
-            </select>
-          </div>
-          <button onClick={handleCheckout} disabled={loading || items.length === 0}
-            style={{
-              width: '100%', padding: '12px', background: '#27ae60', color: 'white',
-              borderWidth: 0, borderStyle: 'none', borderColor: 'transparent', borderRadius: '6px',
-              fontSize: '16px', fontWeight: 'bold', cursor: 'pointer',
-              opacity: (loading || items.length === 0) ? 0.7 : 1,
-            }}>
-            {loading ? 'Đang xử lý...' : `Thanh toán ${grandTotal.toLocaleString()}₫`}
-          </button>
-          {message && (
-            <div style={{ marginTop: '10px', color: message.startsWith('Lỗi') ? 'red' : 'green' }}>
-              {message}
+          <div className="shrink-0 border-t border-red-100 p-5">
+            <div className="mb-4 grid grid-cols-2 gap-2">
+              <label className="relative col-span-2">
+                <UserRound className="absolute left-3 top-1/2 -translate-y-1/2 text-red-400" size={16} />
+                <input
+                  value={customer.name}
+                  onChange={event => setCustomer(prev => ({ ...prev, name: event.target.value }))}
+                  placeholder="Tên khách hàng"
+                  className="h-10 w-full rounded-lg border border-red-100 pl-9 pr-3 text-sm outline-none focus:border-red-300"
+                />
+              </label>
+              <input
+                value={customer.phone}
+                onChange={event => setCustomer(prev => ({ ...prev, phone: event.target.value }))}
+                placeholder="Số điện thoại"
+                className="col-span-2 h-10 rounded-lg border border-red-100 px-3 text-sm outline-none focus:border-red-300"
+              />
             </div>
-          )}
-        </div>
+
+            <label className="mb-4 flex h-12 items-center gap-3 rounded-lg bg-red-50 px-3 text-sm">
+              <TicketPercent size={18} className="shrink-0 text-[#c70d18]" />
+              <select
+                value={selectedPromoId}
+                onChange={event => setSelectedPromoId(event.target.value)}
+                className="min-w-0 flex-1 bg-transparent text-sm font-semibold outline-none"
+              >
+                <option value="auto">Tự động chọn voucher tốt nhất</option>
+                {applicablePromotions.map(promo => (
+                  <option key={promo._id} value={promo._id}>
+                    {promo.name} - giảm {formatCurrency(promo.discountValue)}
+                  </option>
+                ))}
+              </select>
+            </label>
+
+            <div className="space-y-2 text-sm">
+              <div className="flex justify-between text-stone-600">
+                <span>Tạm tính</span>
+                <span>{formatCurrency(cartTotal)}</span>
+              </div>
+              <div className="flex justify-between text-stone-600">
+                <span>Giảm giá {selectedPromo ? `(${selectedPromo.name})` : ''}</span>
+                <span className="text-[#c70d18]">- {formatCurrency(discount)}</span>
+              </div>
+              <div className="flex items-end justify-between border-t border-red-100 pt-3">
+                <span className="font-black">Tổng cộng</span>
+                <span className="text-2xl font-black text-[#c70d18]">{formatCurrency(grandTotal)}</span>
+              </div>
+            </div>
+
+            <div className="my-4 grid grid-cols-2 gap-3">
+              <button
+                onClick={() => setPaymentMethod('cash')}
+                className={`flex h-12 items-center justify-center gap-2 rounded-lg text-sm font-black ${
+                  paymentMethod === 'cash' ? 'bg-red-100 text-[#c70d18]' : 'bg-stone-100 text-stone-700'
+                }`}
+              >
+                <Banknote size={17} />
+                Tiền mặt
+              </button>
+              <button
+                onClick={() => setPaymentMethod('qr')}
+                className={`flex h-12 items-center justify-center gap-2 rounded-lg text-sm font-black ${
+                  paymentMethod === 'qr' ? 'bg-red-100 text-[#c70d18]' : 'bg-stone-100 text-stone-700'
+                }`}
+              >
+                <WalletCards size={17} />
+                Ví / Banking
+              </button>
+            </div>
+
+            <button
+              onClick={handleCheckout}
+              disabled={loading || !items.length}
+              className="flex h-12 w-full items-center justify-center gap-2 rounded-lg bg-[#c70d18] text-sm font-black text-white shadow-lg shadow-red-200 transition hover:bg-[#a90b14] disabled:cursor-not-allowed disabled:bg-stone-300 disabled:shadow-none"
+            >
+              <Printer size={17} />
+              {loading ? 'Đang thanh toán...' : 'Thanh toán'}
+            </button>
+
+            {message && (
+              <p className={`mt-3 rounded-lg px-3 py-2 text-sm font-semibold ${message.startsWith('Đã') ? 'bg-emerald-50 text-emerald-700' : 'bg-red-50 text-red-700'}`}>
+                {message}
+              </p>
+            )}
+          </div>
+        </aside>
       </div>
     </div>
   );

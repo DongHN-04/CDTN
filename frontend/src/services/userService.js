@@ -15,6 +15,12 @@ const getUsers = async () => {
   return response.data;
 };
 
+const getProfile = async () => {
+  // Endpoint này dùng cho cả khách hàng và nhân viên đang đăng nhập.
+  const response = await axios.get(API_URL + 'me', { headers: getAuthHeader() });
+  return response.data;
+};
+
 const createUser = async (userData) => {
   const response = await axios.post(API_URL, userData, { headers: getAuthHeader() });
   return response.data;
@@ -30,5 +36,5 @@ const deleteUser = async (id) => {
   return response.data;
 };
 
-const userService = { getUsers, createUser, updateUser, deleteUser };
+const userService = { getUsers, getProfile, createUser, updateUser, deleteUser };
 export default userService;

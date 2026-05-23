@@ -1,7 +1,10 @@
 const dns = require('dns');
-dns.setServers(['8.8.8.8', '8.8.4.4']);
-
 require('dotenv').config();
+
+if (process.env.FORCE_GOOGLE_DNS === 'true') {
+  // Chi ep DNS khi can debug ket noi MongoDB trong moi truong dev.
+  dns.setServers(['8.8.8.8', '8.8.4.4']);
+}
 
 const express = require('express');
 const cors = require('cors');
@@ -79,8 +82,11 @@ const PORT = process.env.PORT || 5000;
 const startServer = async () => {
   try {
     await connectDB();
-    await seedAdmin();
-    await seedData();
+    if (process.env.RUN_SEED_ON_START === 'true') {
+      // Khong seed mac dinh o production de tranh thay doi du lieu ngoai y muon khi restart server.
+      await seedAdmin();
+      await seedData();
+    }
 
     app.listen(PORT, () => {
       console.log(`Server running on port ${PORT}`);
