@@ -8,9 +8,10 @@ const RoleBasedRoute = ({ children, allowedRoles }) => {
     return <Navigate to="/login" />;
   }
 
-  if (!allowedRoles.includes(user.role)) {
-    // Nếu không có quyền, chuyển hướng về trang dashboard mặc định của role đó
-    // Có thể chuyển đến trang 403 Forbidden
+  const normalizedAllowedRoles = allowedRoles.map(role => role.toLowerCase());
+  const userRole = user.role ? user.role.toLowerCase() : '';
+
+  if (!normalizedAllowedRoles.includes(userRole)) {
     return <Navigate to="/" />;
   }
 

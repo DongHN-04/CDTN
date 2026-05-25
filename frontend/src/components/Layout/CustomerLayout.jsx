@@ -74,6 +74,14 @@ const CustomerLayout = () => {
 
             {user ? (
               <div className="flex items-center gap-3 border-l border-gray-200 pl-3">
+                {(user.role === 'admin' || user.role === 'staff') && (
+                  <Link
+                    to={user.role === 'admin' ? "/admin/dashboard" : "/staff/pos"}
+                    className="px-4 py-2 bg-[#c0392b] text-white text-sm font-bold rounded-xl no-underline hover:bg-[#a93226] transition-colors shadow-sm mr-1"
+                  >
+                    Quản trị
+                  </Link>
+                )}
                 <Link
                   to="/profile"
                   className={`flex items-center gap-2 rounded-xl border px-2.5 py-2 no-underline transition-all ${
