@@ -1,9 +1,26 @@
-const mongoose = require('mongoose');
 const Order = require('../models/Order');
 const MenuItem = require('../models/MenuItem');
 const Ingredient = require('../models/Ingredient');
 const Combo = require('../models/Combo');
 const Promotion = require('../models/Promotion');
+const { runWithOptionalTransaction } = require('../utils/transaction');
+
+const PAYMENT_RESERVATION_MINUTES = Number(process.env.PAYMENT_RESERVATION_MINUTES || 30);
+
+const buildStaffSnapshot = (user) => ({
+  name: user?.name || '',
+  email: user?.email || '',
+  role: user?.role || '',
+  position: user?.position || '',
+  phone: user?.phone || '',
+});
+
+const buildInventoryRequirementSnapshot = (requirements = []) => requirements.map((requirement) => ({
+  ingredient: requirement.ingredientId || requirement.ingredient,
+  name: requirement.name || '',
+  unit: requirement.unit || '',
+  requiredQty: requirement.requiredQty,
+}));
 
 const addIngredientRequirement = (requirements, ingredientDoc, quantity) => {
   if (!ingredientDoc || quantity <= 0) return;
@@ -24,7 +41,8 @@ const addIngredientRequirement = (requirements, ingredientDoc, quantity) => {
   });
 };
 
-const collectOrderDetails = async (items, session = null) => {
+const collectOrderDetails = async (items, session = null, options = {}) => {
+  const { allowUnavailable = false } = options;
   let subtotal = 0;
   const orderItems = [];
   const requirements = new Map();
@@ -33,6 +51,7 @@ const collectOrderDetails = async (items, session = null) => {
     if (item.comboId) {
       const combo = await Combo.findById(item.comboId).populate('items.menuItem').session(session);
       if (!combo) throw new Error(`Combo khong ton tai: ${item.comboId}`);
+      if (!allowUnavailable && (combo.isActive === false || combo.isDeleted === true)) throw new Error(`Combo da ngung ban: ${combo.name}`);
 
       for (const comboItem of combo.items) {
         if (!comboItem.menuItem) {
@@ -41,6 +60,9 @@ const collectOrderDetails = async (items, session = null) => {
 
         const menuItem = await MenuItem.findById(comboItem.menuItem._id).populate('ingredients.ingredient').session(session);
         if (!menuItem) throw new Error(`Mon trong combo khong ton tai: ${comboItem.menuItem._id}`);
+        if (!allowUnavailable && (menuItem.isActive === false || menuItem.isDeleted === true)) {
+          throw new Error(`Mon trong combo da ngung ban: ${menuItem.name}`);
+        }
 
         const menuQuantity = comboItem.quantity * item.quantity;
         for (const ing of menuItem.ingredients) {
@@ -51,6 +73,8 @@ const collectOrderDetails = async (items, session = null) => {
       orderItems.push({
         comboId: combo._id,
         name: combo.name,
+        image: combo.image || '',
+        category: 'Combo',
         price: combo.price,
         quantity: item.quantity,
       });
@@ -61,6 +85,9 @@ const collectOrderDetails = async (items, session = null) => {
     if (item.menuItem) {
       const menuItem = await MenuItem.findById(item.menuItem).populate('ingredients.ingredient').session(session);
       if (!menuItem) throw new Error(`Mon an khong ton tai: ${item.menuItem}`);
+      if (!allowUnavailable && (menuItem.isActive === false || menuItem.isDeleted === true)) {
+        throw new Error(`Mon an da ngung ban: ${menuItem.name}`);
+      }
 
       for (const ing of menuItem.ingredients) {
         addIngredientRequirement(requirements, ing.ingredient, ing.quantity * item.quantity);
@@ -68,6 +95,9 @@ const collectOrderDetails = async (items, session = null) => {
 
       orderItems.push({
         menuItem: menuItem._id,
+        name: menuItem.name,
+        image: menuItem.image || '',
+        category: menuItem.category || '',
         quantity: item.quantity,
         price: menuItem.price,
       });
@@ -93,6 +123,10 @@ const checkAndDecreaseStock = async (requirements, session = null) => {
       throw new Error(`Nguyen lieu khong ton tai: ${requirement.ingredientId}`);
     }
 
+    if (ingredient.isActive === false || ingredient.isDeleted === true) {
+      throw new Error(`Nguyen lieu ${ingredient.name} da ngung su dung`);
+    }
+
     if (ingredient.stock < requirement.requiredQty) {
       throw new Error(
         `Nguyen lieu ${ingredient.name} khong du. Can ${requirement.requiredQty} ${ingredient.unit}, hien co ${ingredient.stock}`
@@ -100,13 +134,32 @@ const checkAndDecreaseStock = async (requirements, session = null) => {
     }
 
     const result = await Ingredient.updateOne(
-      { _id: requirement.ingredientId, stock: { $gte: requirement.requiredQty } },
+      { _id: requirement.ingredientId, isActive: { $ne: false }, isDeleted: { $ne: true }, stock: { $gte: requirement.requiredQty } },
       { $inc: { stock: -requirement.requiredQty } },
       { session }
     );
 
     if (result.modifiedCount !== 1) {
       throw new Error(`Nguyen lieu ${ingredient.name} khong du de tru kho`);
+    }
+  }
+};
+
+const checkStockAvailability = async (requirements, session = null) => {
+  for (const requirement of requirements) {
+    const ingredient = await Ingredient.findById(requirement.ingredientId).session(session);
+    if (!ingredient) {
+      throw new Error(`Nguyen lieu khong ton tai: ${requirement.ingredientId}`);
+    }
+
+    if (ingredient.isActive === false || ingredient.isDeleted === true) {
+      throw new Error(`Nguyen lieu ${ingredient.name} da ngung su dung`);
+    }
+
+    if (ingredient.stock < requirement.requiredQty) {
+      throw new Error(
+        `Nguyen lieu ${ingredient.name} khong du. Can ${requirement.requiredQty} ${ingredient.unit}, hien co ${ingredient.stock}`
+      );
     }
   }
 };
@@ -121,61 +174,153 @@ const restoreStock = async (requirements, session = null) => {
   }
 };
 
-const getBestPromotionDiscount = async (subtotal) => {
+const calculatePromotionDiscount = (promotion, subtotal) => {
+  if (!promotion || subtotal < (promotion.minOrderValue || 0)) return 0;
+
+  if (promotion.type === 'percent') {
+    return Math.round(subtotal * (promotion.value / 100));
+  }
+
+  if (promotion.type === 'fixed') {
+    return promotion.value;
+  }
+
+  return 0;
+};
+
+const getBestPromotionDiscount = async (subtotal, session = null) => {
   const activePromotions = await Promotion.find({
+    type: { $in: ['percent', 'fixed'] },
+    isDeleted: { $ne: true },
     isActive: true,
     startDate: { $lte: new Date() },
     endDate: { $gte: new Date() },
     minOrderValue: { $lte: subtotal },
-  });
+  }).session(session);
 
   let bestDiscount = 0;
 
   for (const promo of activePromotions) {
-    if (promo.type === 'percent') {
-      bestDiscount = Math.max(bestDiscount, subtotal * (promo.value / 100));
-    } else if (promo.type === 'fixed') {
-      bestDiscount = Math.max(bestDiscount, promo.value);
-    }
+    bestDiscount = Math.max(bestDiscount, calculatePromotionDiscount(promo, subtotal));
   }
 
   return Math.min(bestDiscount, subtotal);
+};
+
+const getPromotionDiscount = async (subtotal, promotionId, session = null) => {
+  if (!promotionId) return getBestPromotionDiscount(subtotal, session);
+
+  const promotion = await Promotion.findOne({
+    _id: promotionId,
+    type: { $in: ['percent', 'fixed'] },
+    isDeleted: { $ne: true },
+    isActive: true,
+    startDate: { $lte: new Date() },
+    endDate: { $gte: new Date() },
+    minOrderValue: { $lte: subtotal },
+  }).session(session);
+
+  if (!promotion) {
+    throw new Error('Khuyen mai khong hop le hoac khong ap dung duoc cho don hang nay');
+  }
+
+  return Math.min(calculatePromotionDiscount(promotion, subtotal), subtotal);
+};
+
+const releaseReservedStockForOrder = async (order, session = null) => {
+  if (!order || !order.inventoryDeducted || order.status !== 'pending') return;
+
+  let requirements = (order.inventoryRequirements || []).map((requirement) => ({
+    ingredientId: requirement.ingredient,
+    name: requirement.name,
+    unit: requirement.unit,
+    requiredQty: requirement.requiredQty,
+  })).filter(requirement => requirement.ingredientId && requirement.requiredQty > 0);
+
+  if (requirements.length === 0) {
+    const items = order.items.map((item) => ({
+      menuItem: item.menuItem,
+      comboId: item.comboId,
+      quantity: item.quantity,
+    }));
+    const details = await collectOrderDetails(items, session, { allowUnavailable: true });
+    requirements = details.requirements;
+  }
+
+  await restoreStock(requirements, session);
+
+  order.inventoryDeducted = false;
+};
+
+const releaseExpiredPaymentReservations = async () => {
+  const cutoff = new Date(Date.now() - PAYMENT_RESERVATION_MINUTES * 60 * 1000);
+  const staleOrders = await Order.find({
+    status: 'pending',
+    paymentMethod: 'qr',
+    paymentStatus: 'unpaid',
+    inventoryDeducted: true,
+    txnRef: { $ne: '' },
+    updatedAt: { $lte: cutoff },
+  });
+
+  for (const staleOrder of staleOrders) {
+    try {
+      await runWithOptionalTransaction(async (session) => {
+        const order = await Order.findById(staleOrder._id).session(session);
+        if (
+          !order ||
+          order.status !== 'pending' ||
+          order.paymentMethod !== 'qr' ||
+          order.paymentStatus !== 'unpaid' ||
+          !order.inventoryDeducted ||
+          order.updatedAt > cutoff
+        ) {
+          return;
+        }
+
+        await releaseReservedStockForOrder(order, session);
+        order.status = 'cancelled';
+        order.paymentStatus = 'failed';
+        order.txnRef = '';
+        await order.save({ session });
+      });
+    } catch (error) {
+      console.warn(`Khong the tu dong hoan kho don thanh toan qua han ${staleOrder._id}:`, error.message);
+    }
+  }
 };
 
 // @desc    Tao don hang moi
 // @route   POST /api/orders
 // @access  Private (Admin, Staff)
 const createOrder = async (req, res) => {
-  const session = await mongoose.startSession();
   try {
-    let createdOrderId;
-
-    await session.withTransaction(async () => {
-      const { customer, items, discount, paymentMethod } = req.body;
+    const createdOrderId = await runWithOptionalTransaction(async (session) => {
+      const { customer, items, promotionId, paymentMethod } = req.body;
       const staff = req.user._id;
 
       const { subtotal, orderItems, requirements } = await collectOrderDetails(items, session);
       await checkAndDecreaseStock(requirements, session);
 
-      const bestDiscount = await getBestPromotionDiscount(subtotal);
-      const clientDiscount = discount || 0;
-      const finalDiscount = Math.min(Math.max(clientDiscount, bestDiscount), subtotal);
+      const finalDiscount = await getPromotionDiscount(subtotal, promotionId, session);
       const total = subtotal - finalDiscount;
 
       const [order] = await Order.create([{
         customer: customer || { name: 'Khach le', phone: '' },
         staff,
+        staffSnapshot: buildStaffSnapshot(req.user),
         items: orderItems,
+        inventoryRequirements: buildInventoryRequirementSnapshot(requirements),
         subtotal,
         discount: finalDiscount,
         total,
         paymentMethod: paymentMethod || 'cash',
         paymentStatus: 'paid',
         inventoryDeducted: true,
-        status: 'confirmed',
+        status: 'completed',
       }], { session });
 
-      createdOrderId = order._id;
+      return order._id;
     });
 
     const populatedOrder = await Order.findById(createdOrderId)
@@ -186,8 +331,6 @@ const createOrder = async (req, res) => {
   } catch (error) {
     console.error('Loi tao don:', error.message);
     res.status(400).json({ message: error.message });
-  } finally {
-    session.endSession();
   }
 };
 
@@ -196,6 +339,8 @@ const createOrder = async (req, res) => {
 // @access  Private (Admin, Staff)
 const getOrders = async (req, res) => {
   try {
+    await releaseExpiredPaymentReservations();
+
     const { startDate, endDate } = req.query;
     const filter = {};
     if (startDate && endDate) {
@@ -211,6 +356,7 @@ const getOrders = async (req, res) => {
       .sort('-createdAt');
     res.json(orders);
   } catch (error) {
+    console.error('Loi lay danh sach don hang:', error);
     res.status(500).json({ message: 'Loi server' });
   }
 };
@@ -226,6 +372,7 @@ const getOrderById = async (req, res) => {
     if (!order) return res.status(404).json({ message: 'Khong tim thay hoa don' });
     res.json(order);
   } catch (error) {
+    console.error('Loi lay danh sach don hang dang cho:', error);
     res.status(500).json({ message: 'Loi server' });
   }
 };
@@ -235,6 +382,8 @@ const getOrderById = async (req, res) => {
 // @access  Private (Admin, Staff)
 const getPendingOrders = async (req, res) => {
   try {
+    await releaseExpiredPaymentReservations();
+
     const orders = await Order.find({ isCustomerOrder: true, status: 'pending' })
       .populate('items.menuItem', 'name price')
       .sort('-createdAt');
@@ -244,7 +393,7 @@ const getPendingOrders = async (req, res) => {
   }
 };
 
-const preparePendingOrder = async (order, userId, session = null) => {
+const preparePendingOrder = async (order, user, session = null) => {
   if (order.status !== 'pending') return;
 
   if (order.paymentMethod === 'qr' && order.paymentStatus !== 'paid') {
@@ -257,36 +406,32 @@ const preparePendingOrder = async (order, userId, session = null) => {
       comboId: item.comboId,
       quantity: item.quantity,
     }));
-    const { requirements } = await collectOrderDetails(items, session);
+    const { requirements } = await collectOrderDetails(items, session, { allowUnavailable: true });
     await checkAndDecreaseStock(requirements, session);
     order.inventoryDeducted = true;
+    order.inventoryRequirements = buildInventoryRequirementSnapshot(requirements);
   }
 
-  order.staff = userId;
-  if (order.paymentMethod === 'cash' || order.paymentMethod === 'card') {
-    order.paymentStatus = 'paid';
-  }
+  order.staff = user?._id || user;
+  order.staffSnapshot = buildStaffSnapshot(user);
 };
 
 // @desc    Xac nhan don hang tu khach va tru kho
 // @route   PUT /api/orders/:id/confirm
 // @access  Private (Admin, Staff)
 const confirmOrder = async (req, res) => {
-  const session = await mongoose.startSession();
   try {
-    let confirmedOrderId;
-
-    await session.withTransaction(async () => {
+    const confirmedOrderId = await runWithOptionalTransaction(async (session) => {
       const order = await Order.findById(req.params.id).session(session);
       if (!order) throw new Error('Khong tim thay don hang');
       if (order.status !== 'pending') {
         throw new Error('Don hang khong o trang thai cho xac nhan');
       }
 
-      await preparePendingOrder(order, req.user._id, session);
+      await preparePendingOrder(order, req.user, session);
       order.status = 'confirmed';
       await order.save({ session });
-      confirmedOrderId = order._id;
+      return order._id;
     });
 
     const populatedOrder = await Order.findById(confirmedOrderId)
@@ -296,8 +441,6 @@ const confirmOrder = async (req, res) => {
     res.json(populatedOrder);
   } catch (error) {
     res.status(400).json({ message: error.message });
-  } finally {
-    session.endSession();
   }
 };
 
@@ -305,7 +448,6 @@ const confirmOrder = async (req, res) => {
 // @route   PUT /api/orders/:id/status
 // @access  Private (Admin, Staff)
 const updateOrderStatus = async (req, res) => {
-  const session = await mongoose.startSession();
   try {
     const allowedStatuses = ['pending', 'confirmed', 'delivering', 'completed', 'cancelled'];
     const { status } = req.body;
@@ -314,9 +456,7 @@ const updateOrderStatus = async (req, res) => {
       return res.status(400).json({ message: 'Trang thai don hang khong hop le' });
     }
 
-    let updatedOrderId;
-
-    await session.withTransaction(async () => {
+    const updatedOrderId = await runWithOptionalTransaction(async (session) => {
       const order = await Order.findById(req.params.id).session(session);
       if (!order) throw new Error('Khong tim thay don hang');
       if (order.status === 'cancelled' || order.status === 'completed') {
@@ -328,29 +468,33 @@ const updateOrderStatus = async (req, res) => {
       }
 
       if (status === 'cancelled') {
+        if (order.paymentMethod === 'qr' && order.paymentStatus === 'paid') {
+          throw new Error('Don hang VNPay da thanh toan can xu ly hoan tien truoc khi huy');
+        }
+
         if (order.inventoryDeducted) {
-          const items = order.items.map((item) => ({
-            menuItem: item.menuItem,
-            comboId: item.comboId,
-            quantity: item.quantity,
-          }));
-          const { requirements } = await collectOrderDetails(items, session);
-          await restoreStock(requirements, session);
-          order.inventoryDeducted = false;
+          await releaseReservedStockForOrder(order, session);
         }
         order.status = 'cancelled';
         await order.save({ session });
-        updatedOrderId = order._id;
-        return;
+        return order._id;
       }
 
       if (order.status === 'pending') {
-        await preparePendingOrder(order, req.user._id, session);
+        await preparePendingOrder(order, req.user, session);
+      }
+
+      if (!order.staff || !order.staffSnapshot?.name) {
+        order.staff = req.user._id;
+        order.staffSnapshot = buildStaffSnapshot(req.user);
       }
 
       order.status = status;
+      if (status === 'completed' && (order.paymentMethod === 'cash' || order.paymentMethod === 'card')) {
+        order.paymentStatus = 'paid';
+      }
       await order.save({ session });
-      updatedOrderId = order._id;
+      return order._id;
     });
 
     const populatedOrder = await Order.findById(updatedOrderId)
@@ -360,8 +504,6 @@ const updateOrderStatus = async (req, res) => {
     res.json(populatedOrder);
   } catch (error) {
     res.status(400).json({ message: error.message });
-  } finally {
-    session.endSession();
   }
 };
 
@@ -372,7 +514,9 @@ module.exports = {
   getPendingOrders,
   confirmOrder,
   updateOrderStatus,
+  releaseExpiredPaymentReservations,
   collectOrderDetails,
+  checkStockAvailability,
   checkAndDecreaseStock,
   restoreStock,
 };

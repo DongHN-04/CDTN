@@ -1,8 +1,23 @@
 import React, { useEffect, useMemo, useState } from 'react';
+import { PlusCircle } from 'lucide-react';
 import customerService from '../../services/customerService';
 import { useAuth } from '../../contexts/AuthContext';
+import ConfirmDeleteModal from '../../components/ConfirmDeleteModal';
 
+const pageSize = 5;
 const formatCurrency = (value = 0) => `${Number(value || 0).toLocaleString('vi-VN')}đ`;
+const formatLastPurchase = (value) => {
+  if (!value) return 'Chưa mua hàng';
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return 'Chưa mua hàng';
+  return date.toLocaleString('vi-VN', {
+    hour: '2-digit',
+    minute: '2-digit',
+    day: '2-digit',
+    month: '2-digit',
+    year: 'numeric',
+  });
+};
 
 const emptyForm = {
   name: '',
@@ -21,6 +36,8 @@ const CustomerManagementPage = () => {
   const [error, setError] = useState('');
   const [search, setSearch] = useState('');
   const [typeFilter, setTypeFilter] = useState('all');
+  const [deleteModal, setDeleteModal] = useState({ isOpen: false, customer: null, loading: false });
+  const [currentPage, setCurrentPage] = useState(1);
   const { user } = useAuth();
 
   useEffect(() => {
@@ -64,14 +81,21 @@ const CustomerManagementPage = () => {
     setFormData(emptyForm);
   };
 
-  const handleDelete = async (customer) => {
-    if (!window.confirm(`Xóa khách hàng "${customer.name}"?`)) return;
+  const handleDelete = (customer) => {
+    setDeleteModal({ isOpen: true, customer, loading: false });
+  };
+
+  const confirmDelete = async () => {
+    if (!deleteModal.customer) return;
 
     try {
-      await customerService.deleteCustomer(customer._id);
+      setDeleteModal(current => ({ ...current, loading: true }));
+      await customerService.deleteCustomer(deleteModal.customer._id);
+      setDeleteModal({ isOpen: false, customer: null, loading: false });
       fetchCustomers();
     } catch (err) {
       setError(err.response?.data?.message || 'Không thể xóa khách hàng');
+      setDeleteModal({ isOpen: false, customer: null, loading: false });
     }
   };
 
@@ -97,18 +121,9 @@ const CustomerManagementPage = () => {
     }
   };
 
-  const enrichedCustomers = useMemo(() => (
-    customers.map((customer, index) => ({
-      ...customer,
-      totalOrders: customer.totalOrders ?? (customer.type === 'VIP' ? 42 - (index % 8) : 8 + (index % 12)),
-      totalSpent: customer.totalSpent ?? (customer.type === 'VIP' ? 12450000 - index * 250000 : 1800000 + index * 350000),
-      lastPurchase: customer.lastPurchase || (index === 0 ? 'Hôm qua, 14:30' : index === 1 ? '3 ngày trước' : 'Tuần trước'),
-    }))
-  ), [customers]);
-
   const filteredCustomers = useMemo(() => {
     const keyword = search.trim().toLowerCase();
-    return enrichedCustomers.filter(customer => {
+    return customers.filter(customer => {
       const matchesSearch = !keyword || [
         customer.name,
         customer.phone,
@@ -122,7 +137,21 @@ const CustomerManagementPage = () => {
 
       return matchesSearch && matchesType;
     });
-  }, [enrichedCustomers, search, typeFilter]);
+  }, [customers, search, typeFilter]);
+
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [search, typeFilter]);
+
+  const totalPages = Math.max(1, Math.ceil(filteredCustomers.length / pageSize));
+  const paginatedCustomers = useMemo(() => {
+    const startIndex = (currentPage - 1) * pageSize;
+    return filteredCustomers.slice(startIndex, startIndex + pageSize);
+  }, [filteredCustomers, currentPage]);
+
+  useEffect(() => {
+    if (currentPage > totalPages) setCurrentPage(totalPages);
+  }, [currentPage, totalPages]);
 
   const stats = useMemo(() => {
     const now = new Date();
@@ -167,9 +196,10 @@ const CustomerManagementPage = () => {
           </select>
           <button
             onClick={openCreate}
-            className="rounded-xl bg-[#c70d1a] px-5 py-3 text-sm font-black text-white shadow-sm hover:bg-[#a90b16]"
+            className="inline-flex items-center justify-center gap-2 rounded-xl bg-[#c70d1a] px-5 py-3 text-sm font-black text-white shadow-sm hover:bg-[#a90b16]"
           >
-            + Thêm KH
+            <PlusCircle size={17} />
+            Thêm khách hàng
           </button>
         </div>
       </div>
@@ -208,7 +238,7 @@ const CustomerManagementPage = () => {
                 <td colSpan="6" className="px-5 py-10 text-center text-sm font-bold text-gray-500">Không có khách hàng phù hợp.</td>
               </tr>
             ) : (
-              filteredCustomers.map(customer => (
+              paginatedCustomers.map(customer => (
                 <CustomerRow
                   key={customer._id}
                   customer={customer}
@@ -222,13 +252,39 @@ const CustomerManagementPage = () => {
         </table>
 
         <div className="flex items-center justify-between border-t border-gray-50 px-5 py-4 text-xs font-bold text-gray-500">
-          <span>Hiển thị 1-{filteredCustomers.length} của {customers.length}</span>
+          <span>
+            Hiển thị {filteredCustomers.length ? (currentPage - 1) * pageSize + 1 : 0}
+            -{Math.min(currentPage * pageSize, filteredCustomers.length)} của {filteredCustomers.length} khách hàng
+          </span>
           <div className="flex items-center gap-2">
-            <button className="flex h-8 w-8 items-center justify-center rounded-full border border-gray-100">‹</button>
-            <button className="flex h-8 w-8 items-center justify-center rounded-full bg-[#c70d1a] font-black text-white">1</button>
-            <button className="flex h-8 w-8 items-center justify-center rounded-full border border-gray-100">2</button>
-            <button className="flex h-8 w-8 items-center justify-center rounded-full border border-gray-100">3</button>
-            <button className="flex h-8 w-8 items-center justify-center rounded-full border border-gray-100">›</button>
+            <button
+              type="button"
+              disabled={currentPage === 1}
+              onClick={() => setCurrentPage(page => Math.max(1, page - 1))}
+              className="flex h-8 w-8 items-center justify-center rounded-full border border-gray-100 disabled:cursor-not-allowed disabled:opacity-40"
+            >
+              ‹
+            </button>
+            {Array.from({ length: totalPages }, (_, index) => index + 1).map(page => (
+              <button
+                key={page}
+                type="button"
+                onClick={() => setCurrentPage(page)}
+                className={`flex h-8 w-8 items-center justify-center rounded-full ${
+                  currentPage === page ? 'bg-[#c70d1a] font-black text-white' : 'border border-gray-100 text-gray-600'
+                }`}
+              >
+                {page}
+              </button>
+            ))}
+            <button
+              type="button"
+              disabled={currentPage === totalPages}
+              onClick={() => setCurrentPage(page => Math.min(totalPages, page + 1))}
+              className="flex h-8 w-8 items-center justify-center rounded-full border border-gray-100 disabled:cursor-not-allowed disabled:opacity-40"
+            >
+              ›
+            </button>
           </div>
         </div>
       </div>
@@ -242,6 +298,15 @@ const CustomerManagementPage = () => {
           onClose={closeForm}
         />
       )}
+
+      <ConfirmDeleteModal
+        isOpen={deleteModal.isOpen}
+        title="Xóa khách hàng?"
+        message={`Bạn có chắc chắn muốn xóa "${deleteModal.customer?.name || 'khách hàng này'}" khỏi hệ thống không?`}
+        loading={deleteModal.loading}
+        onCancel={() => setDeleteModal({ isOpen: false, customer: null, loading: false })}
+        onConfirm={confirmDelete}
+      />
     </div>
   );
 };
@@ -283,7 +348,7 @@ const CustomerRow = ({ customer, canDelete, onEdit, onDelete }) => {
       </td>
       <td className="px-5 py-5 font-black">{customer.totalOrders}</td>
       <td className="px-5 py-5 font-black text-[#c70d1a]">{formatCurrency(customer.totalSpent)}</td>
-      <td className="px-5 py-5 font-semibold text-gray-600">{customer.lastPurchase}</td>
+      <td className="px-5 py-5 font-semibold text-gray-600">{formatLastPurchase(customer.lastPurchase)}</td>
       <td className="px-5 py-5">
         <div className="flex justify-end gap-2">
           <button onClick={onEdit} className="rounded-lg bg-gray-100 px-3 py-2 text-xs font-black text-gray-700">Sửa</button>

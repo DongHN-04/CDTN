@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom';
 import publicService from '../../services/publicService';
 import { useCart } from '../../contexts/CartContext';
 import { getImageUrl } from '../../utils/imageUrl';
+import { COMBO_CATEGORY, MENU_CATEGORIES, normalizeCategory } from '../../constants/menuCategories';
 
 /* ───────── SVG Icon Components ───────── */
 const BurgerIcon = () => (
@@ -58,6 +59,7 @@ const StarRating = ({ rating }) => {
 };
 
 /* ───────── Static Data ───────── */
+// eslint-disable-next-line no-unused-vars
 const categories = [
   { name: 'Burger', icon: BurgerIcon, color: '#ef4444' },
   { name: 'Gà Rán', icon: ChickenIcon, color: '#f97316' },
@@ -68,6 +70,20 @@ const categories = [
 ];
 
 // Ảnh mặc định theo category
+const categoryVisuals = {
+  [normalizeCategory('Burger')]: { icon: BurgerIcon, color: '#ef4444' },
+  [normalizeCategory('Gà rán')]: { icon: ChickenIcon, color: '#f97316' },
+  [normalizeCategory('Pizza')]: { icon: PizzaIcon, color: '#ec4899' },
+  [normalizeCategory(COMBO_CATEGORY)]: { icon: ComboIcon, color: '#8b5cf6' },
+  [normalizeCategory('Đồ uống')]: { icon: DrinkIcon, color: '#06b6d4' },
+  [normalizeCategory('Tráng miệng')]: { icon: DessertIcon, color: '#10b981' },
+};
+
+const adminCategories = [...MENU_CATEGORIES, COMBO_CATEGORY].map(name => ({
+  name,
+  ...(categoryVisuals[normalizeCategory(name)] || categoryVisuals[normalizeCategory('Burger')]),
+}));
+
 const defaultImages = {
   'Burger': '/images/home/product-burger.png',
   'Gà Rán': '/images/home/product-chicken.png',
@@ -229,7 +245,7 @@ const HomePage = () => {
             Danh Mục Phổ Biến
           </h2>
           <div className="flex justify-center gap-6 flex-wrap">
-            {categories.map((cat) => {
+            {adminCategories.map((cat) => {
 
               const IconComp = cat.icon;
               return (

@@ -34,6 +34,10 @@ const userSchema = mongoose.Schema(
       type: String,
       default: '',
     },
+    avatar: {
+      type: String,
+      default: '',
+    },
 
     salary: {
       type: Number, 
@@ -42,6 +46,10 @@ const userSchema = mongoose.Schema(
       type: String,
       enum: ['Đang làm việc', 'Đang nghỉ phép', 'Đã nghỉ việc'],
       default: 'Đang làm việc',
+    },
+    isDeleted: {
+      type: Boolean,
+      default: false,
     },
   },
   {

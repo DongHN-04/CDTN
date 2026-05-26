@@ -67,13 +67,11 @@ function App() {
                 }
               />
               <Route path="/cart" element={<CartPage />} />
+              <Route path="/checkout" element={<CheckoutPage />} />
               <Route path="/login" element={<LoginPage />} />
               <Route path="/register" element={<RegisterPage />} />
               <Route path="/payment-result" element={<PaymentResultPage />} />
             </Route>
-
-            {/* Route thanh toán với giao diện tối giản, bảo mật */}
-            <Route path="/checkout" element={<CheckoutPage />} />
 
             {/* ========== PROTECTED ROUTES (ADMIN & STAFF) ========== */}
             <Route
@@ -215,7 +213,14 @@ function App() {
                 }
               />
 
-              <Route path="/admin" element={<DashboardPage />} />
+              <Route
+                path="/admin"
+                element={
+                  <RoleBasedRoute allowedRoles={['admin', 'staff']}>
+                    <DashboardPage />
+                  </RoleBasedRoute>
+                }
+              />
             </Route>
 
             <Route path="*" element={<NotFoundPage />} />

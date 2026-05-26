@@ -1,21 +1,14 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import inventoryService from '../../services/inventoryService';
 import IngredientForm from '../../components/IngredientForm';
+import ConfirmDeleteModal from '../../components/ConfirmDeleteModal';
 import { formatApiError } from '../../utils/apiError';
 
 const LOW_STOCK_THRESHOLD = 10;
+const pageSize = 5;
 
 const formatNumber = (value = 0) => Number(value || 0).toLocaleString('vi-VN');
 const formatCurrency = (value = 0) => `${Number(value || 0).toLocaleString('vi-VN')}đ`;
-
-const getCategory = (name = '') => {
-  const lower = name.toLowerCase();
-  if (lower.includes('bò') || lower.includes('gà') || lower.includes('thịt')) return 'Thịt tươi';
-  if (lower.includes('phô mai') || lower.includes('sữa') || lower.includes('kem')) return 'Bơ sữa';
-  if (lower.includes('cà') || lower.includes('dưa') || lower.includes('rau') || lower.includes('hành')) return 'Rau củ';
-  if (lower.includes('dầu') || lower.includes('sốt')) return 'Gia vị';
-  return 'Nguyên liệu khô';
-};
 
 const getStatus = (stock = 0) => {
   if (Number(stock) <= 0) return { label: 'Hết hàng', className: 'bg-red-50 text-red-700' };
@@ -32,6 +25,8 @@ const InventoryPage = () => {
   const [pageError, setPageError] = useState('');
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
+  const [deleteModal, setDeleteModal] = useState({ isOpen: false, ingredient: null, loading: false });
+  const [currentPage, setCurrentPage] = useState(1);
 
   const fetchData = async () => {
     setLoading(true);
@@ -62,14 +57,21 @@ const InventoryPage = () => {
     setShowForm(true);
   };
 
-  const handleDelete = async (ingredient) => {
-    if (!window.confirm(`Xóa nguyên liệu "${ingredient.name}"?`)) return;
+  const handleDelete = (ingredient) => {
+    setDeleteModal({ isOpen: true, ingredient, loading: false });
+  };
+
+  const confirmDelete = async () => {
+    if (!deleteModal.ingredient) return;
 
     try {
-      await inventoryService.deleteIngredient(ingredient._id);
-      setIngredients(current => current.filter(item => item._id !== ingredient._id));
+      setDeleteModal(current => ({ ...current, loading: true }));
+      await inventoryService.deleteIngredient(deleteModal.ingredient._id);
+      setIngredients(current => current.filter(item => item._id !== deleteModal.ingredient._id));
+      setDeleteModal({ isOpen: false, ingredient: null, loading: false });
     } catch (error) {
       setPageError(formatApiError(error, 'Không thể xóa nguyên liệu'));
+      setDeleteModal({ isOpen: false, ingredient: null, loading: false });
     }
   };
 
@@ -110,7 +112,6 @@ const InventoryPage = () => {
       const matchesSearch = !keyword || [
         item.name,
         item.unit,
-        getCategory(item.name),
         status,
       ].join(' ').toLowerCase().includes(keyword);
 
@@ -122,6 +123,20 @@ const InventoryPage = () => {
       return matchesSearch && matchesStatus;
     });
   }, [ingredients, search, statusFilter]);
+
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [search, statusFilter]);
+
+  const totalPages = Math.max(1, Math.ceil(filteredIngredients.length / pageSize));
+  const paginatedIngredients = useMemo(() => {
+    const startIndex = (currentPage - 1) * pageSize;
+    return filteredIngredients.slice(startIndex, startIndex + pageSize);
+  }, [filteredIngredients, currentPage]);
+
+  useEffect(() => {
+    if (currentPage > totalPages) setCurrentPage(totalPages);
+  }, [currentPage, totalPages]);
 
   return (
     <div className="max-w-6xl mx-auto pb-10">
@@ -173,12 +188,11 @@ const InventoryPage = () => {
       </div>
 
       <div className="overflow-hidden rounded-2xl bg-white shadow-sm ring-1 ring-gray-100">
-        <table className="w-full min-w-[900px] border-collapse">
+        <table className="w-full min-w-[820px] border-collapse">
           <thead>
             <tr className="bg-[#fbf8f7] text-left text-[11px] font-black uppercase tracking-widest text-red-950">
               <th className="px-5 py-4">Mã NL</th>
               <th className="px-5 py-4">Tên nguyên liệu</th>
-              <th className="px-5 py-4">Phân loại</th>
               <th className="px-5 py-4">Tồn kho</th>
               <th className="px-5 py-4">Đơn vị</th>
               <th className="px-5 py-4">Giá nhập</th>
@@ -189,18 +203,18 @@ const InventoryPage = () => {
           <tbody>
             {loading ? (
               <tr>
-                <td colSpan="8" className="px-5 py-10 text-center text-sm font-bold text-gray-500">Đang tải...</td>
+                <td colSpan="7" className="px-5 py-10 text-center text-sm font-bold text-gray-500">Đang tải...</td>
               </tr>
             ) : filteredIngredients.length === 0 ? (
               <tr>
-                <td colSpan="8" className="px-5 py-10 text-center text-sm font-bold text-gray-500">Không có nguyên liệu phù hợp.</td>
+                <td colSpan="7" className="px-5 py-10 text-center text-sm font-bold text-gray-500">Không có nguyên liệu phù hợp.</td>
               </tr>
             ) : (
-              filteredIngredients.map((ingredient, index) => (
+              paginatedIngredients.map((ingredient, index) => (
                 <IngredientRow
                   key={ingredient._id}
                   ingredient={ingredient}
-                  index={index}
+                  index={(currentPage - 1) * pageSize + index}
                   onEdit={() => openEdit(ingredient)}
                   onDelete={() => handleDelete(ingredient)}
                 />
@@ -208,6 +222,14 @@ const InventoryPage = () => {
             )}
           </tbody>
         </table>
+        <PaginationFooter
+          currentPage={currentPage}
+          pageSize={pageSize}
+          totalItems={filteredIngredients.length}
+          totalPages={totalPages}
+          label="nguyên liệu"
+          onPageChange={setCurrentPage}
+        />
       </div>
 
       {showForm && (
@@ -218,6 +240,15 @@ const InventoryPage = () => {
           onCancel={() => setShowForm(false)}
         />
       )}
+
+      <ConfirmDeleteModal
+        isOpen={deleteModal.isOpen}
+        title="Xóa nguyên liệu?"
+        message={`Bạn có chắc chắn muốn xóa "${deleteModal.ingredient?.name || 'nguyên liệu này'}" khỏi hệ thống không?`}
+        loading={deleteModal.loading}
+        onCancel={() => setDeleteModal({ isOpen: false, ingredient: null, loading: false })}
+        onConfirm={confirmDelete}
+      />
     </div>
   );
 };
@@ -246,7 +277,6 @@ const IngredientRow = ({ ingredient, index, onEdit, onDelete }) => {
         <div className="font-black text-gray-950">{ingredient.name}</div>
         <div className="text-xs font-semibold text-gray-400">Cập nhật {new Date(ingredient.updatedAt || ingredient.createdAt || Date.now()).toLocaleDateString('vi-VN')}</div>
       </td>
-      <td className="px-5 py-5 text-gray-700">{getCategory(ingredient.name)}</td>
       <td className={`px-5 py-5 font-black ${ingredient.stock <= 0 ? 'text-[#c70d1a]' : 'text-gray-950'}`}>
         {formatNumber(ingredient.stock)}
       </td>
@@ -264,5 +294,44 @@ const IngredientRow = ({ ingredient, index, onEdit, onDelete }) => {
     </tr>
   );
 };
+
+const PaginationFooter = ({ currentPage, pageSize, totalItems, totalPages, label, onPageChange }) => (
+  <div className="flex items-center justify-between border-t border-gray-50 px-5 py-4 text-xs font-bold text-gray-500">
+    <span>
+      Hiển thị {totalItems ? (currentPage - 1) * pageSize + 1 : 0}
+      -{Math.min(currentPage * pageSize, totalItems)} của {totalItems} {label}
+    </span>
+    <div className="flex items-center gap-2">
+      <button
+        type="button"
+        disabled={currentPage === 1}
+        onClick={() => onPageChange(page => Math.max(1, page - 1))}
+        className="flex h-8 w-8 items-center justify-center rounded-full border border-gray-100 disabled:cursor-not-allowed disabled:opacity-40"
+      >
+        ‹
+      </button>
+      {Array.from({ length: totalPages }, (_, index) => index + 1).map(page => (
+        <button
+          key={page}
+          type="button"
+          onClick={() => onPageChange(page)}
+          className={`flex h-8 w-8 items-center justify-center rounded-full ${
+            currentPage === page ? 'bg-[#c70d1a] font-black text-white' : 'border border-gray-100 text-gray-600'
+          }`}
+        >
+          {page}
+        </button>
+      ))}
+      <button
+        type="button"
+        disabled={currentPage === totalPages}
+        onClick={() => onPageChange(page => Math.min(totalPages, page + 1))}
+        className="flex h-8 w-8 items-center justify-center rounded-full border border-gray-100 disabled:cursor-not-allowed disabled:opacity-40"
+      >
+        ›
+      </button>
+    </div>
+  </div>
+);
 
 export default InventoryPage;

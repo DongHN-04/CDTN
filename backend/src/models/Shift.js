@@ -12,6 +12,7 @@ const shiftSchema = new mongoose.Schema(
     actualCash: { type: Number, default: 0 },
     difference: { type: Number, default: 0 },
     notes: { type: String, default: '' },
+    isDeleted: { type: Boolean, default: false },
   },
   { timestamps: true }
 );

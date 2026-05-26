@@ -148,6 +148,10 @@ const PromotionsPage = () => {
       setMessage('Combo mẫu dùng để giới thiệu. Vui lòng xem thực đơn để đặt món.');
       return;
     }
+    if (combo.isAvailable === false) {
+      setMessage('Combo này đang hết hàng do không đủ nguyên liệu trong kho.');
+      return;
+    }
     addCombo(combo, 1);
     setMessage(`Đã thêm ${combo.name} vào giỏ hàng.`);
   };
@@ -271,14 +275,20 @@ const PromotionsPage = () => {
             {visibleCombos.slice(0, 4).map((combo, index) => {
               const oldPrice = combo.originalPrice || Math.round((combo.price || 0) * 1.25);
               const image = getImageUrl(combo.image, fallbackCombos[index % fallbackCombos.length].image);
+              const isOutOfStock = combo.isAvailable === false;
 
               return (
-                <article key={combo._id} className="overflow-hidden rounded-lg border border-red-100 bg-white shadow-sm transition hover:-translate-y-0.5 hover:shadow-xl">
+                <article key={combo._id} className={`overflow-hidden rounded-lg border border-red-100 bg-white shadow-sm transition ${isOutOfStock ? 'opacity-70' : 'hover:-translate-y-0.5 hover:shadow-xl'}`}>
                   <div className="relative aspect-[4/3] overflow-hidden bg-red-50">
-                    <img src={image} alt={combo.name} className="h-full w-full object-cover" />
+                    <img src={image} alt={combo.name} className={`h-full w-full object-cover ${isOutOfStock ? 'grayscale opacity-60' : ''}`} />
                     <span className="absolute left-3 top-3 rounded-full bg-[#c70d18] px-3 py-1 text-[11px] font-black text-white">
                       Combo -{Math.max(10, Math.round(((oldPrice - combo.price) / oldPrice) * 100))}%
                     </span>
+                    {isOutOfStock && (
+                      <span className="absolute right-3 top-3 rounded-full bg-white/95 px-3 py-1 text-[11px] font-black text-red-600 shadow-sm">
+                        HẾT HÀNG
+                      </span>
+                    )}
                   </div>
                   <div className="p-4">
                     <h3 className="mb-2 line-clamp-2 min-h-[40px] text-sm font-black text-slate-950">{combo.name}</h3>
@@ -291,10 +301,11 @@ const PromotionsPage = () => {
                     </div>
                     <button
                       onClick={() => handleAddCombo(combo)}
-                      className="flex h-10 w-full items-center justify-center gap-2 rounded-lg bg-red-50 text-sm font-black text-[#c70d18] hover:bg-[#c70d18] hover:text-white"
+                      disabled={isOutOfStock}
+                      className="flex h-10 w-full items-center justify-center gap-2 rounded-lg bg-red-50 text-sm font-black text-[#c70d18] hover:bg-[#c70d18] hover:text-white disabled:cursor-not-allowed disabled:bg-slate-100 disabled:text-slate-400"
                     >
                       <ShoppingCart size={16} />
-                      Thêm vào giỏ
+                      {isOutOfStock ? 'Hết hàng' : 'Thêm vào giỏ'}
                     </button>
                   </div>
                 </article>

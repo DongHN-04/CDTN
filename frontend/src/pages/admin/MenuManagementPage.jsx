@@ -1,19 +1,21 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { Edit3, Eye, EyeOff, Plus, Search, Trash2 } from 'lucide-react';
+import { Edit3, PlusCircle, Search, Trash2 } from 'lucide-react';
 import menuService from '../../services/menuService';
 import MenuForm from '../../components/MenuForm';
+import ConfirmDeleteModal from '../../components/ConfirmDeleteModal';
 import { getImageUrl } from '../../utils/imageUrl';
+import { ALL_MENU_CATEGORY, MENU_CATEGORIES } from '../../constants/menuCategories';
 
-const categories = ['Tất cả', 'Burger', 'Gà rán', 'Đồ uống', 'Combo', 'Tráng miệng'];
-const pageSize = 10;
+const categories = [ALL_MENU_CATEGORY, ...MENU_CATEGORIES];
+const pageSize = 5;
 
 const fallbackImages = {
   Burger: '/images/home/product-burger.png',
+  Pizza: '/images/home/product-pizza.png',
   'Gà rán': '/images/home/product-chicken.png',
   'Gà Rán': '/images/home/product-chicken.png',
   'Đồ uống': '/images/home/product-sandwich.png',
   'Đồ Uống': '/images/home/product-sandwich.png',
-  Combo: '/images/home/product-burger.png',
   'Tráng miệng': '/images/home/product-sandwich.png',
   'Tráng Miệng': '/images/home/product-sandwich.png',
 };
@@ -21,7 +23,7 @@ const fallbackImages = {
 const normalizeText = (value = '') => value.toString().trim().toLowerCase();
 const formatPrice = (value) => Number(value || 0).toLocaleString('vi-VN');
 const getItemCode = (item) => `#S-${String(item._id || '').slice(-4).toUpperCase()}`;
-const getStatus = (item) => (item.isActive === false ? 'Hết hàng' : 'Còn hàng');
+const getStatus = (item) => (item.isAvailable === false ? 'Hết hàng' : 'Còn hàng');
 
 const statusClass = {
   'Còn hàng': 'bg-emerald-50 text-emerald-700',
@@ -33,11 +35,13 @@ const MenuManagementPage = () => {
   const [menuItems, setMenuItems] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+  const [notice, setNotice] = useState('');
   const [search, setSearch] = useState('');
   const [activeCategory, setActiveCategory] = useState('Tất cả');
   const [selected, setSelected] = useState(null);
   const [showForm, setShowForm] = useState(false);
   const [currentPage, setCurrentPage] = useState(1);
+  const [deleteModal, setDeleteModal] = useState({ isOpen: false, item: null, loading: false });
 
   useEffect(() => {
     fetchMenu();
@@ -46,6 +50,7 @@ const MenuManagementPage = () => {
   const fetchMenu = async () => {
     setLoading(true);
     setError('');
+    setNotice('');
     try {
       const data = await menuService.getMenuItems();
       setMenuItems(data || []);
@@ -75,6 +80,10 @@ const MenuManagementPage = () => {
   const totalPages = Math.max(1, Math.ceil(filteredItems.length / pageSize));
   const visibleItems = filteredItems.slice((currentPage - 1) * pageSize, currentPage * pageSize);
 
+  useEffect(() => {
+    if (currentPage > totalPages) setCurrentPage(totalPages);
+  }, [currentPage, totalPages]);
+
   const openCreate = () => {
     setSelected(null);
     setShowForm(true);
@@ -92,6 +101,7 @@ const MenuManagementPage = () => {
 
   const handleFormSubmit = async (formData) => {
     setError('');
+    setNotice('');
     try {
       if (selected) {
         const updated = await menuService.updateMenuItem(selected._id, formData);
@@ -107,23 +117,26 @@ const MenuManagementPage = () => {
     }
   };
 
-  const handleToggleStatus = async (item) => {
-    try {
-      const updated = await menuService.updateMenuItem(item._id, { isActive: item.isActive === false });
-      setMenuItems(current => current.map(menuItem => menuItem._id === updated._id ? updated : menuItem));
-    } catch (err) {
-      setError(err.response?.data?.message || 'Không thể cập nhật trạng thái món');
-    }
+  const handleDelete = (item) => {
+    setDeleteModal({ isOpen: true, item, loading: false });
   };
 
-  const handleDelete = async (item) => {
-    if (!window.confirm(`Xóa món "${item.name}"?`)) return;
+  const confirmDelete = async () => {
+    if (!deleteModal.item) return;
 
     try {
-      await menuService.deleteMenuItem(item._id);
-      setMenuItems(current => current.filter(menuItem => menuItem._id !== item._id));
+      setDeleteModal(current => ({ ...current, loading: true }));
+      const result = await menuService.deleteMenuItem(deleteModal.item._id);
+      setMenuItems(current => current.filter(menuItem => menuItem._id !== deleteModal.item._id));
+      const pausedCombos = Number(result?.pausedCombos || 0);
+      setNotice(pausedCombos > 0
+        ? `Da xoa mon va tam ngung ${pausedCombos} combo co chua mon nay.`
+        : 'Da xoa mon khoi thuc don.'
+      );
+      setDeleteModal({ isOpen: false, item: null, loading: false });
     } catch (err) {
       setError(err.response?.data?.message || 'Không thể xóa món');
+      setDeleteModal({ isOpen: false, item: null, loading: false });
     }
   };
 
@@ -144,7 +157,7 @@ const MenuManagementPage = () => {
           onClick={openCreate}
           className="inline-flex items-center justify-center gap-2 rounded-xl bg-[#c70d1a] px-5 py-3 text-sm font-black text-white shadow-sm hover:bg-[#a90b16]"
         >
-          <Plus size={17} strokeWidth={3} />
+          <PlusCircle size={17} />
           Thêm món mới
         </button>
       </div>
@@ -152,6 +165,11 @@ const MenuManagementPage = () => {
       {error && (
         <div className="mb-5 rounded-xl border border-red-100 bg-red-50 px-4 py-3 text-sm font-bold text-red-700">
           {error}
+        </div>
+      )}
+      {notice && (
+        <div className="mb-5 rounded-xl border border-emerald-100 bg-emerald-50 px-4 py-3 text-sm font-bold text-emerald-700">
+          {notice}
         </div>
       )}
 
@@ -217,7 +235,6 @@ const MenuManagementPage = () => {
                     key={item._id}
                     item={item}
                     onEdit={() => openEdit(item)}
-                    onToggle={() => handleToggleStatus(item)}
                     onDelete={() => handleDelete(item)}
                   />
                 ))
@@ -280,11 +297,20 @@ const MenuManagementPage = () => {
           error={error}
         />
       )}
+
+      <ConfirmDeleteModal
+        isOpen={deleteModal.isOpen}
+        title="Xóa món?"
+        message={`Bạn có chắc chắn muốn xóa "${deleteModal.item?.name || 'món này'}" khỏi hệ thống không? Nếu món nằm trong combo, combo đó sẽ tạm ngừng.`}
+        loading={deleteModal.loading}
+        onCancel={() => setDeleteModal({ isOpen: false, item: null, loading: false })}
+        onConfirm={confirmDelete}
+      />
     </div>
   );
 };
 
-const MenuRow = ({ item, onEdit, onToggle, onDelete }) => {
+const MenuRow = ({ item, onEdit, onDelete }) => {
   const status = getStatus(item);
   const image = getImageUrl(item.image, fallbackImages[item.category] || '/images/home/product-burger.png');
 
@@ -295,7 +321,7 @@ const MenuRow = ({ item, onEdit, onToggle, onDelete }) => {
           <img
             src={image}
             alt={item.name}
-            className={`h-14 w-16 rounded-xl object-cover ring-1 ring-gray-100 ${item.isActive === false ? 'grayscale opacity-60' : ''}`}
+            className={`h-14 w-16 rounded-xl object-cover ring-1 ring-gray-100 ${item.isAvailable === false ? 'grayscale opacity-60' : ''}`}
           />
           <div>
             <div className="font-black text-gray-950">{item.name}</div>
@@ -318,9 +344,6 @@ const MenuRow = ({ item, onEdit, onToggle, onDelete }) => {
         <div className="flex justify-end gap-3 text-red-950">
           <button onClick={onEdit} className="rounded-lg p-2 hover:bg-red-50" title="Sửa món">
             <Edit3 size={17} />
-          </button>
-          <button onClick={onToggle} className="rounded-lg p-2 hover:bg-red-50" title={item.isActive === false ? 'Mở bán lại' : 'Ẩn món'}>
-            {item.isActive === false ? <Eye size={17} /> : <EyeOff size={17} />}
           </button>
           <button onClick={onDelete} className="rounded-lg p-2 text-[#c70d1a] hover:bg-red-50" title="Xóa món">
             <Trash2 size={17} />

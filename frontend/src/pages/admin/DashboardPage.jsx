@@ -30,13 +30,40 @@ const statusClasses = {
   cancelled: 'bg-red-50 text-red-700',
 };
 const donutColors = ['#c70d1a', '#e5e7eb', '#0086a8'];
+const REVENUE_TICK_STEP = 500000;
 
 const formatCurrency = (value) => `${Number(value || 0).toLocaleString('vi-VN')} VNĐ`;
-const formatShortCurrency = (value) => `${Math.round(Number(value || 0) / 1000000).toLocaleString('vi-VN')}Tr`;
+const formatGrowth = (value) => {
+  const number = Number(value || 0);
+  const sign = number > 0 ? '+' : '';
+  return `${sign}${number.toLocaleString('vi-VN', { maximumFractionDigits: 1 })}%`;
+};
+const formatShortCurrency = (value) => {
+  const amount = Number(value || 0);
+  if (amount >= 1000000) {
+    return `${(amount / 1000000).toLocaleString('vi-VN', { maximumFractionDigits: 1 })}Tr`;
+  }
+  if (amount >= 1000) return `${Math.round(amount / 1000).toLocaleString('vi-VN')}K`;
+  return amount.toLocaleString('vi-VN');
+};
 const formatOrderCode = (order) => `#SD-${String(order?._id || '').slice(-4).toUpperCase()}`;
+const formatDateParam = (date) => {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, '0');
+  const day = String(date.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+};
+const getOrderDateKey = (order) => {
+  const rawDate = order?.createdAt || order?.updatedAt;
+  if (!rawDate) return '';
+  const date = new Date(rawDate);
+  if (Number.isNaN(date.getTime())) return '';
+  return formatDateParam(date);
+};
 
 const DashboardPage = () => {
   const [report, setReport] = useState(null);
+  const [weekReport, setWeekReport] = useState(null);
   const [orders, setOrders] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -50,11 +77,19 @@ const DashboardPage = () => {
     setLoading(true);
     setError('');
     try {
-      const [reportData, orderData] = await Promise.all([
-        reportService.getReports(),
+      const today = new Date();
+      const weekStart = new Date(today);
+      weekStart.setDate(today.getDate() - 6);
+      const todayText = formatDateParam(today);
+      const weekStartText = formatDateParam(weekStart);
+
+      const [reportData, weekReportData, orderData] = await Promise.all([
+        reportService.getReports({ startDate: todayText, endDate: todayText }),
+        reportService.getReports({ startDate: weekStartText, endDate: todayText }),
         orderService.getOrders(),
       ]);
       setReport(reportData);
+      setWeekReport(weekReportData);
       setOrders(orderData || []);
     } catch (err) {
       setError(err.response?.data?.message || 'Không thể tải dữ liệu tổng quan');
@@ -79,18 +114,23 @@ const DashboardPage = () => {
       .slice(0, 5);
   }, [orders, search]);
 
+  const todayOrders = useMemo(() => {
+    const todayKey = formatDateParam(new Date());
+    return orders.filter(order => getOrderDateKey(order) === todayKey);
+  }, [orders]);
+
   const statusSummary = useMemo(() => {
-    const completed = orders.filter(order => order.status === 'completed').length;
-    const processing = orders.filter(order => ['pending', 'confirmed', 'delivering'].includes(order.status)).length;
-    const cancelled = orders.filter(order => order.status === 'cancelled').length;
-    const total = orders.length || 1;
+    const completed = todayOrders.filter(order => order.status === 'completed').length;
+    const processing = todayOrders.filter(order => ['pending', 'confirmed', 'delivering'].includes(order.status)).length;
+    const cancelled = todayOrders.filter(order => order.status === 'cancelled').length;
+    const total = todayOrders.length || 1;
 
     return [
       { name: 'Hoàn thành', value: completed, percent: Math.round((completed / total) * 100) },
       { name: 'Đang xử lý', value: processing, percent: Math.round((processing / total) * 100) },
       { name: 'Đã hủy', value: cancelled, percent: Math.round((cancelled / total) * 100) },
     ];
-  }, [orders]);
+  }, [todayOrders]);
 
   const weeklyRevenue = useMemo(() => {
     const today = new Date();
@@ -102,23 +142,32 @@ const DashboardPage = () => {
       const date = new Date(weekStart);
       date.setDate(weekStart.getDate() + index);
       return {
-        key: date.toISOString().slice(0, 10),
+        key: formatDateParam(date),
         label: dayLabels[date.getDay()],
         revenue: 0,
       };
     });
 
-    (report?.dailyRevenue || []).forEach(item => {
+    (weekReport?.dailyRevenue || []).forEach(item => {
       const bucket = buckets.find(day => day.key === item._id);
       if (bucket) bucket.revenue = item.revenue || 0;
     });
 
     return buckets;
-  }, [report]);
+  }, [weekReport]);
+
+  const weeklyRevenueTicks = useMemo(() => {
+    const maxRevenue = Math.max(...weeklyRevenue.map(item => Number(item.revenue || 0)), 0);
+    const maxTick = Math.max(REVENUE_TICK_STEP, Math.ceil(maxRevenue / REVENUE_TICK_STEP) * REVENUE_TICK_STEP);
+    return Array.from(
+      { length: Math.floor(maxTick / REVENUE_TICK_STEP) + 1 },
+      (_, index) => index * REVENUE_TICK_STEP
+    );
+  }, [weeklyRevenue]);
 
   const topItem = report?.topItems?.[0];
   const newCustomers = report?.totalCustomers || 0;
-  const totalOrders = report?.totalOrders || orders.length;
+  const totalOrders = report?.totalOrders ?? todayOrders.length;
   const totalRevenue = report?.totalRevenue || 0;
 
   if (loading) {
@@ -150,9 +199,9 @@ const DashboardPage = () => {
       )}
 
       <div className="mb-8 grid grid-cols-1 gap-6 md:grid-cols-2 xl:grid-cols-4">
-        <MetricCard title="Tổng doanh thu" value={formatCurrency(totalRevenue)} trend="+12.5%" icon={<WalletCards size={22} />} tone="bg-red-50 text-[#c70d1a]" />
-        <MetricCard title="Tổng đơn hàng" value={Number(totalOrders).toLocaleString('vi-VN')} trend="+8.2%" icon={<ShoppingCart size={22} />} tone="bg-red-50 text-[#c70d1a]" />
-        <MetricCard title="Khách hàng mới" value={Number(newCustomers).toLocaleString('vi-VN')} trend="+16.3%" icon={<Users size={22} />} tone="bg-sky-50 text-sky-700" />
+        <MetricCard title="Tổng doanh thu" value={formatCurrency(totalRevenue)} trend={formatGrowth(report?.growth?.revenue)} icon={<WalletCards size={22} />} tone="bg-red-50 text-[#c70d1a]" />
+        <MetricCard title="Tổng đơn hàng" value={Number(totalOrders).toLocaleString('vi-VN')} trend={formatGrowth(report?.growth?.orders)} icon={<ShoppingCart size={22} />} tone="bg-red-50 text-[#c70d1a]" />
+        <MetricCard title="Khách hàng mới" value={Number(newCustomers).toLocaleString('vi-VN')} trend={formatGrowth(report?.growth?.customers)} icon={<Users size={22} />} tone="bg-sky-50 text-sky-700" />
         <MetricCard title="Món bán chạy" value={topItem?.name || 'Chưa có'} subText={topItem ? `Đã bán ${topItem.totalQuantity} suất` : 'Chưa có dữ liệu'} icon={<Flame size={22} />} tone="bg-red-50 text-[#c70d1a]" />
       </div>
 
@@ -166,7 +215,14 @@ const DashboardPage = () => {
             <ResponsiveContainer width="100%" height="100%">
               <BarChart data={weeklyRevenue} barSize={48}>
                 <XAxis dataKey="label" axisLine={false} tickLine={false} tick={{ fill: '#6b7280', fontSize: 12, fontWeight: 800 }} />
-                <YAxis axisLine={false} tickLine={false} tickFormatter={formatShortCurrency} tick={{ fill: '#6b7280', fontSize: 12, fontWeight: 800 }} />
+                <YAxis
+                  axisLine={false}
+                  tickLine={false}
+                  tickFormatter={formatShortCurrency}
+                  ticks={weeklyRevenueTicks}
+                  domain={[0, weeklyRevenueTicks[weeklyRevenueTicks.length - 1]]}
+                  tick={{ fill: '#6b7280', fontSize: 12, fontWeight: 800 }}
+                />
                 <Tooltip formatter={(value) => formatCurrency(value)} cursor={{ fill: '#f9eeee' }} />
                 <Bar dataKey="revenue" radius={[4, 4, 0, 0]}>
                   {weeklyRevenue.map((entry, index) => (
@@ -193,7 +249,7 @@ const DashboardPage = () => {
             </ResponsiveContainer>
           </div>
           <div className="-mt-24 mb-12 text-center">
-            <div className="text-3xl font-black text-gray-950">{Number(orders.length).toLocaleString('vi-VN')}</div>
+            <div className="text-3xl font-black text-gray-950">{Number(todayOrders.length).toLocaleString('vi-VN')}</div>
             <div className="text-xs font-black text-gray-500">Tổng số</div>
           </div>
           <div className="space-y-3">
@@ -255,7 +311,7 @@ const MetricCard = ({ title, value, trend, subText, icon, tone }) => (
         <>
           <TrendingUp size={15} className="text-sky-700" />
           <span className="text-sky-700">{trend}</span>
-          <span>so với tuần trước</span>
+          <span>so với kỳ trước</span>
         </>
       ) : (
         <span>{subText}</span>

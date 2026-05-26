@@ -18,9 +18,9 @@ import menuService from '../../services/menuService';
 import orderService from '../../services/orderService';
 import promotionService from '../../services/promotionService';
 import { getImageUrl } from '../../utils/imageUrl';
+import { ALL_MENU_CATEGORY, COMBO_CATEGORY, MENU_CATEGORIES, normalizeCategory } from '../../constants/menuCategories';
 
-const ALL_CATEGORY = 'Tất cả';
-const categories = ['Tất cả', 'Burger', 'Gà rán', 'Đồ uống', 'Combo', 'Tráng miệng'];
+const categories = [ALL_MENU_CATEGORY, ...MENU_CATEGORIES, COMBO_CATEGORY];
 
 const formatCurrency = value =>
   new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND' }).format(Math.max(0, Math.round(value || 0)));
@@ -33,7 +33,7 @@ const POSPage = () => {
   const [menuItems, setMenuItems] = useState([]);
   const [combos, setCombos] = useState([]);
   const [promotions, setPromotions] = useState([]);
-  const [selectedCategory, setSelectedCategory] = useState(ALL_CATEGORY);
+  const [selectedCategory, setSelectedCategory] = useState(ALL_MENU_CATEGORY);
   const [search, setSearch] = useState('');
   const [customer, setCustomer] = useState({ name: '', phone: '' });
   const [selectedPromoId, setSelectedPromoId] = useState('auto');
@@ -53,9 +53,8 @@ const POSPage = () => {
           promotionService.getPromotions(),
         ]);
 
-        const activeMenu = menuData.filter(item => item.isActive !== false);
         const activeCombos = comboData.filter(combo => combo.isActive !== false);
-        setMenuItems(activeMenu);
+        setMenuItems(menuData || []);
         setCombos(activeCombos);
         setPromotions(promoData.filter(promo => promo.isActive !== false));
       } catch (error) {
@@ -107,12 +106,12 @@ const POSPage = () => {
   const filteredProducts = useMemo(() => {
     const keyword = search.trim().toLowerCase();
     const normalizedMenu = menuItems
-      .filter(item => selectedCategory === ALL_CATEGORY || item.category === selectedCategory)
+      .filter(item => selectedCategory === ALL_MENU_CATEGORY || normalizeCategory(item.category) === normalizeCategory(selectedCategory))
       .map(item => ({ ...item, productType: 'item' }));
 
     const normalizedCombos = combos
-      .filter(() => selectedCategory === ALL_CATEGORY || selectedCategory === 'Combo')
-      .map(combo => ({ ...combo, category: 'Combo', productType: 'combo' }));
+      .filter(() => selectedCategory === ALL_MENU_CATEGORY || selectedCategory === COMBO_CATEGORY)
+      .map(combo => ({ ...combo, category: COMBO_CATEGORY, productType: 'combo' }));
 
     return [...normalizedMenu, ...normalizedCombos].filter(product => {
       const text = `${product.name || ''} ${product.description || ''} ${product.category || ''}`.toLowerCase();
@@ -122,7 +121,15 @@ const POSPage = () => {
 
   const handleProductClick = product => {
     setMessage('');
+    if (product.productType === 'item' && product.isAvailable === false) {
+      setMessage('Món này đang hết hàng do không đủ nguyên liệu trong kho.');
+      return;
+    }
     if (product.productType === 'combo') {
+      if (product.isAvailable === false) {
+        setMessage('Combo này đang hết hàng do không đủ nguyên liệu trong kho.');
+        return;
+      }
       if (!product.items || product.items.length === 0) {
         setMessage('Combo này chưa có món, không thể thêm vào giỏ.');
         return;
@@ -222,21 +229,26 @@ const POSPage = () => {
               <div className="grid grid-cols-[repeat(auto-fill,minmax(170px,1fr))] gap-5">
                 {filteredProducts.map(product => {
                   const isCombo = product.productType === 'combo';
+                  const isOutOfStock = product.isAvailable === false;
                   const image = isCombo ? product.image : getImageUrl(product.image);
                   const soldLabel = isCombo ? 'Combo tiết kiệm' : product.description || product.category;
 
                   return (
                     <article
                       key={`${product.productType}-${product._id}`}
-                      className="group overflow-hidden rounded-lg border border-red-50 bg-white shadow-sm transition hover:-translate-y-0.5 hover:shadow-lg"
+                      className={`group overflow-hidden rounded-lg border border-red-50 bg-white shadow-sm transition ${isOutOfStock ? 'opacity-70' : 'hover:-translate-y-0.5 hover:shadow-lg'}`}
                     >
-                      <button onClick={() => handleProductClick(product)} className="block w-full text-left">
+                      <button
+                        onClick={() => handleProductClick(product)}
+                        disabled={isOutOfStock}
+                        className="block w-full text-left disabled:cursor-not-allowed"
+                      >
                         <div className="relative aspect-[4/3] overflow-hidden bg-stone-100">
                           {image ? (
                             <img
                               src={image}
                               alt={product.name}
-                              className="h-full w-full object-cover transition duration-300 group-hover:scale-105"
+                              className={`h-full w-full object-cover transition duration-300 ${isOutOfStock ? 'grayscale opacity-60' : 'group-hover:scale-105'}`}
                               onError={event => {
                                 event.currentTarget.style.display = 'none';
                               }}
@@ -249,13 +261,18 @@ const POSPage = () => {
                               COMBO
                             </span>
                           )}
+                          {isOutOfStock && (
+                            <span className="absolute left-2 top-2 rounded bg-white/95 px-2 py-1 text-[10px] font-black text-red-600 shadow-sm">
+                              HẾT HÀNG
+                            </span>
+                          )}
                         </div>
                         <div className="p-3">
                           <h3 className="line-clamp-1 text-sm font-bold text-slate-900">{product.name}</h3>
                           <p className="mt-1 line-clamp-1 text-xs text-stone-500">{soldLabel}</p>
                           <div className="mt-4 flex items-center justify-between">
                             <span className="text-base font-black text-[#c70d18]">{formatCurrency(product.price)}</span>
-                            <span className="grid h-8 w-8 place-items-center rounded-lg bg-[#c70d18] text-white shadow-sm">
+                            <span className={`grid h-8 w-8 place-items-center rounded-lg shadow-sm ${isOutOfStock ? 'bg-stone-200 text-stone-400' : 'bg-[#c70d18] text-white'}`}>
                               <Plus size={18} strokeWidth={3} />
                             </span>
                           </div>

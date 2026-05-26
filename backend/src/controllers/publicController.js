@@ -3,14 +3,39 @@ const Order = require('../models/Order');
 const Combo = require('../models/Combo');
 const Promotion = require('../models/Promotion');
 const Banner = require('../models/Banner');
+const Customer = require('../models/Customer');
+const {
+  isMenuItemAvailable,
+  attachComboAvailability,
+} = require('../utils/availability');
+const {
+  collectOrderDetails,
+  checkStockAvailability,
+} = require('./orderController');
+
+const hasSellableComboItems = (combo) => (
+  (combo.items || []).every(comboItem => (
+    comboItem.menuItem &&
+    comboItem.menuItem.isActive !== false &&
+    comboItem.menuItem.isDeleted !== true
+  ))
+);
+
+const buildInventoryRequirementSnapshot = (requirements = []) => requirements.map((requirement) => ({
+  ingredient: requirement.ingredientId || requirement.ingredient,
+  name: requirement.name || '',
+  unit: requirement.unit || '',
+  requiredQty: requirement.requiredQty,
+}));
 
 // @desc    Lấy thực đơn công khai
 // @route   GET /api/public/menu
 // @access  Public
 const getMenu = async (req, res) => {
   try {
-    const menuItems = await MenuItem.find({ isActive: { $ne: false } });
-    // Chỉ trả về thông tin cơ bản, không cần populate nguyên liệu
+    const menuItems = await MenuItem.find({ isDeleted: { $ne: true } })
+      .populate('ingredients.ingredient', 'stock isActive isDeleted');
+    // Populate ton kho toi thieu de frontend biet mon nao co the dat.
     const publicMenu = menuItems.map(item => ({
       _id: item._id,
       name: item.name,
@@ -19,6 +44,8 @@ const getMenu = async (req, res) => {
       category: item.category,
       image: item.image,
       isActive: item.isActive,
+      // Frontend dung co nay de khoa nut dat mon thay vi hard-code theo ten mon.
+      isAvailable: isMenuItemAvailable(item),
     }));
     res.json(publicMenu);
   } catch (error) {
@@ -36,39 +63,14 @@ const createOrder = async (req, res) => {
       return res.status(400).json({ message: 'Giỏ hàng trống' });
     }
 
-    let subtotal = 0;
-    const orderItems = [];
+    const { subtotal, orderItems, requirements } = await collectOrderDetails(items);
+    // Khach dat hang chua tru kho ngay, nhung van phai chan neu tong nguyen lieu hien tai khong du.
+    await checkStockAvailability(requirements);
 
-    for (const item of items) {
-      // Có thể là món thường hoặc combo
-      if (item.comboId) {
-        const combo = await Combo.findById(item.comboId);
-        if (!combo) throw new Error(`Combo không tồn tại: ${item.comboId}`);
-        orderItems.push({
-          comboId: combo._id,
-          name: combo.name,
-          quantity: item.quantity,
-          price: combo.price,
-        });
-        subtotal += combo.price * item.quantity;
-      } else if (item.menuItem) {
-        const menuItem = await MenuItem.findById(item.menuItem);
-        if (!menuItem || menuItem.isActive === false) throw new Error(`Món không tồn tại hoặc đã ngừng bán: ${item.menuItem}`);
-        orderItems.push({
-          menuItem: menuItem._id,
-          quantity: item.quantity,
-          price: menuItem.price,
-        });
-        subtotal += menuItem.price * item.quantity;
-      } else {
-        throw new Error('Item không hợp lệ');
-      }
-    }
 
-    // Ánh xạ paymentMethod gửi lên sang enum trong DB: ['cash', 'card', 'qr']
+    // Don VNPay phai luu la qr ngay tu dau de staff khong the xac nhan nhu don the chua thanh toan.
     let dbPaymentMethod = 'cash';
-    if (paymentMethod === 'vnpay') dbPaymentMethod = 'card';
-    else if (paymentMethod === 'momo') dbPaymentMethod = 'qr';
+    if (paymentMethod === 'vnpay') dbPaymentMethod = 'qr';
 
     let orderDiscount = 0;
     let appliedPromoCode = '';
@@ -78,6 +80,8 @@ const createOrder = async (req, res) => {
       const now = new Date();
       const promotion = await Promotion.findOne({
         name: new RegExp(`^${promoCode.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}$`, 'i'),
+        type: { $in: ['percent', 'fixed'] },
+        isDeleted: { $ne: true },
         isActive: true,
         startDate: { $lte: now },
         endDate: { $gte: now },
@@ -109,6 +113,7 @@ const createOrder = async (req, res) => {
     const order = await Order.create({
       customer: customer || { name: 'Khách lẻ', phone: '', address: '' },
       items: orderItems,
+      inventoryRequirements: buildInventoryRequirementSnapshot(requirements),
       subtotal,
       deliveryFee,
       discount: orderDiscount,
@@ -121,6 +126,27 @@ const createOrder = async (req, res) => {
       status: 'pending'
     });
 
+    const customerPhone = customer?.phone?.trim();
+    const customerEmail = customer?.email?.trim().toLowerCase();
+    if (customer?.name && (customerPhone || customerEmail)) {
+      const filter = customerEmail ? { email: customerEmail } : { phone: customerPhone };
+      await Customer.findOneAndUpdate(
+        filter,
+        {
+          $set: {
+            name: customer.name,
+            phone: customerPhone || '',
+            email: customerEmail || '',
+          },
+          $setOnInsert: {
+            type: 'Thường',
+            notes: '',
+          },
+        },
+        { upsert: true, new: true }
+      );
+    }
+
     res.status(201).json(order);
   } catch (error) {
     res.status(400).json({ message: error.message });
@@ -132,8 +158,12 @@ const createOrder = async (req, res) => {
 // @access  Public
 const getCombos = async (req, res) => {
   try {
-    const combos = await Combo.find({ isActive: true }).populate('items.menuItem', 'name price image');
-    res.json(combos);
+    const combos = await Combo.find({ isActive: true, isDeleted: { $ne: true } }).populate({
+      path: 'items.menuItem',
+      select: 'name price image isActive isDeleted ingredients',
+      populate: { path: 'ingredients.ingredient', select: 'stock unit name isActive isDeleted' },
+    });
+    res.json(combos.filter(hasSellableComboItems).map(attachComboAvailability));
   } catch (error) {
     res.status(500).json({ message: 'Lỗi server' });
   }
@@ -147,6 +177,8 @@ const getPromotions = async (req, res) => {
     const Promotion = require('../models/Promotion');
     const now = new Date();
     const promotions = await Promotion.find({
+      type: { $in: ['percent', 'fixed'] },
+      isDeleted: { $ne: true },
       isActive: true,
       startDate: { $lte: now },
       endDate: { $gte: now },
@@ -165,9 +197,15 @@ const getHomepageData = async (req, res) => {
     const now = new Date();
 
     const [menuItems, combos, promotions, banners] = await Promise.all([
-      MenuItem.find({ isActive: { $ne: false } }),
-      Combo.find({ isActive: true }).populate('items.menuItem', 'name price image'),
+      MenuItem.find({ isActive: { $ne: false }, isDeleted: { $ne: true } }),
+      Combo.find({ isActive: true, isDeleted: { $ne: true } }).populate({
+        path: 'items.menuItem',
+        select: 'name price image isActive isDeleted ingredients',
+        populate: { path: 'ingredients.ingredient', select: 'stock unit name isActive isDeleted' },
+      }),
       Promotion.find({
+        type: { $in: ['percent', 'fixed'] },
+        isDeleted: { $ne: true },
         isActive: true,
         startDate: { $lte: now },
         endDate: { $gte: now },
@@ -191,7 +229,7 @@ const getHomepageData = async (req, res) => {
     res.json({
       featured,
       categories,
-      combos,
+      combos: combos.filter(hasSellableComboItems).map(attachComboAvailability),
       promotions,
       banners,
       totalMenuItems: menuItems.length,

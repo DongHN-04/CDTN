@@ -16,7 +16,8 @@ const comboMenuSchema = new mongoose.Schema(
     items: [comboItemSchema],         // Danh sách món trong combo
     price: { type: Number, required: true }, // Giá bán combo
     image: { type: String, default: '' },
-    isActive: { type: Boolean, default: true }
+    isActive: { type: Boolean, default: true },
+    isDeleted: { type: Boolean, default: false }
   },
   { timestamps: true }
 );

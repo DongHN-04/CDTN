@@ -2,6 +2,8 @@ const express = require('express');
 const router = express.Router();
 const {
   getMe,
+  updateMe,
+  changeMyPassword,
   getUsers,
   createUser,
   updateUser,
@@ -10,7 +12,11 @@ const {
 const { protect, authorize } = require('../middleware/authMiddleware');
 const { validateUserCreate, validateUserUpdate } = require('../middleware/validationMiddleware');
 
-router.get('/me', protect, getMe);
+router.route('/me')
+  .get(protect, getMe)
+  .put(protect, updateMe);
+
+router.put('/me/password', protect, changeMyPassword);
 
 router.route('/')
   .get(protect, authorize('admin'), getUsers)

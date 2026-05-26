@@ -26,6 +26,11 @@ const formatCurrency = (value = 0) => `${Number(value).toLocaleString('vi-VN')} 
 const formatOrderCode = (id = '') => `#SD-${id.slice(-4).toUpperCase()}`;
 const formatTime = (value) => new Date(value).toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' });
 const formatDate = (value) => new Date(value).toLocaleDateString('vi-VN');
+const pageSize = 10;
+const getNextStatus = (order) => {
+  if (!order?.isCustomerOrder && order?.status === 'confirmed') return 'completed';
+  return nextStatus[order?.status];
+};
 
 const CustomerOrdersPage = () => {
   const [orders, setOrders] = useState([]);
@@ -34,6 +39,7 @@ const CustomerOrdersPage = () => {
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
   const [updatingId, setUpdatingId] = useState('');
+  const [currentPage, setCurrentPage] = useState(1);
 
   const fetchOrders = async () => {
     setLoading(true);
@@ -75,12 +81,27 @@ const CustomerOrdersPage = () => {
         order.customer?.name,
         order.customer?.phone,
         order.tableNumber,
+        order.staffSnapshot?.name,
         order.staff?.name,
       ].filter(Boolean).join(' ').toLowerCase();
 
       return matchesStatus && (!keyword || haystack.includes(keyword));
     });
   }, [orders, search, statusFilter]);
+
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [search, statusFilter]);
+
+  const totalPages = Math.max(1, Math.ceil(filteredOrders.length / pageSize));
+  const paginatedOrders = useMemo(() => {
+    const startIndex = (currentPage - 1) * pageSize;
+    return filteredOrders.slice(startIndex, startIndex + pageSize);
+  }, [filteredOrders, currentPage]);
+
+  useEffect(() => {
+    if (currentPage > totalPages) setCurrentPage(totalPages);
+  }, [currentPage, totalPages]);
 
   const updateStatus = async (order, status) => {
     setUpdatingId(order._id);
@@ -96,7 +117,7 @@ const CustomerOrdersPage = () => {
   };
 
   const handlePrimaryAction = (order) => {
-    const target = nextStatus[order.status];
+    const target = getNextStatus(order);
     if (target) updateStatus(order, target);
   };
 
@@ -169,9 +190,9 @@ const CustomerOrdersPage = () => {
                 <td colSpan="7" className="px-5 py-10 text-center text-gray-500">Không có đơn hàng phù hợp.</td>
               </tr>
             ) : (
-              filteredOrders.map(order => {
+              paginatedOrders.map(order => {
                 const config = statusConfig[order.status] || statusConfig.pending;
-                const actionStatus = nextStatus[order.status];
+                const actionStatus = getNextStatus(order);
 
                 return (
                   <tr key={order._id} className="border-t border-gray-50 text-sm text-gray-900 hover:bg-gray-50/60">
@@ -183,7 +204,9 @@ const CustomerOrdersPage = () => {
                         </div>
                         <div>
                           <div className="font-bold">{order.customer?.name || 'Khách lẻ'}</div>
-                          <div className="text-xs text-gray-500">{order.customer?.phone || 'Không có SĐT'}</div>
+                          <div className="text-xs text-gray-500">
+                            {order.isCustomerOrder ? 'Giao hàng' : 'Tại quầy'} · {order.customer?.phone || 'Không có SĐT'}
+                          </div>
                         </div>
                       </div>
                     </td>
@@ -238,6 +261,42 @@ const CustomerOrdersPage = () => {
             )}
           </tbody>
         </table>
+        <div className="flex items-center justify-between border-t border-gray-50 px-5 py-4 text-xs font-bold text-gray-500">
+          <span>
+            Hiển thị {filteredOrders.length ? (currentPage - 1) * pageSize + 1 : 0}
+            -{Math.min(currentPage * pageSize, filteredOrders.length)} của {filteredOrders.length} đơn hàng
+          </span>
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              disabled={currentPage === 1}
+              onClick={() => setCurrentPage(page => Math.max(1, page - 1))}
+              className="flex h-8 w-8 items-center justify-center rounded-full border border-gray-100 disabled:cursor-not-allowed disabled:opacity-40"
+            >
+              ‹
+            </button>
+            {Array.from({ length: totalPages }, (_, index) => index + 1).map(page => (
+              <button
+                key={page}
+                type="button"
+                onClick={() => setCurrentPage(page)}
+                className={`flex h-8 w-8 items-center justify-center rounded-full ${
+                  currentPage === page ? 'bg-[#c70d1a] font-black text-white' : 'border border-gray-100 text-gray-600'
+                }`}
+              >
+                {page}
+              </button>
+            ))}
+            <button
+              type="button"
+              disabled={currentPage === totalPages}
+              onClick={() => setCurrentPage(page => Math.min(totalPages, page + 1))}
+              className="flex h-8 w-8 items-center justify-center rounded-full border border-gray-100 disabled:cursor-not-allowed disabled:opacity-40"
+            >
+              ›
+            </button>
+          </div>
+        </div>
       </div>
     </div>
   );

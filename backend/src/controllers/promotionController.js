@@ -1,9 +1,10 @@
 const Promotion = require('../models/Promotion');
 const Banner = require('../models/Banner');
+const Order = require('../models/Order');
 const { ApiError, asyncHandler } = require('../middleware/errorMiddleware');
 
 const getPromotions = asyncHandler(async (req, res) => {
-  const promotions = await Promotion.find({}).sort({ createdAt: -1 });
+  const promotions = await Promotion.find({ isDeleted: { $ne: true } }).sort({ createdAt: -1 });
   res.json(promotions);
 });
 
@@ -25,13 +26,25 @@ const updatePromotion = asyncHandler(async (req, res) => {
 });
 
 const deletePromotion = asyncHandler(async (req, res) => {
-  const promotion = await Promotion.findByIdAndDelete(req.params.id);
+  const promotion = await Promotion.findById(req.params.id);
 
   if (!promotion) {
     throw new ApiError(404, 'Không tìm thấy khuyến mãi');
   }
 
-  res.json({ message: 'Đã xóa khuyến mãi' });
+  const orderCount = await Order.countDocuments({ promoCode: promotion.name });
+  if (orderCount > 0) {
+    promotion.isActive = false;
+    promotion.isDeleted = true;
+    await promotion.save();
+    return res.json({
+      message: 'Khuyến mãi đã được dùng trong đơn hàng nên đã được tạm tắt thay vì xóa vĩnh viễn',
+      mode: 'soft-deleted',
+    });
+  }
+
+  await promotion.deleteOne();
+  res.json({ message: 'Đã xóa khuyến mãi', mode: 'hard-deleted' });
 });
 
 // @desc    Lấy danh sách banner

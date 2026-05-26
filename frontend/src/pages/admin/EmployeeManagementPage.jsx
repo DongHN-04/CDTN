@@ -1,5 +1,7 @@
 import React, { useEffect, useMemo, useState } from 'react';
+import { PlusCircle } from 'lucide-react';
 import userService from '../../services/userService';
+import ConfirmDeleteModal from '../../components/ConfirmDeleteModal';
 
 const emptyForm = {
   name: '',
@@ -17,6 +19,7 @@ const positions = [
 ];
 
 const statusOptions = ['Đang làm việc', 'Đang nghỉ phép', 'Đã nghỉ việc'];
+const pageSize = 5;
 
 const getPosition = (employee) => {
   if (employee.role === 'admin') return 'Quản trị viên';
@@ -42,6 +45,7 @@ const EmployeeManagementPage = () => {
   const [editingEmployee, setEditingEmployee] = useState(null);
   const [formData, setFormData] = useState(emptyForm);
   const [deleteModal, setDeleteModal] = useState({ isOpen: false, employee: null });
+  const [currentPage, setCurrentPage] = useState(1);
 
   useEffect(() => {
     fetchEmployees();
@@ -84,6 +88,20 @@ const EmployeeManagementPage = () => {
       return matchesSearch && matchesPosition && matchesStatus;
     });
   }, [enrichedEmployees, search, positionFilter, statusFilter]);
+
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [search, positionFilter, statusFilter]);
+
+  const totalPages = Math.max(1, Math.ceil(filteredEmployees.length / pageSize));
+  const paginatedEmployees = useMemo(() => {
+    const startIndex = (currentPage - 1) * pageSize;
+    return filteredEmployees.slice(startIndex, startIndex + pageSize);
+  }, [filteredEmployees, currentPage]);
+
+  useEffect(() => {
+    if (currentPage > totalPages) setCurrentPage(totalPages);
+  }, [currentPage, totalPages]);
 
   const stats = useMemo(() => ({
     total: employees.length,
@@ -179,9 +197,10 @@ const EmployeeManagementPage = () => {
 
         <button
           onClick={openCreate}
-          className="rounded-xl bg-[#c70d1a] px-5 py-3 text-sm font-black text-white shadow-sm hover:bg-[#a90b16]"
+          className="inline-flex h-11 items-center justify-center gap-2 rounded-xl bg-[#c20d1e] px-6 text-sm font-black text-white shadow-sm hover:bg-[#a80b19]"
         >
-          + Thêm nhân viên
+          <PlusCircle size={17} />
+          Thêm nhân viên
         </button>
       </div>
 
@@ -247,7 +266,7 @@ const EmployeeManagementPage = () => {
                 <td colSpan="6" className="px-5 py-10 text-center text-sm font-bold text-gray-500">Không có nhân viên phù hợp.</td>
               </tr>
             ) : (
-              filteredEmployees.map(employee => (
+              paginatedEmployees.map(employee => (
                 <EmployeeRow
                   key={employee._id}
                   employee={employee}
@@ -260,13 +279,39 @@ const EmployeeManagementPage = () => {
         </table>
 
         <div className="flex items-center justify-between border-t border-gray-50 px-5 py-4 text-xs font-bold text-gray-500">
-          <span>Hiển thị {filteredEmployees.length} trong số {employees.length} nhân viên</span>
+          <span>
+            Hiển thị {filteredEmployees.length ? (currentPage - 1) * pageSize + 1 : 0}
+            -{Math.min(currentPage * pageSize, filteredEmployees.length)} trong số {filteredEmployees.length} nhân viên
+          </span>
           <div className="flex items-center gap-2">
-            <button className="flex h-8 w-8 items-center justify-center rounded-full border border-gray-100">‹</button>
-            <button className="flex h-8 w-8 items-center justify-center rounded-full bg-[#c70d1a] font-black text-white">1</button>
-            <button className="flex h-8 w-8 items-center justify-center rounded-full border border-gray-100">2</button>
-            <button className="flex h-8 w-8 items-center justify-center rounded-full border border-gray-100">3</button>
-            <button className="flex h-8 w-8 items-center justify-center rounded-full border border-gray-100">›</button>
+            <button
+              type="button"
+              disabled={currentPage === 1}
+              onClick={() => setCurrentPage(page => Math.max(1, page - 1))}
+              className="flex h-8 w-8 items-center justify-center rounded-full border border-gray-100 disabled:cursor-not-allowed disabled:opacity-40"
+            >
+              ‹
+            </button>
+            {Array.from({ length: totalPages }, (_, index) => index + 1).map(page => (
+              <button
+                key={page}
+                type="button"
+                onClick={() => setCurrentPage(page)}
+                className={`flex h-8 w-8 items-center justify-center rounded-full ${
+                  currentPage === page ? 'bg-[#c70d1a] font-black text-white' : 'border border-gray-100 text-gray-600'
+                }`}
+              >
+                {page}
+              </button>
+            ))}
+            <button
+              type="button"
+              disabled={currentPage === totalPages}
+              onClick={() => setCurrentPage(page => Math.min(totalPages, page + 1))}
+              className="flex h-8 w-8 items-center justify-center rounded-full border border-gray-100 disabled:cursor-not-allowed disabled:opacity-40"
+            >
+              ›
+            </button>
           </div>
         </div>
       </div>
@@ -283,7 +328,9 @@ const EmployeeManagementPage = () => {
 
       {deleteModal.isOpen && (
         <ConfirmDeleteModal
-          employee={deleteModal.employee}
+          isOpen={deleteModal.isOpen}
+          title="Xóa nhân viên?"
+          message={`Bạn có chắc chắn muốn xóa ${deleteModal.employee?.name || 'nhân viên này'} khỏi hệ thống không?`}
           onCancel={() => setDeleteModal({ isOpen: false, employee: null })}
           onConfirm={confirmDelete}
         />
@@ -397,20 +444,6 @@ const EmployeeFormModal = ({ formData, setFormData, editingEmployee, onSubmit, o
           </button>
         </div>
       </form>
-    </div>
-  </div>
-);
-
-const ConfirmDeleteModal = ({ employee, onCancel, onConfirm }) => (
-  <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/35 px-4">
-    <div className="w-full max-w-sm rounded-2xl bg-white p-6 text-center shadow-2xl">
-      <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-full bg-red-50 text-2xl font-black text-red-600">!</div>
-      <h2 className="m-0 text-xl font-black text-gray-950">Xóa nhân viên?</h2>
-      <p className="mt-2 text-sm font-medium text-gray-500">Bạn có chắc chắn muốn xóa {employee?.name} khỏi hệ thống không?</p>
-      <div className="mt-6 flex gap-3">
-        <button onClick={onCancel} className="flex-1 rounded-xl bg-gray-100 px-4 py-3 text-sm font-black text-gray-600">Hủy</button>
-        <button onClick={onConfirm} className="flex-1 rounded-xl bg-[#c70d1a] px-4 py-3 text-sm font-black text-white">Xóa</button>
-      </div>
     </div>
   </div>
 );

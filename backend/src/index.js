@@ -27,6 +27,7 @@ const shiftRoutes = require('./routes/shiftRoutes');
 const supplierRoutes = require('./routes/supplierRoutes');
 const paymentRoutes = require('./routes/paymentRoutes');
 const { notFound, errorHandler } = require('./middleware/errorMiddleware');
+const { releaseExpiredPaymentReservations } = require('./controllers/orderController');
 
 const app = express();
 
@@ -78,6 +79,7 @@ app.use(notFound);
 app.use(errorHandler);
 
 const PORT = process.env.PORT || 5000;
+const PAYMENT_RESERVATION_SWEEP_MS = Number(process.env.PAYMENT_RESERVATION_SWEEP_MS || 60 * 1000);
 
 const startServer = async () => {
   try {
@@ -91,6 +93,19 @@ const startServer = async () => {
     app.listen(PORT, () => {
       console.log(`Server running on port ${PORT}`);
     });
+
+    let isSweepingPaymentReservations = false;
+    setInterval(async () => {
+      if (isSweepingPaymentReservations) return;
+      isSweepingPaymentReservations = true;
+      try {
+        await releaseExpiredPaymentReservations();
+      } catch (error) {
+        console.warn('Khong the quet don VNPay qua han:', error.message);
+      } finally {
+        isSweepingPaymentReservations = false;
+      }
+    }, PAYMENT_RESERVATION_SWEEP_MS);
   } catch (error) {
     console.error('Cannot start server:', error);
     process.exit(1);

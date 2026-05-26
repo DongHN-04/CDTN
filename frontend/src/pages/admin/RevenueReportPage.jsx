@@ -8,6 +8,17 @@ const formatCurrency = (value = 0, compact = false) => {
   }
   return `${number.toLocaleString('vi-VN')}đ`;
 };
+const formatGrowth = (value) => {
+  const number = Number(value || 0);
+  const sign = number > 0 ? '+' : '';
+  return `${sign}${number.toLocaleString('vi-VN', { maximumFractionDigits: 1 })}%`;
+};
+const getPercentChange = (current, previous) => {
+  const currentValue = Number(current || 0);
+  const previousValue = Number(previous || 0);
+  if (previousValue === 0) return currentValue > 0 ? 100 : 0;
+  return ((currentValue - previousValue) / previousValue) * 100;
+};
 
 const groupByWeek = (source) => {
   const groups = new Map();
@@ -99,17 +110,22 @@ const RevenueReportPage = () => {
 
   const revenueStructure = useMemo(() => {
     const total = Number(data?.totalRevenue || 0);
-    const topItems = data?.topItems || [];
-    return topItems.slice(0, 4).map((item, index) => ({
-      name: item.name || 'Món ăn',
-      value: item.totalRevenue || 0,
-      percent: total > 0 ? Math.round((item.totalRevenue / total) * 100) : 0,
+    const categories = data?.categoryRevenue || [];
+    return categories.slice(0, 4).map((item, index) => ({
+      key: `${item.category || 'category'}-${index}`,
+      name: item.category || 'Chưa phân loại',
+      value: item.revenue || 0,
+      percent: total > 0 ? Math.round((Number(item.revenue || 0) / total) * 100) : 0,
       color: ['bg-[#c70d1a]', 'bg-[#0089a8]', 'bg-[#ff8b82]', 'bg-gray-300'][index],
     }));
   }, [data]);
 
   const averageOrderValue = data?.totalOrders ? Math.round(data.totalRevenue / data.totalOrders) : 0;
-  const estimatedOperatingCost = Math.round(Number(data?.totalRevenue || 0) * 0.34);
+  const previousAverageOrderValue = data?.previous?.totalOrders
+    ? Math.round(Number(data.previous.totalRevenue || 0) / Number(data.previous.totalOrders || 1))
+    : 0;
+  const averageOrderGrowth = getPercentChange(averageOrderValue, previousAverageOrderValue);
+  const operatingCost = Number(data?.operatingCost || 0);
 
   return (
     <div className="max-w-6xl mx-auto pb-10">
@@ -152,10 +168,10 @@ const RevenueReportPage = () => {
       ) : (
         <>
           <div className="mb-7 grid grid-cols-1 gap-5 md:grid-cols-2 xl:grid-cols-4">
-            <MetricCard title="Tổng doanh thu" value={formatCurrency(data?.totalRevenue)} hint="+12.5% so với kỳ trước" icon="▣" />
-            <MetricCard title="Tổng đơn hàng" value={data?.totalOrders || 0} hint="+8.2% so với kỳ trước" icon="▤" />
-            <MetricCard title="Giá trị TB / đơn" value={formatCurrency(averageOrderValue)} hint="+0.0% so với kỳ trước" icon="◈" />
-            <MetricCard title="Chi phí vận hành" value={formatCurrency(estimatedOperatingCost)} hint="-2.4% chi phí tổng" icon="⌁" danger />
+            <MetricCard title="Tổng doanh thu" value={formatCurrency(data?.totalRevenue)} hint={`${formatGrowth(data?.growth?.revenue)} so với kỳ trước`} icon="▣" />
+            <MetricCard title="Tổng đơn hàng" value={data?.totalOrders || 0} hint={`${formatGrowth(data?.growth?.orders)} so với kỳ trước`} icon="▤" />
+            <MetricCard title="Giá trị TB / đơn" value={formatCurrency(averageOrderValue)} hint={`${formatGrowth(averageOrderGrowth)} so với kỳ trước`} icon="◈" />
+            <MetricCard title="Chi phí vận hành" value={formatCurrency(operatingCost)} hint={`${formatGrowth(data?.growth?.operatingCost)} so với kỳ trước`} icon="⌁" danger={Number(data?.growth?.operatingCost || 0) > 0} />
           </div>
 
           <section className="mb-7 rounded-2xl bg-white p-6 shadow-sm ring-1 ring-gray-100">
@@ -203,27 +219,42 @@ const RevenueReportPage = () => {
           <div className="grid grid-cols-1 gap-7 lg:grid-cols-[1.6fr_1fr]">
             <section className="rounded-2xl bg-white p-6 shadow-sm ring-1 ring-gray-100">
               <div className="mb-5 flex items-center justify-between">
-                <h2 className="m-0 text-xl font-black text-gray-950">Món ăn Lợi nhuận Cao nhất</h2>
-                <span className="text-xs font-black text-[#c70d1a]">Xem tất cả</span>
+                <h2 className="m-0 text-xl font-black text-gray-950">Sản phẩm Doanh thu Cao nhất</h2>
+                <span className="text-xs font-black text-[#c70d1a]">{(data?.topItems || []).length} sản phẩm</span>
               </div>
               <table className="w-full border-collapse">
                 <thead>
                   <tr className="text-left text-[11px] font-black uppercase tracking-widest text-red-950">
-                    <th className="py-3">Món ăn</th>
+                    <th className="py-3">Sản phẩm</th>
                     <th className="py-3">Đã bán</th>
                     <th className="py-3">Doanh thu</th>
                     <th className="py-3">Xu hướng</th>
                   </tr>
                 </thead>
                 <tbody>
-                  {(data?.topItems || []).slice(0, 5).map(item => (
-                    <tr key={`${item.type}-${item.itemId || item.name}`} className="border-t border-gray-50 text-sm">
-                      <td className="py-4 font-black text-gray-950">{item.name || 'Món ăn'}</td>
-                      <td className="py-4 font-bold">{item.totalQuantity}</td>
-                      <td className="py-4 font-black text-[#c70d1a]">{formatCurrency(item.totalRevenue)}</td>
-                      <td className="py-4"><span className="rounded-full bg-sky-50 px-2 py-1 text-xs font-black text-sky-700">+12%</span></td>
+                  {(data?.topItems || []).length === 0 ? (
+                    <tr>
+                      <td colSpan="4" className="border-t border-gray-50 py-8 text-center text-sm font-bold text-gray-400">
+                        Chưa có dữ liệu doanh thu sản phẩm.
+                      </td>
                     </tr>
-                  ))}
+                  ) : (
+                    (data?.topItems || []).slice(0, 5).map(item => {
+                      const trend = Number(item.revenueGrowthPercent || 0);
+                      return (
+                        <tr key={`${item.type}-${item.itemId || item.name}`} className="border-t border-gray-50 text-sm">
+                          <td className="py-4 font-black text-gray-950">{item.name || 'Sản phẩm'}</td>
+                          <td className="py-4 font-bold">{item.totalQuantity}</td>
+                          <td className="py-4 font-black text-[#c70d1a]">{formatCurrency(item.totalRevenue)}</td>
+                          <td className="py-4">
+                            <span className={`rounded-full px-2 py-1 text-xs font-black ${trend < 0 ? 'bg-red-50 text-red-600' : 'bg-sky-50 text-sky-700'}`}>
+                              {formatGrowth(trend)}
+                            </span>
+                          </td>
+                        </tr>
+                      );
+                    })
+                  )}
                 </tbody>
               </table>
             </section>
@@ -236,7 +267,7 @@ const RevenueReportPage = () => {
                   <p className="text-sm font-bold text-gray-400">Chưa có dữ liệu.</p>
                 ) : (
                   revenueStructure.map(item => (
-                    <div key={item.name}>
+                    <div key={item.key}>
                       <div className="mb-1 flex justify-between text-xs font-black text-gray-600">
                         <span>{item.name}</span>
                         <span>{item.percent}%</span>

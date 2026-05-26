@@ -12,7 +12,7 @@ const formatTime = (date) => {
 // @access  Private (Admin)
 const getShifts = async (req, res) => {
     try {
-        const shifts = await Shift.find({})
+        const shifts = await Shift.find({ isDeleted: { $ne: true } })
             .populate('staff', 'name email')
             .sort('-createdAt');
         res.json(shifts);
@@ -26,7 +26,7 @@ const getShifts = async (req, res) => {
 // @access  Private (Admin, Staff)
 const getMyShifts = async (req, res) => {
     try {
-        const filter = { staff: req.user._id };
+        const filter = { staff: req.user._id, isDeleted: { $ne: true } };
         const shifts = await Shift.find(filter)
             .populate('staff', 'name email')
             .sort('-createdAt');
@@ -160,13 +160,13 @@ const closeShift = async (req, res) => {
 
         const cashOrders = await Order.find({
             paymentMethod: 'cash',
-            status: { $in: ['confirmed', 'delivering', 'completed'] },
+            status: 'completed',
             paymentStatus: 'paid',
             createdAt: { $gte: shift.startTime, $lte: shiftEndTime },
         });
 
         const revenueOrders = await Order.find({
-            status: { $in: ['confirmed', 'delivering', 'completed'] },
+            status: 'completed',
             paymentStatus: 'paid',
             createdAt: { $gte: shift.startTime, $lte: shiftEndTime },
         });
@@ -198,8 +198,21 @@ const deleteShift = async (req, res) => {
         const shift = await Shift.findById(req.params.id);
         if (!shift) return res.status(404).json({ message: 'Không tìm thấy ca' });
 
+        const linkedOrderCount = await Order.countDocuments({
+            createdAt: { $gte: shift.startTime, $lte: shift.endTime },
+        });
+
+        if (shift.status === 'closed' || linkedOrderCount > 0 || (shift.staff || []).length > 0) {
+            shift.isDeleted = true;
+            await shift.save();
+            return res.json({
+                message: 'Ca đã phát sinh dữ liệu liên quan nên đã được ẩn thay vì xóa vĩnh viễn',
+                mode: 'soft-deleted',
+            });
+        }
+
         await Shift.findByIdAndDelete(req.params.id);
-        res.json({ message: 'Đã xóa ca' });
+        res.json({ message: 'Đã xóa ca', mode: 'hard-deleted' });
     } catch (error) {
         res.status(500).json({ message: 'Lỗi server' });
     }

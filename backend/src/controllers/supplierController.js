@@ -8,7 +8,7 @@ const Ingredient = require('../models/Ingredient');
 // @access  Private (Admin)
 const getSuppliers = async (req, res) => {
     try {
-        const suppliers = await Supplier.find({}).sort('-createdAt');
+        const suppliers = await Supplier.find({ isDeleted: { $ne: true } }).sort('-createdAt');
         res.json(suppliers);
     } catch (error) {
         res.status(500).json({ message: 'Loi server' });
@@ -33,7 +33,7 @@ const getSupplierById = async (req, res) => {
 // @access  Private (Admin)
 const createSupplier = async (req, res) => {
     try {
-        const supplier = await Supplier.create(req.body);
+        const supplier = await Supplier.create({ ...req.body, isActive: true, isDeleted: false });
         res.status(201).json(supplier);
     } catch (error) {
         res.status(400).json({ message: 'Du lieu khong hop le' });
@@ -58,9 +58,22 @@ const updateSupplier = async (req, res) => {
 // @access  Private (Admin)
 const deleteSupplier = async (req, res) => {
     try {
-        const supplier = await Supplier.findByIdAndDelete(req.params.id);
+        const supplier = await Supplier.findById(req.params.id);
         if (!supplier) return res.status(404).json({ message: 'Khong tim thay' });
-        res.json({ message: 'Da xoa nha cung cap' });
+
+        const purchaseCount = await Purchase.countDocuments({ supplier: supplier._id });
+        if (purchaseCount > 0 || Number(supplier.debt || 0) > 0) {
+            supplier.isActive = false;
+            supplier.isDeleted = true;
+            await supplier.save();
+            return res.json({
+                message: 'Nha cung cap da phat sinh phieu nhap/cong no nen da duoc ngung hoat dong thay vi xoa vinh vien',
+                mode: 'soft-deleted',
+            });
+        }
+
+        await supplier.deleteOne();
+        res.json({ message: 'Da xoa nha cung cap', mode: 'hard-deleted' });
     } catch (error) {
         res.status(500).json({ message: 'Loi server' });
     }
@@ -75,6 +88,9 @@ const createPurchase = async (req, res) => {
         const { supplierId, items, paidAmount, purchaseDate, notes } = req.body;
         const supplier = await Supplier.findById(supplierId);
         if (!supplier) return res.status(404).json({ message: 'Khong tim thay nha cung cap' });
+        if (supplier.isActive === false || supplier.isDeleted === true) {
+            return res.status(400).json({ message: 'Nha cung cap da ngung hoat dong' });
+        }
         if (!Array.isArray(items) || items.length === 0) {
             return res.status(400).json({ message: 'Danh sach nhap hang khong hop le' });
         }
@@ -87,6 +103,9 @@ const createPurchase = async (req, res) => {
         for (const item of items) {
             const ingredient = await Ingredient.findById(item.ingredient);
             if (!ingredient) throw new Error(`Nguyen lieu khong ton tai: ${item.ingredient}`);
+            if (ingredient.isActive === false || ingredient.isDeleted === true) {
+                throw new Error(`Nguyen lieu da ngung su dung: ${ingredient.name}`);
+            }
 
             const quantity = Number(item.quantity);
             const unitPrice = Number(item.unitPrice);

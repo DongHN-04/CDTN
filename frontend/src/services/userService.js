@@ -21,6 +21,16 @@ const getProfile = async () => {
   return response.data;
 };
 
+const updateProfile = async (profileData) => {
+  const response = await axios.put(API_URL + 'me', profileData, { headers: getAuthHeader() });
+  return response.data;
+};
+
+const changePassword = async (passwordData) => {
+  const response = await axios.put(API_URL + 'me/password', passwordData, { headers: getAuthHeader() });
+  return response.data;
+};
+
 const createUser = async (userData) => {
   const response = await axios.post(API_URL, userData, { headers: getAuthHeader() });
   return response.data;
@@ -36,5 +46,5 @@ const deleteUser = async (id) => {
   return response.data;
 };
 
-const userService = { getUsers, getProfile, createUser, updateUser, deleteUser };
+const userService = { getUsers, getProfile, updateProfile, changePassword, createUser, updateUser, deleteUser };
 export default userService;

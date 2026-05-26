@@ -1,5 +1,7 @@
 const User = require('../models/User');
 const generateToken = require('../utils/generateToken');
+const Order = require('../models/Order');
+const Shift = require('../models/Shift');
 
 // @desc    Lay ho so cua nguoi dung dang dang nhap
 // @route   GET /api/users/me
@@ -17,13 +19,80 @@ const getMe = async (req, res) => {
   }
 };
 
+// @desc    Cap nhat ho so cua nguoi dung dang dang nhap
+// @route   PUT /api/users/me
+// @access  Private
+const updateMe = async (req, res) => {
+  try {
+    const user = await User.findById(req.user._id);
+    if (!user || user.isDeleted === true) {
+      return res.status(404).json({ message: 'Khong tim thay nguoi dung' });
+    }
+
+    const { name, phone, address, avatar } = req.body;
+    if (name !== undefined) user.name = name;
+    if (phone !== undefined) user.phone = phone;
+    if (address !== undefined) user.address = address;
+    if (avatar !== undefined) user.avatar = avatar;
+
+    const updatedUser = await user.save();
+    res.json({
+      _id: updatedUser._id,
+      name: updatedUser.name,
+      email: updatedUser.email,
+      role: updatedUser.role,
+      position: updatedUser.position,
+      phone: updatedUser.phone,
+      address: updatedUser.address,
+      avatar: updatedUser.avatar,
+      salary: updatedUser.salary,
+      status: updatedUser.status,
+      createdAt: updatedUser.createdAt,
+      updatedAt: updatedUser.updatedAt,
+    });
+  } catch (error) {
+    res.status(400).json({ message: 'Cap nhat ho so that bai', error: error.message });
+  }
+};
+
+// @desc    Doi mat khau cua nguoi dung dang dang nhap
+// @route   PUT /api/users/me/password
+// @access  Private
+const changeMyPassword = async (req, res) => {
+  try {
+    const { currentPassword, newPassword } = req.body;
+    if (!currentPassword || !newPassword) {
+      return res.status(400).json({ message: 'Vui long nhap day du mat khau hien tai va mat khau moi' });
+    }
+    if (newPassword.length < 6) {
+      return res.status(400).json({ message: 'Mat khau moi phai co it nhat 6 ky tu' });
+    }
+
+    const user = await User.findById(req.user._id);
+    if (!user || user.isDeleted === true) {
+      return res.status(404).json({ message: 'Khong tim thay nguoi dung' });
+    }
+
+    const isMatch = await user.matchPassword(currentPassword);
+    if (!isMatch) {
+      return res.status(400).json({ message: 'Mat khau hien tai khong dung' });
+    }
+
+    user.password = newPassword;
+    await user.save();
+    res.json({ message: 'Da doi mat khau thanh cong' });
+  } catch (error) {
+    res.status(400).json({ message: 'Doi mat khau that bai', error: error.message });
+  }
+};
+
 // @desc    Lấy danh sách người dùng (Admin và Staff)
 // @route   GET /api/users
 // @access  Private/Admin
 const getUsers = async (req, res) => {
   try {
     // Lấy tất cả user nhưng chỉ hiển thị role 'staff' hoặc 'admin' (không hiện customer)
-    const users = await User.find({ role: { $in: ['admin', 'staff'] } }).select('-password');
+    const users = await User.find({ role: { $in: ['admin', 'staff'] }, isDeleted: { $ne: true } }).select('-password');
     res.json(users);
   } catch (error) {
     res.status(500).json({ message: 'Lỗi server' });
@@ -143,11 +212,26 @@ const deleteUser = async (req, res) => {
       return res.status(400).json({ message: 'Bạn không thể xóa chính mình' });
     }
 
+    const [orderCount, shiftCount] = await Promise.all([
+      Order.countDocuments({ staff: user._id }),
+      Shift.countDocuments({ staff: user._id }),
+    ]);
+
+    if (orderCount > 0 || shiftCount > 0) {
+      user.status = 'Đã nghỉ việc';
+      user.isDeleted = true;
+      await user.save();
+      return res.json({
+        message: 'Nhân viên đã phát sinh đơn/ca nên đã được chuyển trạng thái nghỉ việc thay vì xóa vĩnh viễn',
+        mode: 'soft-deleted',
+      });
+    }
+
     await user.deleteOne();
-    res.json({ message: 'Đã xóa người dùng' });
+    res.json({ message: 'Đã xóa người dùng', mode: 'hard-deleted' });
   } catch (error) {
     res.status(500).json({ message: 'Lỗi server' });
   }
 };
 
-module.exports = { getMe, getUsers, createUser, updateUser, deleteUser };
+module.exports = { getMe, updateMe, changeMyPassword, getUsers, createUser, updateUser, deleteUser };

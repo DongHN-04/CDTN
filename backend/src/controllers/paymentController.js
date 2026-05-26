@@ -1,6 +1,6 @@
 const { VNPay, ignoreLogger, ProductCode, VnpLocale, dateFormat } = require('vnpay');
-const mongoose = require('mongoose');
 const Order = require('../models/Order');
+const { runWithOptionalTransaction } = require('../utils/transaction');
 const {
   collectOrderDetails,
   checkAndDecreaseStock,
@@ -19,8 +19,29 @@ const getVNPay = () => new VNPay({
 
 const PAYMENT_RESERVATION_MINUTES = Number(process.env.PAYMENT_RESERVATION_MINUTES || 30);
 
+const cancelExpiredPaymentReservation = async (order) => {
+  if (
+    !order ||
+    order.status !== 'pending' ||
+    order.paymentMethod !== 'qr' ||
+    order.paymentStatus !== 'unpaid' ||
+    !order.txnRef
+  ) {
+    return false;
+  }
+
+  const isExpired = Date.now() - new Date(order.updatedAt).getTime() > PAYMENT_RESERVATION_MINUTES * 60 * 1000;
+  if (!isExpired) return false;
+
+  await releaseReservedStock(order);
+  order.status = 'cancelled';
+  order.paymentStatus = 'failed';
+  order.txnRef = '';
+  await order.save();
+  return true;
+};
+
 const createPayment = async (req, res) => {
-  const session = await mongoose.startSession();
   try {
     if (!process.env.VNPAY_TMN_CODE || !process.env.VNPAY_HASH_SECRET || !process.env.VNPAY_RETURN_URL) {
       return res.status(500).json({ message: 'Cau hinh VNPAY chua dung' });
@@ -30,20 +51,13 @@ const createPayment = async (req, res) => {
     const order = await Order.findById(orderId);
     if (!order) return res.status(404).json({ message: 'Khong tim thay don hang' });
 
-    if (
-      order.status === 'pending' &&
-      order.paymentStatus === 'unpaid' &&
-      order.inventoryDeducted &&
-      order.txnRef &&
-      Date.now() - new Date(order.updatedAt).getTime() > PAYMENT_RESERVATION_MINUTES * 60 * 1000
-    ) {
-      // Neu khach bo qua cong thanh toan, lan tao thanh toan tiep theo se giai phong ton kho cu truoc.
-      await releaseReservedStock(order);
-      order.inventoryDeducted = false;
+    if (await cancelExpiredPaymentReservation(order)) {
+      return res.status(400).json({ message: 'Don hang thanh toan VNPay da qua han va bi huy' });
     }
 
     if (order.total <= 0) return res.status(400).json({ message: 'Gia tri don hang khong hop le' });
     if (order.status !== 'pending') return res.status(400).json({ message: 'Chi thanh toan online cho don dang cho xac nhan' });
+    if (order.paymentMethod !== 'qr') return res.status(400).json({ message: 'Don hang khong chon thanh toan VNPay' });
     if (order.paymentStatus === 'paid') return res.status(400).json({ message: 'Don hang da duoc thanh toan' });
 
     let ipAddr =
@@ -74,10 +88,11 @@ const createPayment = async (req, res) => {
       vnp_ExpireDate: dateFormat(tomorrow),
     });
 
-    await session.withTransaction(async () => {
+    await runWithOptionalTransaction(async (session) => {
       const orderInTx = await Order.findById(orderId).session(session);
       if (!orderInTx) throw new Error('Khong tim thay don hang');
       if (orderInTx.status !== 'pending') throw new Error('Chi thanh toan online cho don dang cho xac nhan');
+      if (orderInTx.paymentMethod !== 'qr') throw new Error('Don hang khong chon thanh toan VNPay');
       if (orderInTx.paymentStatus === 'paid') throw new Error('Don hang da duoc thanh toan');
 
       if (!orderInTx.inventoryDeducted) {
@@ -86,13 +101,18 @@ const createPayment = async (req, res) => {
           comboId: item.comboId,
           quantity: item.quantity,
         }));
-        const { requirements } = await collectOrderDetails(items, session);
+        const { requirements } = await collectOrderDetails(items, session, { allowUnavailable: true });
         await checkAndDecreaseStock(requirements, session);
         orderInTx.inventoryDeducted = true;
+        orderInTx.inventoryRequirements = requirements.map((requirement) => ({
+          ingredient: requirement.ingredientId,
+          name: requirement.name || '',
+          unit: requirement.unit || '',
+          requiredQty: requirement.requiredQty,
+        }));
       }
 
       orderInTx.txnRef = txnRef;
-      orderInTx.paymentMethod = 'qr';
       orderInTx.paymentStatus = 'unpaid';
       await orderInTx.save({ session });
     });
@@ -101,34 +121,38 @@ const createPayment = async (req, res) => {
   } catch (error) {
     console.error('Loi createPayment:', error);
     res.status(400).json({ message: error.message || 'Loi server' });
-  } finally {
-    session.endSession();
   }
 };
 
 const releaseReservedStock = async (order) => {
   if (!order || !order.inventoryDeducted || order.status !== 'pending') return;
 
-  const session = await mongoose.startSession();
-  try {
-    await session.withTransaction(async () => {
-      const orderInTx = await Order.findById(order._id).session(session);
-      if (!orderInTx || !orderInTx.inventoryDeducted || orderInTx.status !== 'pending') return;
+  await runWithOptionalTransaction(async (session) => {
+    const orderInTx = await Order.findById(order._id).session(session);
+    if (!orderInTx || !orderInTx.inventoryDeducted || orderInTx.status !== 'pending') return;
 
+    let requirements = (orderInTx.inventoryRequirements || []).map((requirement) => ({
+      ingredientId: requirement.ingredient,
+      name: requirement.name,
+      unit: requirement.unit,
+      requiredQty: requirement.requiredQty,
+    })).filter(requirement => requirement.ingredientId && requirement.requiredQty > 0);
+
+    if (requirements.length === 0) {
       const items = orderInTx.items.map((item) => ({
         menuItem: item.menuItem,
         comboId: item.comboId,
         quantity: item.quantity,
       }));
-      const { requirements } = await collectOrderDetails(items, session);
-      await restoreStock(requirements, session);
+      const details = await collectOrderDetails(items, session, { allowUnavailable: true });
+      requirements = details.requirements;
+    }
 
-      orderInTx.inventoryDeducted = false;
-      await orderInTx.save({ session });
-    });
-  } finally {
-    session.endSession();
-  }
+    await restoreStock(requirements, session);
+
+    orderInTx.inventoryDeducted = false;
+    await orderInTx.save({ session });
+  });
 };
 
 const paymentReturn = async (req, res) => {
@@ -150,6 +174,9 @@ const paymentReturn = async (req, res) => {
         order.paymentStatus = 'failed';
         await order.save();
         await releaseReservedStock(order);
+        order.status = 'cancelled';
+        order.txnRef = '';
+        await order.save();
       }
 
       return res.redirect(
@@ -167,11 +194,15 @@ const paymentReturn = async (req, res) => {
       order.paymentStatus = 'failed';
       await order.save();
       await releaseReservedStock(order);
+      order.status = 'cancelled';
+      order.txnRef = '';
+      await order.save();
       return res.redirect(`${process.env.CLIENT_URL}/payment-result?status=invalid-amount`);
     }
 
-    // Thanh toan thanh cong chi danh dau paid; staff van can confirm de tru kho.
+    // VNPay thanh toan thanh cong thi don duoc xac nhan luon; ton kho da duoc giu/tru khi tao payment URL.
     order.paymentStatus = 'paid';
+    order.status = 'confirmed';
     await order.save();
 
     return res.redirect(

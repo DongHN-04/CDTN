@@ -1,54 +1,55 @@
-import React, { useState, useEffect } from 'react';
+import React, { useEffect, useState } from 'react';
 import supplierService from '../services/supplierService';
 import inventoryService from '../services/inventoryService';
 import { ErrorBox, formatApiError } from '../utils/apiError';
+
+const emptyItem = { ingredient: '', quantity: '', unitPrice: '' };
 
 const PurchaseForm = ({ onClose, onSuccess }) => {
   const [suppliers, setSuppliers] = useState([]);
   const [selectedSupplier, setSelectedSupplier] = useState('');
   const [ingredients, setIngredients] = useState([]);
-  const [items, setItems] = useState([{ ingredient: '', quantity: '', unitPrice: '' }]);
+  const [items, setItems] = useState([emptyItem]);
   const [paidAmount, setPaidAmount] = useState(0);
   const [notes, setNotes] = useState('');
   const [formError, setFormError] = useState('');
 
   useEffect(() => {
-    supplierService.getSuppliers().then(setSuppliers);
+    supplierService.getSuppliers().then(data => setSuppliers(data || []));
     inventoryService.getIngredients().then(list => {
-      setIngredients(list.filter(item => item && item._id));
+      setIngredients((list || []).filter(item => item && item._id));
     });
   }, []);
 
-  const addRow = () => setItems([...items, { ingredient: '', quantity: '', unitPrice: '' }]);
-  const removeRow = (idx) => setItems(items.filter((_, i) => i !== idx));
+  const addRow = () => setItems(current => [...current, emptyItem]);
+  const removeRow = index => setItems(current => current.filter((_, itemIndex) => itemIndex !== index));
 
-  const handleItemChange = (idx, field, value) => {
-    const newItems = [...items];
-    newItems[idx] = { ...newItems[idx], [field]: value };
-    setItems(newItems);
+  const handleItemChange = (index, field, value) => {
+    setItems(current => {
+      const next = [...current];
+      next[index] = { ...next[index], [field]: value };
+      return next;
+    });
   };
 
-  const buildPayloadItems = () => {
-    return items
-      .map(it => ({
-        ingredient: it.ingredient,
-        quantity: Number(it.quantity),
-        unitPrice: Number(it.unitPrice),
+  const buildPayloadItems = () => (
+    items
+      .map(item => ({
+        ingredient: item.ingredient,
+        quantity: Number(item.quantity),
+        unitPrice: Number(item.unitPrice),
       }))
-      // Bo qua dong rong hoan toan, tranh gui ingredient rong/quantity 0 len backend.
-      .filter(it => it.ingredient || it.quantity || it.unitPrice);
-  };
+      .filter(item => item.ingredient || item.quantity || item.unitPrice)
+  );
 
-  const handleSubmit = async (e) => {
-    e.preventDefault();
+  const handleSubmit = async (event) => {
+    event.preventDefault();
     setFormError('');
 
-    if (!selectedSupplier) return setFormError('supplierId: Chon nha cung cap');
+    if (!selectedSupplier) return setFormError('supplierId: Chọn nhà cung cấp là bắt buộc');
 
     const payloadItems = buildPayloadItems();
-    if (payloadItems.length === 0) {
-      return setFormError('items: Vui long them it nhat mot nguyen lieu');
-    }
+    if (payloadItems.length === 0) return setFormError('items: Vui lòng thêm ít nhất một nguyên liệu');
 
     const invalidItem = payloadItems.find(item =>
       !item.ingredient ||
@@ -59,7 +60,7 @@ const PurchaseForm = ({ onClose, onSuccess }) => {
     );
 
     if (invalidItem) {
-      return setFormError('items: Moi dong nhap hang phai chon nguyen lieu, so luong > 0 va don gia >= 0');
+      return setFormError('items: Mỗi dòng nhập hàng phải chọn nguyên liệu, số lượng > 0 và đơn giá >= 0');
     }
 
     try {
@@ -72,67 +73,76 @@ const PurchaseForm = ({ onClose, onSuccess }) => {
       });
       onSuccess();
     } catch (error) {
-      setFormError(formatApiError(error, 'Loi nhap hang'));
+      setFormError(formatApiError(error, 'Lỗi nhập hàng'));
     }
   };
 
   return (
-    <div style={overlayStyle}>
-      <div style={modalStyle}>
-        <h3>Nhap hang</h3>
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/35 px-4 py-8">
+      <div className="max-h-[90vh] w-full max-w-4xl overflow-y-auto rounded-2xl bg-white p-6 shadow-2xl">
+        <div className="mb-5 flex items-start justify-between gap-4">
+          <div>
+            <h2 className="m-0 text-xl font-black text-gray-950">Nhập hàng</h2>
+            <p className="mt-1 text-sm font-medium text-gray-500">Ghi nhận nguyên liệu nhập kho, đơn giá và số tiền đã thanh toán.</p>
+          </div>
+          <button type="button" onClick={onClose} className="rounded-lg bg-gray-100 px-3 py-2 text-sm font-black text-gray-600">
+            Đóng
+          </button>
+        </div>
+
         <ErrorBox message={formError} />
-        <form onSubmit={handleSubmit}>
-          <select value={selectedSupplier} onChange={e => setSelectedSupplier(e.target.value)} style={inputStyle} required>
-            <option value="">-- Chon nha cung cap --</option>
-            {suppliers.map(s => <option key={s._id} value={s._id}>{s.name}</option>)}
-          </select>
 
-          {items.map((item, idx) => (
-            <div key={idx} style={rowStyle}>
-              <select value={item.ingredient} onChange={e => handleItemChange(idx, 'ingredient', e.target.value)} style={inputStyle}>
-                <option value="">-- Chon nguyen lieu --</option>
-                {ingredients.map(ing => (
-                  <option key={ing._id} value={ing._id}>{ing.name} ({ing.unit})</option>
-                ))}
-              </select>
-              <input
-                type="number"
-                min="0"
-                step="any"
-                placeholder="SL"
-                value={item.quantity}
-                onChange={e => handleItemChange(idx, 'quantity', e.target.value)}
-                style={inputStyle}
-              />
-              <input
-                type="number"
-                min="0"
-                step="any"
-                placeholder="Don gia"
-                value={item.unitPrice}
-                onChange={e => handleItemChange(idx, 'unitPrice', e.target.value)}
-                style={inputStyle}
-              />
-              <button type="button" onClick={() => removeRow(idx)} style={deleteButtonStyle}>Xoa</button>
+        <form onSubmit={handleSubmit} className="mt-4 flex flex-col gap-5">
+          <Field label="Nhà cung cấp">
+            <select value={selectedSupplier} onChange={event => setSelectedSupplier(event.target.value)} className={inputClass} required>
+              <option value="">Chọn nhà cung cấp</option>
+              {suppliers.map(supplier => <option key={supplier._id} value={supplier._id}>{supplier.name}</option>)}
+            </select>
+          </Field>
+
+          <div className="rounded-2xl border border-gray-100 bg-gray-50 p-4">
+            <div className="mb-3 flex items-center justify-between gap-3">
+              <h3 className="m-0 text-sm font-black text-gray-900">Nguyên liệu nhập</h3>
+              <button type="button" onClick={addRow} className="rounded-xl bg-emerald-50 px-3 py-2 text-xs font-black text-emerald-700">
+                + Thêm dòng
+              </button>
             </div>
-          ))}
 
-          <button type="button" onClick={addRow} style={addButtonStyle}>+ Them dong</button>
+            <div className="flex flex-col gap-3">
+              {items.map((item, index) => (
+                <div key={index} className="grid grid-cols-1 gap-3 lg:grid-cols-[1fr_120px_150px_auto]">
+                  <select value={item.ingredient} onChange={event => handleItemChange(index, 'ingredient', event.target.value)} className={inputClass}>
+                    <option value="">Chọn nguyên liệu</option>
+                    {ingredients.map(ingredient => (
+                      <option key={ingredient._id} value={ingredient._id}>{ingredient.name} ({ingredient.unit})</option>
+                    ))}
+                  </select>
+                  <input type="number" min="0" step="any" placeholder="Số lượng" value={item.quantity} onChange={event => handleItemChange(index, 'quantity', event.target.value)} className={inputClass} />
+                  <input type="number" min="0" step="any" placeholder="Đơn giá" value={item.unitPrice} onChange={event => handleItemChange(index, 'unitPrice', event.target.value)} className={inputClass} />
+                  <button type="button" onClick={() => removeRow(index)} disabled={items.length === 1} className="rounded-xl bg-red-50 px-3 py-3 text-xs font-black text-red-600 disabled:cursor-not-allowed disabled:opacity-40">
+                    Xóa
+                  </button>
+                </div>
+              ))}
+            </div>
+          </div>
 
-          <input
-            type="number"
-            min="0"
-            step="any"
-            placeholder="Thanh toan truoc"
-            value={paidAmount}
-            onChange={e => setPaidAmount(e.target.value)}
-            style={inputStyle}
-          />
-          <textarea placeholder="Ghi chu" value={notes} onChange={e => setNotes(e.target.value)} style={inputStyle} rows={2} />
+          <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+            <Field label="Thanh toán trước">
+              <input type="number" min="0" step="any" value={paidAmount} onChange={event => setPaidAmount(event.target.value)} className={inputClass} />
+            </Field>
+            <Field label="Ghi chú">
+              <textarea value={notes} onChange={event => setNotes(event.target.value)} className={`${inputClass} min-h-[90px] resize-none`} />
+            </Field>
+          </div>
 
-          <div style={{ textAlign: 'right' }}>
-            <button type="submit" style={saveButtonStyle}>Luu</button>
-            <button type="button" onClick={onClose} style={cancelButtonStyle}>Huy</button>
+          <div className="flex justify-end gap-3 border-t border-gray-100 pt-5">
+            <button type="button" onClick={onClose} className="rounded-xl bg-gray-100 px-5 py-3 text-sm font-black text-gray-600">
+              Hủy
+            </button>
+            <button type="submit" className="rounded-xl bg-[#c70d1a] px-5 py-3 text-sm font-black text-white">
+              Lưu
+            </button>
           </div>
         </form>
       </div>
@@ -140,34 +150,13 @@ const PurchaseForm = ({ onClose, onSuccess }) => {
   );
 };
 
-const overlayStyle = {
-  position: 'fixed',
-  top: 0,
-  left: 0,
-  right: 0,
-  bottom: 0,
-  backgroundColor: 'rgba(0,0,0,0.5)',
-  display: 'flex',
-  justifyContent: 'center',
-  alignItems: 'center',
-  zIndex: 1000,
-};
+const Field = ({ label, children }) => (
+  <label className="flex flex-col gap-1.5">
+    <span className="text-xs font-black uppercase tracking-wider text-gray-500">{label}</span>
+    {children}
+  </label>
+);
 
-const modalStyle = {
-  background: 'white',
-  padding: 20,
-  borderRadius: 8,
-  width: '90%',
-  maxWidth: 700,
-  maxHeight: '80vh',
-  overflow: 'auto',
-};
-
-const rowStyle = { display: 'flex', gap: 10, marginBottom: 10 };
-const inputStyle = { padding: 8, borderRadius: 4, border: '1px solid #ccc' };
-const addButtonStyle = { marginBottom: 10, background: '#2ecc71', color: 'white', border: 'none', padding: '5px 10px', borderRadius: 4, cursor: 'pointer' };
-const deleteButtonStyle = { background: '#e74c3c', color: 'white', border: 'none', borderRadius: 4, cursor: 'pointer' };
-const saveButtonStyle = { padding: '10px 20px', background: '#3498db', color: 'white', border: 'none', borderRadius: 4, cursor: 'pointer', marginRight: 10 };
-const cancelButtonStyle = { padding: '10px 20px', background: '#95a5a6', color: 'white', border: 'none', borderRadius: 4, cursor: 'pointer' };
+const inputClass = 'w-full rounded-xl border border-gray-200 bg-white px-3 py-3 text-sm font-semibold text-gray-800 outline-none transition focus:border-[#c0392b] focus:ring-2 focus:ring-red-100';
 
 export default PurchaseForm;

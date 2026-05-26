@@ -28,8 +28,6 @@ const CustomerLayout = () => {
 
   return (
     <div className="flex min-h-screen flex-col bg-[#f9fafb]" style={{ fontFamily: "'Segoe UI', system-ui, -apple-system, sans-serif" }}>
-      <div className="h-1.5 w-full bg-gradient-to-r from-[#c0392b] via-[#e74c3c] to-[#c0392b]" />
-
       <header className="sticky top-0 z-50 border-b border-gray-100 bg-white shadow-[0_2px_15px_rgba(0,0,0,0.04)]">
         <div className="mx-auto flex h-[72px] max-w-[1200px] items-center justify-between gap-6 px-5">
           <Link to="/" className="flex shrink-0 items-center gap-2 no-underline">
@@ -156,7 +154,7 @@ const CustomerLayout = () => {
             <h4 className="mb-4 text-sm font-bold uppercase tracking-wide text-gray-800">Liên hệ</h4>
             <ul className="m-0 list-none space-y-3 p-0 text-sm text-gray-500">
               <li>Kim Giang, Đại Kim, Hoàng Mai, Hà Nội</li>
-              <li>0386422292</li>
+              <li>0386422292 - 0338869004</li>
               <li>Mở cửa: 08:00 - 23:00</li>
             </ul>
           </div>

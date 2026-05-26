@@ -255,9 +255,19 @@ const PurchaseHistoryPage = () => {
         </div>
 
         <div className="mt-5 flex items-center justify-between text-xs font-bold text-gray-500">
-          <span>Hiển thị {pageItems.length} / {filteredPurchases.length} mục</span>
+          <span>
+            Hiển thị {filteredPurchases.length ? (currentPage - 1) * PAGE_SIZE + 1 : 0}
+            -{Math.min(currentPage * PAGE_SIZE, filteredPurchases.length)} của {filteredPurchases.length} mục
+          </span>
           <div className="flex items-center gap-2">
-            <button onClick={() => setPage(Math.max(1, currentPage - 1))} className="rounded-lg px-3 py-2 hover:bg-gray-100">‹</button>
+            <button
+              type="button"
+              disabled={currentPage === 1}
+              onClick={() => setPage(Math.max(1, currentPage - 1))}
+              className="rounded-lg px-3 py-2 hover:bg-gray-100 disabled:cursor-not-allowed disabled:opacity-40"
+            >
+              ‹
+            </button>
             {Array.from({ length: totalPages }, (_, index) => (
               <button
                 key={index + 1}
@@ -267,7 +277,14 @@ const PurchaseHistoryPage = () => {
                 {index + 1}
               </button>
             ))}
-            <button onClick={() => setPage(Math.min(totalPages, currentPage + 1))} className="rounded-lg px-3 py-2 hover:bg-gray-100">›</button>
+            <button
+              type="button"
+              disabled={currentPage === totalPages}
+              onClick={() => setPage(Math.min(totalPages, currentPage + 1))}
+              className="rounded-lg px-3 py-2 hover:bg-gray-100 disabled:cursor-not-allowed disabled:opacity-40"
+            >
+              ›
+            </button>
           </div>
         </div>
       </section>

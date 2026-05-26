@@ -3,6 +3,8 @@ import comboService from '../../services/comboService';
 import menuService from '../../services/menuService';
 import uploadService from '../../services/uploadService';
 import { getImageUrl } from '../../utils/imageUrl';
+import { PlusCircle } from 'lucide-react';
+import ConfirmDeleteModal from '../../components/ConfirmDeleteModal';
 
 const emptyForm = {
   name: '',
@@ -19,7 +21,14 @@ const fallbackImages = [
   '/images/home/product-burger.png',
 ];
 
+const pageSize = 6;
+const NEW_COMBO_DAYS = 2;
 const formatPrice = (value = 0) => `${Number(value).toLocaleString('vi-VN')} VNĐ`;
+const isNewCombo = (combo) => {
+  const createdAt = new Date(combo?.createdAt || 0);
+  if (Number.isNaN(createdAt.getTime())) return false;
+  return Date.now() - createdAt.getTime() <= NEW_COMBO_DAYS * 24 * 60 * 60 * 1000;
+};
 
 const ComboManagementPage = () => {
   const [combos, setCombos] = useState([]);
@@ -30,6 +39,8 @@ const ComboManagementPage = () => {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
+  const [deleteModal, setDeleteModal] = useState({ isOpen: false, combo: null, loading: false });
+  const [currentPage, setCurrentPage] = useState(1);
   const fileInputRef = useRef(null);
 
   useEffect(() => {
@@ -55,9 +66,27 @@ const ComboManagementPage = () => {
 
   const stats = useMemo(() => ({
     total: combos.length,
-    active: combos.filter(combo => combo.isActive).length,
+    active: combos.filter(combo => combo.isActive && combo.isAvailable !== false).length,
+    outOfStock: combos.filter(combo => combo.isActive && combo.isAvailable === false).length,
     paused: combos.filter(combo => !combo.isActive).length,
   }), [combos]);
+
+  const totalPages = Math.max(1, Math.ceil(combos.length / pageSize));
+  const bestSellingComboId = useMemo(() => {
+    const bestSeller = combos
+      .filter(combo => Number(combo.soldQuantity || 0) > 0)
+      .sort((a, b) => Number(b.soldQuantity || 0) - Number(a.soldQuantity || 0))[0];
+    return bestSeller?._id || '';
+  }, [combos]);
+
+  const paginatedCombos = useMemo(() => {
+    const startIndex = (currentPage - 1) * pageSize;
+    return combos.slice(startIndex, startIndex + pageSize);
+  }, [combos, currentPage]);
+
+  useEffect(() => {
+    if (currentPage > totalPages) setCurrentPage(totalPages);
+  }, [currentPage, totalPages]);
 
   const openCreateForm = () => {
     setEditingId(null);
@@ -161,14 +190,21 @@ const ComboManagementPage = () => {
     }
   };
 
-  const handleDelete = async (combo) => {
-    if (!window.confirm(`Xóa combo "${combo.name}"?`)) return;
+  const handleDelete = (combo) => {
+    setDeleteModal({ isOpen: true, combo, loading: false });
+  };
+
+  const confirmDelete = async () => {
+    if (!deleteModal.combo) return;
 
     try {
-      await comboService.deleteCombo(combo._id);
-      setCombos(current => current.filter(item => item._id !== combo._id));
+      setDeleteModal(current => ({ ...current, loading: true }));
+      await comboService.deleteCombo(deleteModal.combo._id);
+      setCombos(current => current.filter(item => item._id !== deleteModal.combo._id));
+      setDeleteModal({ isOpen: false, combo: null, loading: false });
     } catch (err) {
       setError(err.response?.data?.message || 'Không thể xóa combo');
+      setDeleteModal({ isOpen: false, combo: null, loading: false });
     }
   };
 
@@ -190,6 +226,7 @@ const ComboManagementPage = () => {
           <div className="mt-4 flex flex-wrap gap-2 text-xs font-bold">
             <span className="rounded-full bg-red-50 px-3 py-1 text-[#c0392b]">{stats.total} combo</span>
             <span className="rounded-full bg-emerald-50 px-3 py-1 text-emerald-700">{stats.active} đang bán</span>
+            <span className="rounded-full bg-red-50 px-3 py-1 text-red-700">{stats.outOfStock} hết hàng</span>
             <span className="rounded-full bg-gray-100 px-3 py-1 text-gray-600">{stats.paused} tạm ngừng</span>
           </div>
         </div>
@@ -198,7 +235,7 @@ const ComboManagementPage = () => {
           onClick={openCreateForm}
           className="inline-flex items-center justify-center gap-2 rounded-xl bg-[#c70d1a] px-5 py-3 text-sm font-black text-white shadow-sm transition hover:bg-[#a90b16]"
         >
-          <span className="flex h-5 w-5 items-center justify-center rounded-full border border-white/70 text-base leading-none">+</span>
+          <PlusCircle size={17} />
           Tạo Combo Mới
         </button>
       </div>
@@ -219,19 +256,33 @@ const ComboManagementPage = () => {
           </button>
         </div>
       ) : (
-        <div className="grid grid-cols-1 gap-6 md:grid-cols-2 xl:grid-cols-3">
-          {combos.map((combo, index) => (
-            <ComboCard
-              key={combo._id}
-              combo={combo}
-              index={index}
-              image={getComboImage(combo, index)}
-              oldPrice={getOldPrice(combo, index)}
-              onEdit={() => openEditForm(combo)}
-              onDelete={() => handleDelete(combo)}
-            />
-          ))}
-        </div>
+        <>
+          <div className="grid grid-cols-1 gap-6 md:grid-cols-2 xl:grid-cols-3">
+            {paginatedCombos.map((combo, index) => {
+              const absoluteIndex = (currentPage - 1) * pageSize + index;
+              return (
+                <ComboCard
+                  key={combo._id}
+                  combo={combo}
+                  index={absoluteIndex}
+                  isBestSeller={combo._id === bestSellingComboId}
+                  image={getComboImage(combo, absoluteIndex)}
+                  oldPrice={getOldPrice(combo, absoluteIndex)}
+                  onEdit={() => openEditForm(combo)}
+                  onDelete={() => handleDelete(combo)}
+                />
+              );
+            })}
+          </div>
+          <PaginationFooter
+            currentPage={currentPage}
+            pageSize={pageSize}
+            totalItems={combos.length}
+            totalPages={totalPages}
+            label="combo"
+            onPageChange={setCurrentPage}
+          />
+        </>
       )}
 
       {showForm && (
@@ -373,26 +424,41 @@ const ComboManagementPage = () => {
           </div>
         </div>
       )}
+
+      <ConfirmDeleteModal
+        isOpen={deleteModal.isOpen}
+        title="Xóa combo?"
+        message={`Bạn có chắc chắn muốn xóa "${deleteModal.combo?.name || 'combo này'}" khỏi hệ thống không?`}
+        loading={deleteModal.loading}
+        onCancel={() => setDeleteModal({ isOpen: false, combo: null, loading: false })}
+        onConfirm={confirmDelete}
+      />
     </div>
   );
 };
 
-const ComboCard = ({ combo, index, image, oldPrice, onEdit, onDelete }) => {
+const ComboCard = ({ combo, index, isBestSeller, image, oldPrice, onEdit, onDelete }) => {
   const items = combo.items || [];
   const visibleItems = items.slice(0, 4);
   const badge = !combo.isActive
     ? { text: 'Tạm Ngừng', className: 'bg-gray-100 text-gray-500' }
-    : index === 0
-      ? { text: 'Bán Chạy', className: 'bg-[#c70d1a] text-white' }
-      : { text: 'Mới', className: 'bg-cyan-500 text-white' };
+    : combo.isAvailable === false
+      ? { text: 'Hết Hàng', className: 'bg-red-50 text-red-700' }
+      : isBestSeller
+        ? { text: 'Bán Chạy', className: 'bg-[#c70d1a] text-white' }
+        : isNewCombo(combo)
+          ? { text: 'Mới', className: 'bg-cyan-500 text-white' }
+          : null;
 
   return (
-    <article className={`overflow-hidden rounded-2xl bg-white shadow-sm ring-1 ring-gray-100 transition hover:-translate-y-1 hover:shadow-xl ${!combo.isActive ? 'opacity-60' : ''}`}>
+    <article className={`overflow-hidden rounded-2xl bg-white shadow-sm ring-1 ring-gray-100 transition hover:-translate-y-1 hover:shadow-xl ${!combo.isActive || combo.isAvailable === false ? 'opacity-60' : ''}`}>
       <div className="relative h-[170px] bg-gray-100">
-        <img src={image} alt={combo.name} className="h-full w-full object-cover" />
-        <span className={`absolute right-3 top-3 rounded-full px-3 py-1 text-[11px] font-black ${badge.className}`}>
-          {badge.text}
-        </span>
+        <img src={image} alt={combo.name} className={`h-full w-full object-cover ${combo.isAvailable === false ? 'grayscale' : ''}`} />
+        {badge && (
+          <span className={`absolute right-3 top-3 rounded-full px-3 py-1 text-[11px] font-black ${badge.className}`}>
+            {badge.text}
+          </span>
+        )}
       </div>
 
       <div className="p-5">
@@ -443,6 +509,45 @@ const Field = ({ label, children }) => (
     <span className="text-xs font-black uppercase tracking-wider text-gray-500">{label}</span>
     {children}
   </label>
+);
+
+const PaginationFooter = ({ currentPage, pageSize, totalItems, totalPages, label, onPageChange }) => (
+  <div className="mt-6 flex items-center justify-between rounded-2xl bg-white px-5 py-4 text-xs font-bold text-gray-500 shadow-sm ring-1 ring-gray-100">
+    <span>
+      Hiển thị {totalItems ? (currentPage - 1) * pageSize + 1 : 0}
+      -{Math.min(currentPage * pageSize, totalItems)} của {totalItems} {label}
+    </span>
+    <div className="flex items-center gap-2">
+      <button
+        type="button"
+        disabled={currentPage === 1}
+        onClick={() => onPageChange(page => Math.max(1, page - 1))}
+        className="flex h-8 w-8 items-center justify-center rounded-full border border-gray-100 disabled:cursor-not-allowed disabled:opacity-40"
+      >
+        ‹
+      </button>
+      {Array.from({ length: totalPages }, (_, index) => index + 1).map(page => (
+        <button
+          key={page}
+          type="button"
+          onClick={() => onPageChange(page)}
+          className={`flex h-8 w-8 items-center justify-center rounded-full ${
+            currentPage === page ? 'bg-[#c70d1a] font-black text-white' : 'border border-gray-100 text-gray-600'
+          }`}
+        >
+          {page}
+        </button>
+      ))}
+      <button
+        type="button"
+        disabled={currentPage === totalPages}
+        onClick={() => onPageChange(page => Math.min(totalPages, page + 1))}
+        className="flex h-8 w-8 items-center justify-center rounded-full border border-gray-100 disabled:cursor-not-allowed disabled:opacity-40"
+      >
+        ›
+      </button>
+    </div>
+  </div>
 );
 
 const inputClass = 'w-full rounded-xl border border-gray-200 bg-white px-3 py-3 text-sm font-semibold text-gray-800 outline-none transition focus:border-[#c0392b] focus:ring-2 focus:ring-red-100';

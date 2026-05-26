@@ -3,10 +3,20 @@ const mongoose = require('mongoose');
 const orderItemSchema = new mongoose.Schema({
   menuItem: { type: mongoose.Schema.Types.ObjectId, ref: 'MenuItem' }, // không còn required
   comboId: { type: mongoose.Schema.Types.ObjectId, ref: 'Combo' },
-  name: String,   // lưu tên combo nếu là combo
+  // Snapshot thong tin luc ban de hoa don cu khong bi mat ten/anh khi mon bi an khoi thuc don.
+  name: String,
+  image: String,
+  category: String,
   quantity: { type: Number, required: true },
   price: { type: Number, required: true }
 });
+
+const inventoryRequirementSchema = new mongoose.Schema({
+  ingredient: { type: mongoose.Schema.Types.ObjectId, ref: 'Ingredient' },
+  name: { type: String, default: '' },
+  unit: { type: String, default: '' },
+  requiredQty: { type: Number, required: true },
+}, { _id: false });
 
 const orderSchema = new mongoose.Schema({
   customer: {
@@ -15,7 +25,15 @@ const orderSchema = new mongoose.Schema({
     address: { type: String, default: '' }
   },
   staff: { type: mongoose.Schema.Types.ObjectId, ref: 'User' }, // không bắt buộc (vì khách tự đặt)
+  staffSnapshot: {
+    name: { type: String, default: '' },
+    email: { type: String, default: '' },
+    role: { type: String, default: '' },
+    position: { type: String, default: '' },
+    phone: { type: String, default: '' },
+  },
   items: [orderItemSchema],
+  inventoryRequirements: [inventoryRequirementSchema],
   subtotal: { type: Number, required: true },
   deliveryFee: { type: Number, default: 0 },
   discount: { type: Number, default: 0 },

@@ -1,11 +1,14 @@
-import React, { useState, useEffect } from 'react';
+import React, { useEffect, useState } from 'react';
 import inventoryService from '../services/inventoryService';
 import uploadService from '../services/uploadService';
 import { ErrorBox } from '../utils/apiError';
 import { getImageUrl } from '../utils/imageUrl';
+import { MENU_CATEGORIES } from '../constants/menuCategories';
+
+const emptyForm = { name: '', price: 0, description: '', category: MENU_CATEGORIES[0], image: '' };
 
 const MenuForm = ({ menuItem, onSubmit, onCancel, error }) => {
-  const [form, setForm] = useState({ name: '', price: 0, description: '', category: 'Burger', image: '', isActive: true });
+  const [form, setForm] = useState(emptyForm);
   const [ingredientsList, setIngredientsList] = useState([]);
   const [selectedIngredients, setSelectedIngredients] = useState([]);
   const [imageFile, setImageFile] = useState(null);
@@ -14,16 +17,15 @@ const MenuForm = ({ menuItem, onSubmit, onCancel, error }) => {
   const [localError, setLocalError] = useState('');
 
   useEffect(() => {
-    inventoryService.getIngredients().then(data => setIngredientsList(data));
+    inventoryService.getIngredients().then(data => setIngredientsList(data || []));
 
     if (menuItem) {
       setForm({
         name: menuItem.name || '',
         price: menuItem.price ?? 0,
         description: menuItem.description || '',
-        category: menuItem.category || 'Burger',
+        category: menuItem.category || MENU_CATEGORIES[0],
         image: menuItem.image || '',
-        isActive: menuItem.isActive !== false,
       });
       setSelectedIngredients(
         (menuItem.ingredients || [])
@@ -32,7 +34,7 @@ const MenuForm = ({ menuItem, onSubmit, onCancel, error }) => {
       );
       setImagePreview(getImageUrl(menuItem.image));
     } else {
-      setForm({ name: '', price: 0, description: '', category: 'Burger', image: '', isActive: true });
+      setForm(emptyForm);
       setSelectedIngredients([]);
       setImagePreview('');
     }
@@ -41,8 +43,8 @@ const MenuForm = ({ menuItem, onSubmit, onCancel, error }) => {
     setLocalError('');
   }, [menuItem]);
 
-  const handleImageChange = (e) => {
-    const file = e.target.files[0];
+  const handleImageChange = (event) => {
+    const file = event.target.files?.[0];
     if (!file) return;
 
     setImageFile(file);
@@ -51,26 +53,28 @@ const MenuForm = ({ menuItem, onSubmit, onCancel, error }) => {
     reader.readAsDataURL(file);
   };
 
-  const addRow = () => setSelectedIngredients([...selectedIngredients, { ingredient: '', quantity: 0 }]);
-  const removeRow = idx => setSelectedIngredients(selectedIngredients.filter((_, i) => i !== idx));
+  const addRow = () => setSelectedIngredients(current => [...current, { ingredient: '', quantity: 0 }]);
+  const removeRow = index => setSelectedIngredients(current => current.filter((_, itemIndex) => itemIndex !== index));
 
-  const handleIngredientChange = (idx, field, value) => {
-    const newArr = [...selectedIngredients];
-    newArr[idx] = { ...newArr[idx], [field]: value };
-    setSelectedIngredients(newArr);
+  const handleIngredientChange = (index, field, value) => {
+    setSelectedIngredients(current => {
+      const next = [...current];
+      next[index] = { ...next[index], [field]: value };
+      return next;
+    });
   };
 
-  const handleSubmit = async (e) => {
-    e.preventDefault();
+  const handleSubmit = async (event) => {
+    event.preventDefault();
     setLocalError('');
 
-    if (!form.name.trim()) return setLocalError('name: Ten mon la bat buoc');
-    if (!form.category.trim()) return setLocalError('category: Danh muc la bat buoc');
-    if (Number(form.price) < 0) return setLocalError('price: Gia ban phai >= 0');
+    if (!form.name.trim()) return setLocalError('name: Tên món là bắt buộc');
+    if (!form.category.trim()) return setLocalError('category: Danh mục là bắt buộc');
+    if (Number(form.price) < 0) return setLocalError('price: Giá bán phải >= 0');
 
     for (const ing of selectedIngredients) {
       if (!ing.ingredient || Number(ing.quantity) <= 0) {
-        return setLocalError('ingredients: Chon nguyen lieu va so luong > 0');
+        return setLocalError('ingredients: Chọn nguyên liệu và số lượng > 0');
       }
     }
 
@@ -79,8 +83,8 @@ const MenuForm = ({ menuItem, onSubmit, onCancel, error }) => {
       setUploading(true);
       try {
         imageUrl = await uploadService.uploadImage(imageFile);
-      } catch (error) {
-        setLocalError('image: Upload anh that bai: ' + (error.response?.data?.message || error.message));
+      } catch (uploadError) {
+        setLocalError('image: Upload ảnh thất bại: ' + (uploadError.response?.data?.message || uploadError.message));
         setUploading(false);
         return;
       }
@@ -99,63 +103,83 @@ const MenuForm = ({ menuItem, onSubmit, onCancel, error }) => {
   };
 
   return (
-    <div style={overlayStyle}>
-      <div style={modalStyle}>
-        <h3>{menuItem ? 'Sửa' : 'Thêm'} món</h3>
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/35 px-4 py-8">
+      <div className="max-h-[90vh] w-full max-w-3xl overflow-y-auto rounded-2xl bg-white p-6 shadow-2xl">
+        <div className="mb-5 flex items-start justify-between gap-4">
+          <div>
+            <h2 className="m-0 text-xl font-black text-gray-950">{menuItem ? 'Sửa món' : 'Thêm món mới'}</h2>
+            <p className="mt-1 text-sm font-medium text-gray-500">Nhập thông tin món, ảnh và công thức nguyên liệu.</p>
+          </div>
+          <button type="button" onClick={onCancel} className="rounded-lg bg-gray-100 px-3 py-2 text-sm font-black text-gray-600">
+            Đóng
+          </button>
+        </div>
+
         <ErrorBox message={localError || error} />
-        <form onSubmit={handleSubmit}>
-          <label>Tên món:</label>
-          <input value={form.name} onChange={e => setForm({ ...form, name: e.target.value })} style={inputStyle} />
 
-          <label>Giá:</label>
-          <input type="number" value={form.price} onChange={e => setForm({ ...form, price: e.target.value })} style={inputStyle} />
+        <form onSubmit={handleSubmit} className="mt-4 flex flex-col gap-5">
+          <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+            <Field label="Tên món">
+              <input value={form.name} onChange={event => setForm({ ...form, name: event.target.value })} className={inputClass} />
+            </Field>
+            <Field label="Giá bán">
+              <input type="number" min="0" value={form.price} onChange={event => setForm({ ...form, price: event.target.value })} className={inputClass} />
+            </Field>
+            <Field label="Danh mục">
+              <select value={form.category} onChange={event => setForm({ ...form, category: event.target.value })} className={inputClass}>
+                {MENU_CATEGORIES.map(category => <option key={category}>{category}</option>)}
+              </select>
+            </Field>
+            <Field label="Ảnh món ăn">
+              <input type="file" accept=".jpg,.jpeg,.png,.webp" onChange={handleImageChange} className={fileClass} />
+            </Field>
+          </div>
 
-          <label>Mô tả:</label>
-          <textarea value={form.description} onChange={e => setForm({ ...form, description: e.target.value })} style={inputStyle} />
+          <Field label="Mô tả">
+            <textarea value={form.description} onChange={event => setForm({ ...form, description: event.target.value })} className={`${inputClass} min-h-[90px] resize-none`} />
+          </Field>
 
-          <label>Danh mục:</label>
-          <select value={form.category} onChange={e => setForm({ ...form, category: e.target.value })} style={inputStyle}>
-            <option>Burger</option>
-            <option>Gà rán</option>
-            <option>Đồ uống</option>
-            <option>Combo</option>
-            <option>Tráng miệng</option>
-          </select>
+          {imagePreview && (
+            <div className="h-36 w-52 overflow-hidden rounded-xl bg-gray-100 ring-1 ring-gray-100">
+              <img src={imagePreview} alt="Preview" className="h-full w-full object-cover" />
+            </div>
+          )}
 
-          <label>Trạng thái:</label>
-          <select value={form.isActive ? 'active' : 'inactive'} onChange={e => setForm({ ...form, isActive: e.target.value === 'active' })} style={inputStyle}>
-            <option value="active">Còn hàng</option>
-            <option value="inactive">Hết hàng</option>
-          </select>
+          <div className="rounded-2xl border border-gray-100 bg-gray-50 p-4">
+            <div className="mb-3 flex items-center justify-between gap-3">
+              <h3 className="m-0 text-sm font-black text-gray-900">Nguyên liệu</h3>
+              <button type="button" onClick={addRow} className="rounded-xl bg-emerald-50 px-3 py-2 text-xs font-black text-emerald-700">
+                + Thêm nguyên liệu
+              </button>
+            </div>
 
-          <label>Ảnh món ăn:</label>
-          <input type="file" accept=".jpg,.jpeg,.png,.webp" onChange={handleImageChange} style={inputStyle} />
-          {imagePreview && <img src={imagePreview} alt="Preview" style={{ maxWidth: 200, display: 'block', marginTop: 5 }} />}
+            <div className="flex flex-col gap-3">
+              {selectedIngredients.length === 0 ? (
+                <div className="rounded-xl border border-dashed border-gray-200 bg-white px-4 py-5 text-center text-sm font-semibold text-gray-500">
+                  Chưa có nguyên liệu nào.
+                </div>
+              ) : selectedIngredients.map((ing, index) => (
+                <div key={index} className="grid grid-cols-1 gap-3 md:grid-cols-[1fr_130px_auto]">
+                  <select value={ing.ingredient} onChange={event => handleIngredientChange(index, 'ingredient', event.target.value)} className={inputClass}>
+                    <option value="">Chọn nguyên liệu</option>
+                    {ingredientsList.map(item => <option key={item._id} value={item._id}>{item.name} ({item.unit})</option>)}
+                  </select>
+                  <input type="number" min="0" step="any" placeholder="Số lượng" value={ing.quantity} onChange={event => handleIngredientChange(index, 'quantity', event.target.value)} className={inputClass} />
+                  <button type="button" onClick={() => removeRow(index)} className="rounded-xl bg-red-50 px-3 py-3 text-xs font-black text-red-600">
+                    Xóa
+                  </button>
+                </div>
+              ))}
+            </div>
+          </div>
 
-          <fieldset style={{ marginTop: 12 }}>
-            <legend>Nguyên liệu</legend>
-            {selectedIngredients.map((ing, idx) => (
-              <div key={idx} style={{ display: 'flex', gap: 8, marginBottom: 8 }}>
-                <select value={ing.ingredient} onChange={e => handleIngredientChange(idx, 'ingredient', e.target.value)} style={inputStyle}>
-                  <option value="">-- Chọn --</option>
-                  {ingredientsList.map(i => <option key={i._id} value={i._id}>{i.name} ({i.unit})</option>)}
-                </select>
-                <input
-                  type="number"
-                  placeholder="Số lượng"
-                  value={ing.quantity}
-                  onChange={e => handleIngredientChange(idx, 'quantity', e.target.value)}
-                  style={inputStyle}
-                />
-                <button type="button" onClick={() => removeRow(idx)}>Xóa</button>
-              </div>
-            ))}
-            <button type="button" onClick={addRow}>+ Thêm nguyên liệu</button>
-          </fieldset>
-
-          <div style={{ marginTop: 10 }}>
-            <button type="submit" disabled={uploading}>{uploading ? 'Đang upload ảnh...' : 'Lưu'}</button>
-            <button type="button" onClick={onCancel}>Hủy</button>
+          <div className="flex justify-end gap-3 border-t border-gray-100 pt-5">
+            <button type="button" onClick={onCancel} className="rounded-xl bg-gray-100 px-5 py-3 text-sm font-black text-gray-600">
+              Hủy
+            </button>
+            <button type="submit" disabled={uploading} className="rounded-xl bg-[#c70d1a] px-5 py-3 text-sm font-black text-white disabled:opacity-60">
+              {uploading ? 'Đang upload ảnh...' : 'Lưu món'}
+            </button>
           </div>
         </form>
       </div>
@@ -163,8 +187,14 @@ const MenuForm = ({ menuItem, onSubmit, onCancel, error }) => {
   );
 };
 
-const overlayStyle = { position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(0,0,0,0.5)', display: 'flex', justifyContent: 'center', alignItems: 'center', zIndex: 1000 };
-const modalStyle = { background: '#fff', padding: 20, borderRadius: 8, width: '80%', maxWidth: 600, maxHeight: '80vh', overflow: 'auto' };
-const inputStyle = { display: 'block', width: '100%', marginBottom: 8, padding: 8, border: '1px solid #ccc', borderRadius: 4 };
+const Field = ({ label, children }) => (
+  <label className="flex flex-col gap-1.5">
+    <span className="text-xs font-black uppercase tracking-wider text-gray-500">{label}</span>
+    {children}
+  </label>
+);
+
+const inputClass = 'w-full rounded-xl border border-gray-200 bg-white px-3 py-3 text-sm font-semibold text-gray-800 outline-none transition focus:border-[#c0392b] focus:ring-2 focus:ring-red-100';
+const fileClass = 'w-full rounded-xl border border-gray-200 bg-white px-3 py-2.5 text-sm font-semibold text-gray-700 file:mr-3 file:rounded-lg file:border-0 file:bg-red-50 file:px-3 file:py-2 file:text-xs file:font-black file:text-[#c70d1a]';
 
 export default MenuForm;

@@ -2,6 +2,8 @@ import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import shiftService from '../../services/shiftService';
 import userService from '../../services/userService';
 import { useAuth } from '../../contexts/AuthContext';
+import { PlusCircle } from 'lucide-react';
+import ConfirmDeleteModal from '../../components/ConfirmDeleteModal';
 
 const shiftSlots = [
   { id: 'morning', label: 'Ca Sáng', time: '08:00 - 13:00', color: 'bg-[#0089a8]', dot: 'bg-[#0089a8]' },
@@ -60,6 +62,7 @@ const ShiftManagementPage = () => {
   const [selectedShiftForAssign, setSelectedShiftForAssign] = useState(null);
   const [selectedShiftForSummary, setSelectedShiftForSummary] = useState(null);
   const [selectedStaffId, setSelectedStaffId] = useState('');
+  const [deleteModal, setDeleteModal] = useState({ isOpen: false, shift: null, loading: false });
 
   const fetchShifts = useCallback(async () => {
     setLoading(true);
@@ -169,14 +172,21 @@ const ShiftManagementPage = () => {
     }
   };
 
-  const handleDelete = async (shift) => {
-    if (!window.confirm(`Xóa ca "${shift.name}"?`)) return;
+  const handleDelete = (shift) => {
+    setDeleteModal({ isOpen: true, shift, loading: false });
+  };
+
+  const confirmDelete = async () => {
+    if (!deleteModal.shift) return;
 
     try {
-      await shiftService.deleteShift(shift._id);
+      setDeleteModal(current => ({ ...current, loading: true }));
+      await shiftService.deleteShift(deleteModal.shift._id);
+      setDeleteModal({ isOpen: false, shift: null, loading: false });
       fetchShifts();
     } catch (err) {
       setError(err.response?.data?.message || 'Không thể xóa ca');
+      setDeleteModal({ isOpen: false, shift: null, loading: false });
     }
   };
 
@@ -244,7 +254,7 @@ const ShiftManagementPage = () => {
               onClick={() => openCreateForm(new Date(), 'morning')}
               className="inline-flex items-center gap-2 rounded-xl bg-[#c70d1a] px-5 py-3 text-xs font-black text-white shadow-sm hover:bg-[#a90b16]"
             >
-              <span className="flex h-5 w-5 items-center justify-center rounded-full border border-white/70">+</span>
+              <PlusCircle size={17} />
               Thêm ca mới
             </button>
           )}
@@ -396,6 +406,15 @@ const ShiftManagementPage = () => {
           onClose={() => setSelectedShiftForSummary(null)}
         />
       )}
+
+      <ConfirmDeleteModal
+        isOpen={deleteModal.isOpen}
+        title="Xóa ca?"
+        message={`Bạn có chắc chắn muốn xóa "${deleteModal.shift?.name || 'ca này'}" khỏi hệ thống không?`}
+        loading={deleteModal.loading}
+        onCancel={() => setDeleteModal({ isOpen: false, shift: null, loading: false })}
+        onConfirm={confirmDelete}
+      />
     </div>
   );
 };

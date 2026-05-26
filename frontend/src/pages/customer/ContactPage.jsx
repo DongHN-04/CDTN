@@ -5,7 +5,7 @@ const contactCards = [
   {
     title: 'Hotline',
     subtitle: 'Hỗ trợ khách hàng 24/7',
-    value: '0338869004',
+    value: '0338869004 - 0386422292',
     icon: Phone,
     tone: 'bg-red-50 text-[#c0392b]',
   },

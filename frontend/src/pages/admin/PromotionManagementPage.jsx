@@ -3,6 +3,9 @@ import { ImagePlus, MoreVertical, Pencil, PlusCircle, Search, Trash2 } from 'luc
 import promotionService from '../../services/promotionService';
 import uploadService from '../../services/uploadService';
 import { getImageUrl } from '../../utils/imageUrl';
+import ConfirmDeleteModal from '../../components/ConfirmDeleteModal';
+
+const pageSize = 6;
 
 const initialForm = {
   name: '',
@@ -51,7 +54,7 @@ const getPromotionStatus = (promotion) => {
 const getDiscountText = (promotion) => {
   if (promotion.type === 'percent') return `Giảm ${promotion.value}%`;
   if (promotion.type === 'fixed') return `Giảm ${formatCurrency(promotion.value)}`;
-  return 'Mua món tặng món';
+  return 'Không hỗ trợ';
 };
 
 const PromotionManagementPage = () => {
@@ -66,6 +69,8 @@ const PromotionManagementPage = () => {
   const [banners, setBanners] = useState([defaultBanner]);
   const [activeBannerIndex, setActiveBannerIndex] = useState(0);
   const [uploadingBanner, setUploadingBanner] = useState(false);
+  const [deleteModal, setDeleteModal] = useState({ isOpen: false, type: '', target: null, loading: false });
+  const [currentPage, setCurrentPage] = useState(1);
   const bannerInputRef = useRef(null);
 
   const fetchPromotions = async () => {
@@ -129,15 +134,22 @@ const PromotionManagementPage = () => {
     setShowForm(true);
   };
 
-  const handleDelete = async (id) => {
-    if (!window.confirm('Bạn có chắc muốn xóa mã khuyến mãi này?')) return;
+  const handleDelete = (promotion) => {
+    setDeleteModal({ isOpen: true, type: 'promotion', target: promotion, loading: false });
+  };
+
+  const confirmDeletePromotion = async () => {
+    if (!deleteModal.target?._id) return;
 
     try {
-      await promotionService.deletePromotion(id);
-      setPromotions(current => current.filter(promotion => promotion._id !== id));
-      if (editingId === id) closeForm();
+      setDeleteModal(current => ({ ...current, loading: true }));
+      await promotionService.deletePromotion(deleteModal.target._id);
+      setPromotions(current => current.filter(promotion => promotion._id !== deleteModal.target._id));
+      if (editingId === deleteModal.target._id) closeForm();
+      setDeleteModal({ isOpen: false, type: '', target: null, loading: false });
     } catch (err) {
       setError(err.response?.data?.message || 'Không thể xóa khuyến mãi');
+      setDeleteModal({ isOpen: false, type: '', target: null, loading: false });
     }
   };
 
@@ -168,6 +180,20 @@ const PromotionManagementPage = () => {
       return matchesStatus && (!keyword || haystack.includes(keyword));
     });
   }, [promotions, search, statusFilter]);
+
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [search, statusFilter]);
+
+  const totalPages = Math.max(1, Math.ceil(filteredPromotions.length / pageSize));
+  const paginatedPromotions = useMemo(() => {
+    const startIndex = (currentPage - 1) * pageSize;
+    return filteredPromotions.slice(startIndex, startIndex + pageSize);
+  }, [filteredPromotions, currentPage]);
+
+  useEffect(() => {
+    if (currentPage > totalPages) setCurrentPage(totalPages);
+  }, [currentPage, totalPages]);
 
   const featuredPromotion = useMemo(() => {
     return promotions.find(promotion => getPromotionStatus(promotion).label === 'Đang chạy') || promotions[0];
@@ -206,21 +232,33 @@ const PromotionManagementPage = () => {
     }
   };
 
-  const handleDeleteBanner = async (index) => {
+  const handleDeleteBanner = (index) => {
     const targetBanner = banners[index];
     if (!targetBanner?._id) {
       // Nếu là default mock banner, không thể xóa khỏi DB
       return;
     }
 
-    if (!window.confirm('Bạn có chắc muốn xóa banner này?')) return;
+    setDeleteModal({ isOpen: true, type: 'banner', target: targetBanner, loading: false });
+  };
+
+  const confirmDeleteBanner = async () => {
+    if (!deleteModal.target?._id) return;
 
     try {
-      await promotionService.deleteBanner(targetBanner._id);
+      setDeleteModal(current => ({ ...current, loading: true }));
+      await promotionService.deleteBanner(deleteModal.target._id);
       await fetchBanners();
+      setDeleteModal({ isOpen: false, type: '', target: null, loading: false });
     } catch (err) {
       setError(err.response?.data?.message || 'Không thể xóa banner');
+      setDeleteModal({ isOpen: false, type: '', target: null, loading: false });
     }
+  };
+
+  const confirmDelete = () => {
+    if (deleteModal.type === 'banner') return confirmDeleteBanner();
+    return confirmDeletePromotion();
   };
 
   return (
@@ -259,8 +297,9 @@ const PromotionManagementPage = () => {
       )}
 
       {showForm && (
-        <div className="mb-10 rounded-2xl bg-white p-5 shadow-sm ring-1 ring-red-50">
-          <div className="mb-4 flex items-center justify-between">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/35 px-4 py-8">
+          <div className="max-h-[90vh] w-full max-w-3xl overflow-y-auto rounded-2xl bg-white p-6 shadow-2xl">
+          <div className="mb-5 flex items-start justify-between gap-4">
             <h2 className="m-0 text-lg font-black text-gray-900">{editingId ? 'Sửa khuyến mãi' : 'Tạo khuyến mãi mới'}</h2>
             <button onClick={closeForm} className="rounded-lg px-3 py-1.5 text-sm font-bold text-gray-500 hover:bg-gray-100">
               Đóng
@@ -275,7 +314,6 @@ const PromotionManagementPage = () => {
               <select value={form.type} onChange={event => setForm({ ...form, type: event.target.value })} className={inputClass}>
                 <option value="percent">Giảm theo phần trăm</option>
                 <option value="fixed">Giảm tiền trực tiếp</option>
-                <option value="buyXgetY">Mua món tặng món</option>
               </select>
             </Field>
             <Field label="Giá trị">
@@ -303,6 +341,7 @@ const PromotionManagementPage = () => {
               </button>
             </div>
           </form>
+          </div>
         </div>
       )}
 
@@ -405,18 +444,39 @@ const PromotionManagementPage = () => {
         ) : filteredPromotions.length === 0 ? (
           <div className="rounded-2xl bg-white p-8 text-center text-sm font-semibold text-gray-500">Chưa có mã giảm giá phù hợp.</div>
         ) : (
-          <div className="grid grid-cols-1 gap-5 md:grid-cols-2 xl:grid-cols-3">
-            {filteredPromotions.map(promotion => (
-              <PromotionCard
-                key={promotion._id}
-                promotion={promotion}
-                onEdit={() => handleEdit(promotion)}
-                onDelete={() => handleDelete(promotion._id)}
-              />
-            ))}
-          </div>
+          <>
+            <div className="grid grid-cols-1 gap-5 md:grid-cols-2 xl:grid-cols-3">
+              {paginatedPromotions.map(promotion => (
+                <PromotionCard
+                  key={promotion._id}
+                  promotion={promotion}
+                  onEdit={() => handleEdit(promotion)}
+                  onDelete={() => handleDelete(promotion)}
+                />
+              ))}
+            </div>
+            <PaginationFooter
+              currentPage={currentPage}
+              pageSize={pageSize}
+              totalItems={filteredPromotions.length}
+              totalPages={totalPages}
+              label="mã giảm giá"
+              onPageChange={setCurrentPage}
+            />
+          </>
         )}
       </section>
+
+      <ConfirmDeleteModal
+        isOpen={deleteModal.isOpen}
+        title={deleteModal.type === 'banner' ? 'Xóa banner?' : 'Xóa mã khuyến mãi?'}
+        message={deleteModal.type === 'banner'
+          ? 'Bạn có chắc chắn muốn xóa banner này khỏi hệ thống không?'
+          : `Bạn có chắc chắn muốn xóa "${deleteModal.target?.name || 'mã khuyến mãi này'}" khỏi hệ thống không?`}
+        loading={deleteModal.loading}
+        onCancel={() => setDeleteModal({ isOpen: false, type: '', target: null, loading: false })}
+        onConfirm={confirmDelete}
+      />
     </div>
   );
 };
@@ -481,6 +541,45 @@ const Field = ({ label, children }) => (
     <span className="mb-1.5 block text-xs font-black uppercase tracking-wider text-gray-500">{label}</span>
     {children}
   </label>
+);
+
+const PaginationFooter = ({ currentPage, pageSize, totalItems, totalPages, label, onPageChange }) => (
+  <div className="mt-6 flex items-center justify-between rounded-2xl bg-white px-5 py-4 text-xs font-bold text-gray-500 shadow-sm ring-1 ring-gray-100">
+    <span>
+      Hiển thị {totalItems ? (currentPage - 1) * pageSize + 1 : 0}
+      -{Math.min(currentPage * pageSize, totalItems)} của {totalItems} {label}
+    </span>
+    <div className="flex items-center gap-2">
+      <button
+        type="button"
+        disabled={currentPage === 1}
+        onClick={() => onPageChange(page => Math.max(1, page - 1))}
+        className="flex h-8 w-8 items-center justify-center rounded-full border border-gray-100 disabled:cursor-not-allowed disabled:opacity-40"
+      >
+        ‹
+      </button>
+      {Array.from({ length: totalPages }, (_, index) => index + 1).map(page => (
+        <button
+          key={page}
+          type="button"
+          onClick={() => onPageChange(page)}
+          className={`flex h-8 w-8 items-center justify-center rounded-full ${
+            currentPage === page ? 'bg-[#c70d1a] font-black text-white' : 'border border-gray-100 text-gray-600'
+          }`}
+        >
+          {page}
+        </button>
+      ))}
+      <button
+        type="button"
+        disabled={currentPage === totalPages}
+        onClick={() => onPageChange(page => Math.min(totalPages, page + 1))}
+        className="flex h-8 w-8 items-center justify-center rounded-full border border-gray-100 disabled:cursor-not-allowed disabled:opacity-40"
+      >
+        ›
+      </button>
+    </div>
+  </div>
 );
 
 export default PromotionManagementPage;

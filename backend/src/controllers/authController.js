@@ -10,6 +10,7 @@ const buildAuthResponse = (user) => ({
   role: user.role,
   phone: user.phone,
   address: user.address,
+  avatar: user.avatar,
   token: generateToken(user._id, user.role),
 });
 
@@ -52,7 +53,7 @@ const loginUser = asyncHandler(async (req, res) => {
   const { email, password } = req.body;
   const user = await User.findOne({ email });
 
-  if (!user || !(await user.matchPassword(password))) {
+  if (!user || user.isDeleted === true || !(await user.matchPassword(password))) {
     throw new ApiError(401, 'Email hoặc mật khẩu không đúng');
   }
 

@@ -92,7 +92,7 @@ const normalizePromotion = (body, errors, { partial = false } = {}) => {
 
   if (!partial || hasField(body, 'type')) {
     const type = trimString(body.type);
-    if (!['percent', 'fixed', 'buyXgetY'].includes(type)) {
+    if (!['percent', 'fixed'].includes(type)) {
       errors.push({ field: 'type', message: 'Loai khuyen mai khong hop le' });
     }
     payload.type = type;
@@ -189,17 +189,21 @@ const normalizeCustomer = (customer) => {
 };
 
 const validateOrderCreate = validateBody((body, errors) => {
-  const discount = normalizeNonNegativeNumber(errors, 'discount', body.discount || 0, 'Giam gia phai >= 0');
   const paymentMethod = trimString(body.paymentMethod || 'cash');
+  const promotionId = trimString(body.promotionId || '');
 
   if (!['cash', 'card', 'qr'].includes(paymentMethod)) {
     errors.push({ field: 'paymentMethod', message: 'Phuong thuc thanh toan khong hop le' });
   }
 
+  if (promotionId && !isObjectId(promotionId)) {
+    errors.push({ field: 'promotionId', message: 'Ma khuyen mai khong hop le' });
+  }
+
   return {
     customer: normalizeCustomer(body.customer),
     items: normalizeOrderItems(body.items, errors),
-    discount,
+    promotionId: promotionId || '',
     paymentMethod,
   };
 });
@@ -207,7 +211,7 @@ const validateOrderCreate = validateBody((body, errors) => {
 const validatePublicOrderCreate = validateBody((body, errors) => {
   const paymentMethod = trimString(body.paymentMethod || 'cash');
 
-  if (!['cash', 'vnpay', 'momo'].includes(paymentMethod)) {
+  if (!['cash', 'vnpay'].includes(paymentMethod)) {
     errors.push({ field: 'paymentMethod', message: 'Phuong thuc thanh toan khong hop le' });
   }
 

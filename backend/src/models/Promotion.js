@@ -16,7 +16,7 @@ const promotionSchema = new mongoose.Schema(
     },
     type: {
       type: String,
-      enum: ['percent', 'fixed', 'buyXgetY'],
+      enum: ['percent', 'fixed'],
       required: true,
     },
     value: {
@@ -52,6 +52,10 @@ const promotionSchema = new mongoose.Schema(
     isActive: {
       type: Boolean,
       default: true,
+    },
+    isDeleted: {
+      type: Boolean,
+      default: false,
     },
   },
   { timestamps: true }

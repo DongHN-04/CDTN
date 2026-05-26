@@ -3,7 +3,10 @@ import supplierService from '../../services/supplierService';
 import SupplierForm from '../../components/SupplierForm';
 import PurchaseForm from '../../components/PurchaseForm';
 import { formatApiError } from '../../utils/apiError';
+import { PlusCircle } from 'lucide-react';
+import ConfirmDeleteModal from '../../components/ConfirmDeleteModal';
 
+const pageSize = 5;
 const formatCurrency = (value = 0, compact = false) => {
   const number = Number(value || 0);
   if (compact && Math.abs(number) >= 1000000) {
@@ -24,6 +27,8 @@ const SupplierManagementPage = () => {
   const [pageError, setPageError] = useState('');
   const [search, setSearch] = useState('');
   const [debtFilter, setDebtFilter] = useState('all');
+  const [deleteModal, setDeleteModal] = useState({ isOpen: false, supplier: null, loading: false });
+  const [currentPage, setCurrentPage] = useState(1);
 
   useEffect(() => {
     fetchData();
@@ -58,14 +63,21 @@ const SupplierManagementPage = () => {
     setShowForm(true);
   };
 
-  const handleDelete = async (supplier) => {
-    if (!window.confirm(`Xóa nhà cung cấp "${supplier.name}"?`)) return;
+  const handleDelete = (supplier) => {
+    setDeleteModal({ isOpen: true, supplier, loading: false });
+  };
+
+  const confirmDelete = async () => {
+    if (!deleteModal.supplier) return;
 
     try {
-      await supplierService.deleteSupplier(supplier._id);
+      setDeleteModal(current => ({ ...current, loading: true }));
+      await supplierService.deleteSupplier(deleteModal.supplier._id);
+      setDeleteModal({ isOpen: false, supplier: null, loading: false });
       fetchData();
     } catch (error) {
       setPageError(formatApiError(error, 'Không thể xóa nhà cung cấp'));
+      setDeleteModal({ isOpen: false, supplier: null, loading: false });
     }
   };
 
@@ -121,6 +133,20 @@ const SupplierManagementPage = () => {
     });
   }, [suppliers, search, debtFilter]);
 
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [search, debtFilter]);
+
+  const totalPages = Math.max(1, Math.ceil(filteredSuppliers.length / pageSize));
+  const paginatedSuppliers = useMemo(() => {
+    const startIndex = (currentPage - 1) * pageSize;
+    return filteredSuppliers.slice(startIndex, startIndex + pageSize);
+  }, [filteredSuppliers, currentPage]);
+
+  useEffect(() => {
+    if (currentPage > totalPages) setCurrentPage(totalPages);
+  }, [currentPage, totalPages]);
+
   const stats = useMemo(() => {
     const totalDebt = suppliers.reduce((sum, supplier) => sum + Number(supplier.debt || 0), 0);
     const activeSupplierIds = new Set(purchases.map(purchase => purchase.supplier?._id || purchase.supplier).filter(Boolean));
@@ -165,16 +191,11 @@ const SupplierManagementPage = () => {
 
         <div className="flex flex-wrap gap-3">
           <button
-            onClick={() => setShowPurchaseForm(true)}
-            className="rounded-xl border border-red-100 bg-white px-4 py-3 text-xs font-black text-gray-700 shadow-sm hover:border-[#c70d1a]"
-          >
-            Xuất báo cáo
-          </button>
-          <button
             onClick={openCreate}
-            className="rounded-xl bg-[#c70d1a] px-5 py-3 text-xs font-black text-white shadow-sm hover:bg-[#a90b16]"
+            className="inline-flex h-11 items-center justify-center gap-2 rounded-xl bg-[#c20d1e] px-6 text-sm font-black text-white shadow-sm hover:bg-[#a80b19]"
           >
-            + Thêm đối tác
+            <PlusCircle size={17} />
+            Thêm đối tác
           </button>
         </div>
       </div>
@@ -236,11 +257,11 @@ const SupplierManagementPage = () => {
                   <td colSpan="7" className="px-4 py-10 text-center text-sm font-bold text-gray-500">Không có nhà cung cấp phù hợp.</td>
                 </tr>
               ) : (
-                filteredSuppliers.map((supplier, index) => (
+                paginatedSuppliers.map((supplier, index) => (
                   <SupplierRow
                     key={supplier._id}
                     supplier={supplier}
-                    index={index}
+                    index={(currentPage - 1) * pageSize + index}
                     onEdit={() => openEdit(supplier)}
                     onDelete={() => handleDelete(supplier)}
                     onPayDebt={() => setPayingSupplier(supplier)}
@@ -250,6 +271,14 @@ const SupplierManagementPage = () => {
             </tbody>
           </table>
         </div>
+        <PaginationFooter
+          currentPage={currentPage}
+          pageSize={pageSize}
+          totalItems={filteredSuppliers.length}
+          totalPages={totalPages}
+          label="nhà cung cấp"
+          onPageChange={setCurrentPage}
+        />
       </div>
 
       <div className="grid grid-cols-1 gap-7 lg:grid-cols-2">
@@ -317,6 +346,15 @@ const SupplierManagementPage = () => {
           onClose={() => setPayingSupplier(null)}
         />
       )}
+
+      <ConfirmDeleteModal
+        isOpen={deleteModal.isOpen}
+        title="Xóa nhà cung cấp?"
+        message={`Bạn có chắc chắn muốn xóa "${deleteModal.supplier?.name || 'nhà cung cấp này'}" khỏi hệ thống không?`}
+        loading={deleteModal.loading}
+        onCancel={() => setDeleteModal({ isOpen: false, supplier: null, loading: false })}
+        onConfirm={confirmDelete}
+      />
     </div>
   );
 };
@@ -384,6 +422,45 @@ const PayDebtModal = ({ supplier, onConfirm, onClose }) => (
         <button onClick={onClose} className="rounded-xl bg-gray-100 px-5 py-3 text-sm font-black text-gray-600">Hủy</button>
         <button onClick={onConfirm} className="rounded-xl bg-[#c70d1a] px-5 py-3 text-sm font-black text-white">Xác nhận</button>
       </div>
+    </div>
+  </div>
+);
+
+const PaginationFooter = ({ currentPage, pageSize, totalItems, totalPages, label, onPageChange }) => (
+  <div className="flex items-center justify-between border-t border-gray-50 px-4 py-4 text-xs font-bold text-gray-500">
+    <span>
+      Hiển thị {totalItems ? (currentPage - 1) * pageSize + 1 : 0}
+      -{Math.min(currentPage * pageSize, totalItems)} của {totalItems} {label}
+    </span>
+    <div className="flex items-center gap-2">
+      <button
+        type="button"
+        disabled={currentPage === 1}
+        onClick={() => onPageChange(page => Math.max(1, page - 1))}
+        className="flex h-8 w-8 items-center justify-center rounded-full border border-gray-100 disabled:cursor-not-allowed disabled:opacity-40"
+      >
+        ‹
+      </button>
+      {Array.from({ length: totalPages }, (_, index) => index + 1).map(page => (
+        <button
+          key={page}
+          type="button"
+          onClick={() => onPageChange(page)}
+          className={`flex h-8 w-8 items-center justify-center rounded-full ${
+            currentPage === page ? 'bg-[#c70d1a] font-black text-white' : 'border border-gray-100 text-gray-600'
+          }`}
+        >
+          {page}
+        </button>
+      ))}
+      <button
+        type="button"
+        disabled={currentPage === totalPages}
+        onClick={() => onPageChange(page => Math.min(totalPages, page + 1))}
+        className="flex h-8 w-8 items-center justify-center rounded-full border border-gray-100 disabled:cursor-not-allowed disabled:opacity-40"
+      >
+        ›
+      </button>
     </div>
   </div>
 );

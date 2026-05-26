@@ -6,7 +6,9 @@ const customerSchema = new mongoose.Schema(
     phone: { type: String, default: '' },
     email: { type: String, default: '' },
     type: { type: String, enum: ['VIP', 'Thường'], default: 'Thường' },
-    notes: { type: String, default: '' }
+    notes: { type: String, default: '' },
+    isActive: { type: Boolean, default: true },
+    isDeleted: { type: Boolean, default: false }
   },
   { timestamps: true }
 );

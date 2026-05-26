@@ -8,7 +8,9 @@ const supplierSchema = new mongoose.Schema(
     email: { type: String, default: '' },
     address: { type: String, default: '' },
     debt: { type: Number, default: 0 }, // Công nợ hiện tại (số tiền còn nợ supplier)
-    notes: { type: String, default: '' }
+    notes: { type: String, default: '' },
+    isActive: { type: Boolean, default: true },
+    isDeleted: { type: Boolean, default: false }
   },
   { timestamps: true }
 );

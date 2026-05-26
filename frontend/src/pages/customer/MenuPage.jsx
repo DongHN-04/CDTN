@@ -1,8 +1,9 @@
-import React, { useState, useEffect } from 'react';
+import React, { useMemo, useState, useEffect } from 'react';
 import { useCart } from '../../contexts/CartContext';
 import publicService from '../../services/publicService';
 import { useLocation } from 'react-router-dom';
 import { getImageUrl } from '../../utils/imageUrl';
+import { ALL_MENU_CATEGORY, COMBO_CATEGORY, MENU_CATEGORIES, normalizeCategory } from '../../constants/menuCategories';
 
 // Định nghĩa defaultImages
 const defaultImages = {
@@ -16,15 +17,6 @@ const defaultImages = {
 
 const formatPrice = (val) => val.toLocaleString('vi-VN') + 'đ';
 
-// Định nghĩa cấu trúc danh mục UI
-const categoriesUI = [
-  { id: 'all', label: 'Tất cả' },
-  { id: 'burger', label: 'Burger', dbCats: ['Burger'] },
-  { id: 'garan', label: 'Gà rán', dbCats: ['Gà Rán'] },
-  { id: 'ankem', label: 'Món ăn kèm', dbCats: ['Pizza', 'Khai Vị', 'Tráng Miệng', 'Combo'] },
-  { id: 'douong', label: 'Đồ uống', dbCats: ['Đồ Uống'] }
-];
-
 const MenuPage = () => {
   const [menuItems, setMenuItems] = useState([]);
   const [selectedCatIds, setSelectedCatIds] = useState(['all']);
@@ -32,29 +24,53 @@ const MenuPage = () => {
   const [sortBy, setSortBy] = useState('popular');
   const [minPriceInput, setMinPriceInput] = useState('0');
   const [maxPriceInput, setMaxPriceInput] = useState('500.000');
-  const [onlyAvailable, setOnlyAvailable] = useState(true);
+  const [onlyAvailable, setOnlyAvailable] = useState(false);
   const [toast, setToast] = useState({ show: false, message: '' });
 
-  const { addItem } = useCart();
+  const { addItem, addCombo } = useCart();
   const location = useLocation();
 
   useEffect(() => {
-    publicService.getMenu().then(data => {
-      setMenuItems(data || []);
+    Promise.all([
+      publicService.getMenu(),
+      publicService.getCombos(),
+    ]).then(([menuData, comboData]) => {
+      const normalizedMenu = (menuData || []).map(item => ({ ...item, type: 'item' }));
+      const normalizedCombos = (comboData || []).map(combo => ({
+        ...combo,
+        type: 'combo',
+        category: COMBO_CATEGORY,
+        description: combo.description || 'Combo tiết kiệm',
+      }));
+      setMenuItems([...normalizedMenu, ...normalizedCombos]);
     });
   }, []);
+
+  const categoriesUI = useMemo(() => {
+    const liveCategories = menuItems.map(item => item.category).filter(Boolean);
+    const categories = Array.from(new Set([...MENU_CATEGORIES, COMBO_CATEGORY, ...liveCategories]));
+
+    return [
+      { id: 'all', label: ALL_MENU_CATEGORY },
+      ...categories.map(category => ({
+        id: category,
+        label: category,
+        value: category,
+      })),
+    ];
+  }, [menuItems]);
 
   // Nếu URL có category, lọc sẵn
   useEffect(() => {
     const params = new URLSearchParams(location.search);
     const cat = params.get('category');
     if (cat) {
-      const foundUI = categoriesUI.find(ui => ui.dbCats?.includes(cat));
+      const foundUI = categoriesUI.find(ui => normalizeCategory(ui.value || ui.label) === normalizeCategory(cat));
       if (foundUI) {
         setSelectedCatIds([foundUI.id]);
       }
     }
-  }, [location]);
+  }, [location, categoriesUI]);
 
   const handleCategoryToggle = (id) => {
     if (id === 'all') {
@@ -95,7 +111,11 @@ const MenuPage = () => {
   };
 
   const handleAddToCart = (item) => {
-    addItem(item, 1);
+    if (item.type === 'combo') {
+      addCombo(item, 1);
+    } else {
+      addItem(item, 1);
+    }
     setToast({ show: true, message: `Đã thêm "${item.name}" vào giỏ hàng!` });
     setTimeout(() => {
       setToast({ show: false, message: '' });
@@ -113,14 +133,11 @@ const MenuPage = () => {
       badge = 'MỚI';
     }
 
-    let status = 'ĐANG BÁN';
-    if (item.name === 'Burger Phô Mai Đôi' || item.name === 'Bánh Flan Trứng') {
-      status = 'HẾT HÀNG';
-    }
+    const status = item.isAvailable === false ? 'HẾT HÀNG' : 'ĐANG BÁN';
 
     // Chuẩn hóa URL ảnh để tránh phụ thuộc cứng vào localhost.
-    const resolvedImage = item.image 
-      ? getImageUrl(item.image, defaultImages[item.category] || '/images/home/product-burger.png') 
+    const resolvedImage = item.image
+      ? getImageUrl(item.image, defaultImages[item.category] || '/images/home/product-burger.png')
       : defaultImages[item.category] || '/images/home/product-burger.png';
 
     return {
@@ -140,8 +157,8 @@ const MenuPage = () => {
       matchCategory = true;
     } else {
       const activeCats = categoriesUI.filter(ui => selectedCatIds.includes(ui.id));
-      const allowedDbCats = activeCats.flatMap(ui => ui.dbCats || []);
-      matchCategory = allowedDbCats.includes(item.category);
+      const allowedCategories = activeCats.map(ui => normalizeCategory(ui.value || ui.label));
+      matchCategory = allowedCategories.includes(normalizeCategory(item.category));
     }
 
     // 3. Lọc khoảng giá
@@ -295,8 +312,8 @@ const MenuPage = () => {
           {sortedMenu.length === 0 ? (
             <div className="bg-white rounded-3xl border border-gray-100 p-12 text-center shadow-sm">
               <span className="text-5xl block mb-4">🍔</span>
-              <h3 className="text-[18px] font-black text-gray-800 mb-1">Không tìm thấy món ăn nào</h3>
-              <p className="text-gray-400 text-sm">Vui lòng điều chỉnh lại bộ lọc hoặc từ khóa tìm kiếm</p>
+              <h3 className="text-[18px] font-black text-gray-800 mb-1">Chưa có sản phẩm nào</h3>
+              <p className="text-gray-400 text-sm">Danh mục hoặc bộ lọc này hiện chưa có món phù hợp.</p>
             </div>
           ) : (
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">

@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React from 'react';
 import { Outlet, Link, useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
 
@@ -7,20 +7,18 @@ const AdminLayout = () => {
   const navigate = useNavigate();
   const location = useLocation();
 
-  const [showNotifications, setShowNotifications] = useState(false);
+  const initials = (user?.name || 'SD')
+    .trim()
+    .split(/\s+/)
+    .map(part => part[0])
+    .slice(-2)
+    .join('')
+    .toUpperCase();
 
   const handleLogout = () => {
     logout();
     navigate('/login');
   };
-
-  // Dữ liệu thông báo mẫu
-  const notifications = [
-    { id: 1, text: 'Có đơn hàng mới #SD-8493 cần xác nhận', time: '5 phút trước', isRead: false },
-    { id: 2, text: 'Kho hàng sắp hết: Gà rán giòn (còn 5 phần)', time: '1 giờ trước', isRead: false },
-    { id: 3, text: 'Khách hàng Nguyễn Văn A vừa đăng ký thành viên', time: '3 giờ trước', isRead: true },
-    { id: 4, text: 'Báo cáo doanh thu ngày 23/05 đã sẵn sàng', time: '1 ngày trước', isRead: true },
-  ];
 
   const menuItems = [
     { label: 'Tổng quan', path: '/admin/dashboard', roles: ['admin', 'staff'], iconSrc: '/images/ICON/ICDashboard.png' },
@@ -50,11 +48,17 @@ const AdminLayout = () => {
 
         <div className="flex items-center gap-3 px-5 pb-5">
           <div className="w-[45px] h-[45px] rounded-lg bg-gray-800 overflow-hidden shrink-0">
-            <img
-              src="https://i.pravatar.cc/150?img=11"
-              alt="Avatar"
-              className="w-full h-full object-cover"
-            />
+            {user?.avatar ? (
+              <img
+                src={user.avatar}
+                alt={user?.name || 'Avatar'}
+                className="w-full h-full object-cover"
+              />
+            ) : (
+              <div className="grid h-full w-full place-items-center text-sm font-black text-white">
+                {initials}
+              </div>
+            )}
           </div>
           <div>
             <p className="m-0 font-bold text-[15px] text-gray-900">{user?.role === 'admin' ? 'Quản lý' : 'Nhân viên'}</p>
@@ -99,52 +103,9 @@ const AdminLayout = () => {
 
           <div className="flex items-center gap-5">
             <div className="flex items-center gap-4 pl-5 border-l border-gray-200">
-              {/* Nút thông báo */}
-              <div className="relative">
-                <button
-                  className="bg-transparent border-none p-1 cursor-pointer flex items-center justify-center hover:bg-gray-100 rounded-full transition-colors"
-                  title="Thông báo"
-                  onClick={() => setShowNotifications(!showNotifications)}
-                >
-                  <img src="/images/ICON/ICnotice.png" alt="Notice" className="w-6 h-6 object-contain opacity-70" />
-                  <span className="absolute -top-1 -right-1 bg-red-500 text-white text-[10px] font-bold w-4 h-4 rounded-full flex items-center justify-center border-2 border-white">
-                    2
-                  </span>
-                </button>
-
-                {/* Dropdown Thông báo */}
-                {showNotifications && (
-                  <div className="absolute top-12 -right-4 w-80 bg-white rounded-lg shadow-xl border border-gray-100 z-50 flex flex-col overflow-hidden">
-                    <div className="flex justify-between items-center p-3 px-4 border-b border-gray-100 bg-gray-50/50">
-                      <h4 className="m-0 text-[15px] font-bold text-gray-800">Thông báo mới</h4>
-                      <span className="text-xs text-blue-500 cursor-pointer hover:underline font-medium">Đánh dấu đã đọc</span>
-                    </div>
-                    <ul className="list-none p-0 m-0 max-h-80 overflow-y-auto">
-                      {notifications.map(notif => (
-                        <li
-                          key={notif.id}
-                          className={`p-3 px-4 border-b border-gray-50 cursor-pointer transition-colors hover:bg-gray-50 ${
-                            notif.isRead ? 'bg-white' : 'bg-blue-50/30'
-                          }`}
-                        >
-                          <p className={`m-0 mb-1 text-[13px] text-gray-700 ${notif.isRead ? 'font-normal' : 'font-semibold'}`}>
-                            {notif.text}
-                          </p>
-                          <span className="text-[11px] text-gray-400">{notif.time}</span>
-                        </li>
-                      ))}
-                    </ul>
-                    <div className="p-2.5 text-center text-[13px] text-gray-600 font-semibold cursor-pointer border-t border-gray-100 bg-gray-50 hover:bg-gray-100 transition-colors">
-                      Xem tất cả thông báo
-                    </div>
-                  </div>
-                )}
-              </div>
-
               {/* Nút Cài đặt */}
               <button
                 onClick={() => {
-                  setShowNotifications(false);
                   navigate('/admin/profile');
                 }}
                 className="bg-transparent border-none p-1 cursor-pointer flex items-center justify-center hover:bg-gray-100 rounded-full transition-colors"
