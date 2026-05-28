@@ -45,12 +45,12 @@ const getPercentChange = (current, previous) => {
 };
 
 const buildOrderFilter = (start, end) => ({
-  status: { $in: ['confirmed', 'delivering', 'completed'] },
+  status: 'completed',
   paymentStatus: 'paid',
-  createdAt: {
-    $gte: start,
-    $lte: end,
-  },
+  $or: [
+    { completedAt: { $gte: start, $lte: end } },
+    { completedAt: { $exists: false }, createdAt: { $gte: start, $lte: end } },
+  ],
 });
 
 const getTopItems = async (matchFilter) => Order.aggregate([
@@ -104,7 +104,7 @@ const getTopItems = async (matchFilter) => Order.aggregate([
       name: {
         $ifNull: [
           '$menuItem.name',
-          { $ifNull: ['$combo.name', { $ifNull: ['$itemName', 'Mon da xoa'] }] },
+          { $ifNull: ['$combo.name', { $ifNull: ['$itemName', 'Món đã xóa'] }] },
         ],
       },
       totalQuantity: 1,
@@ -194,7 +194,7 @@ const getReports = async (req, res) => {
           _id: {
             $dateToString: {
               format: '%Y-%m-%d',
-              date: '$createdAt',
+              date: { $ifNull: ['$completedAt', '$createdAt'] },
               timezone: REPORT_TIMEZONE,
             },
           },
@@ -235,7 +235,7 @@ const getReports = async (req, res) => {
     });
   } catch (error) {
     console.error('Loi bao cao:', error);
-    res.status(500).json({ message: 'Loi server khi lay bao cao' });
+    res.status(500).json({ message: 'Lỗi server khi lấy báo cáo' });
   }
 };
 

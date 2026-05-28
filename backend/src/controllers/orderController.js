@@ -3,6 +3,7 @@ const MenuItem = require('../models/MenuItem');
 const Ingredient = require('../models/Ingredient');
 const Combo = require('../models/Combo');
 const Promotion = require('../models/Promotion');
+const Shift = require('../models/Shift');
 const { runWithOptionalTransaction } = require('../utils/transaction');
 
 const PAYMENT_RESERVATION_MINUTES = Number(process.env.PAYMENT_RESERVATION_MINUTES || 30);
@@ -21,6 +22,25 @@ const buildInventoryRequirementSnapshot = (requirements = []) => requirements.ma
   unit: requirement.unit || '',
   requiredQty: requirement.requiredQty,
 }));
+
+const getActiveShiftForUser = async (userId, at = new Date(), session = null) => {
+  if (!userId) return null;
+  return Shift.findOne({
+    staff: userId,
+    status: 'open',
+    isDeleted: { $ne: true },
+    startTime: { $lte: at },
+    endTime: { $gte: at },
+  }).session(session);
+};
+
+const requireActiveShiftForUser = async (user, session = null) => {
+  const activeShift = await getActiveShiftForUser(user?._id, new Date(), session);
+  if (!activeShift) {
+    throw new Error('Bạn không nằm trong ca đang mở nên không thể xử lý đơn hàng');
+  }
+  return activeShift;
+};
 
 const addIngredientRequirement = (requirements, ingredientDoc, quantity) => {
   if (!ingredientDoc || quantity <= 0) return;
@@ -50,16 +70,16 @@ const collectOrderDetails = async (items, session = null, options = {}) => {
   for (const item of items) {
     if (item.comboId) {
       const combo = await Combo.findById(item.comboId).populate('items.menuItem').session(session);
-      if (!combo) throw new Error(`Combo khong ton tai: ${item.comboId}`);
+      if (!combo) throw new Error(`Combo không tồn tại: ${item.comboId}`);
       if (!allowUnavailable && (combo.isActive === false || combo.isDeleted === true)) throw new Error(`Combo da ngung ban: ${combo.name}`);
 
       for (const comboItem of combo.items) {
         if (!comboItem.menuItem) {
-          throw new Error(`Combo ${combo.name} co mon khong ton tai`);
+          throw new Error(`Combo ${combo.name} có món không tồn tại`);
         }
 
         const menuItem = await MenuItem.findById(comboItem.menuItem._id).populate('ingredients.ingredient').session(session);
-        if (!menuItem) throw new Error(`Mon trong combo khong ton tai: ${comboItem.menuItem._id}`);
+        if (!menuItem) throw new Error(`Món trong combo không tồn tại: ${comboItem.menuItem._id}`);
         if (!allowUnavailable && (menuItem.isActive === false || menuItem.isDeleted === true)) {
           throw new Error(`Mon trong combo da ngung ban: ${menuItem.name}`);
         }
@@ -84,7 +104,7 @@ const collectOrderDetails = async (items, session = null, options = {}) => {
 
     if (item.menuItem) {
       const menuItem = await MenuItem.findById(item.menuItem).populate('ingredients.ingredient').session(session);
-      if (!menuItem) throw new Error(`Mon an khong ton tai: ${item.menuItem}`);
+      if (!menuItem) throw new Error(`Món ăn không tồn tại: ${item.menuItem}`);
       if (!allowUnavailable && (menuItem.isActive === false || menuItem.isDeleted === true)) {
         throw new Error(`Mon an da ngung ban: ${menuItem.name}`);
       }
@@ -105,7 +125,7 @@ const collectOrderDetails = async (items, session = null, options = {}) => {
       continue;
     }
 
-    throw new Error('Item khong hop le: thieu menuItem hoac comboId');
+    throw new Error('Dòng hàng không hợp lệ: thiếu món hoặc combo');
   }
 
   return {
@@ -120,16 +140,16 @@ const checkAndDecreaseStock = async (requirements, session = null) => {
   for (const requirement of requirements) {
     const ingredient = await Ingredient.findById(requirement.ingredientId).session(session);
     if (!ingredient) {
-      throw new Error(`Nguyen lieu khong ton tai: ${requirement.ingredientId}`);
+      throw new Error(`Nguyên liệu không tồn tại: ${requirement.ingredientId}`);
     }
 
     if (ingredient.isActive === false || ingredient.isDeleted === true) {
-      throw new Error(`Nguyen lieu ${ingredient.name} da ngung su dung`);
+      throw new Error(`Nguyên liệu ${ingredient.name} da ngung su dung`);
     }
 
     if (ingredient.stock < requirement.requiredQty) {
       throw new Error(
-        `Nguyen lieu ${ingredient.name} khong du. Can ${requirement.requiredQty} ${ingredient.unit}, hien co ${ingredient.stock}`
+        `Nguyên liệu ${ingredient.name} không đủ. Cần ${requirement.requiredQty} ${ingredient.unit}, hiện có ${ingredient.stock}`
       );
     }
 
@@ -140,7 +160,7 @@ const checkAndDecreaseStock = async (requirements, session = null) => {
     );
 
     if (result.modifiedCount !== 1) {
-      throw new Error(`Nguyen lieu ${ingredient.name} khong du de tru kho`);
+      throw new Error(`Nguyên liệu ${ingredient.name} không đủ de tru kho`);
     }
   }
 };
@@ -149,16 +169,16 @@ const checkStockAvailability = async (requirements, session = null) => {
   for (const requirement of requirements) {
     const ingredient = await Ingredient.findById(requirement.ingredientId).session(session);
     if (!ingredient) {
-      throw new Error(`Nguyen lieu khong ton tai: ${requirement.ingredientId}`);
+      throw new Error(`Nguyên liệu không tồn tại: ${requirement.ingredientId}`);
     }
 
     if (ingredient.isActive === false || ingredient.isDeleted === true) {
-      throw new Error(`Nguyen lieu ${ingredient.name} da ngung su dung`);
+      throw new Error(`Nguyên liệu ${ingredient.name} da ngung su dung`);
     }
 
     if (ingredient.stock < requirement.requiredQty) {
       throw new Error(
-        `Nguyen lieu ${ingredient.name} khong du. Can ${requirement.requiredQty} ${ingredient.unit}, hien co ${ingredient.stock}`
+        `Nguyên liệu ${ingredient.name} không đủ. Cần ${requirement.requiredQty} ${ingredient.unit}, hiện có ${ingredient.stock}`
       );
     }
   }
@@ -221,7 +241,7 @@ const getPromotionDiscount = async (subtotal, promotionId, session = null) => {
   }).session(session);
 
   if (!promotion) {
-    throw new Error('Khuyen mai khong hop le hoac khong ap dung duoc cho don hang nay');
+    throw new Error('Khuyến mãi không hợp lệ hoặc không áp dụng được cho đơn hàng này');
   }
 
   return Math.min(calculatePromotionDiscount(promotion, subtotal), subtotal);
@@ -238,16 +258,26 @@ const releaseReservedStockForOrder = async (order, session = null) => {
   })).filter(requirement => requirement.ingredientId && requirement.requiredQty > 0);
 
   if (requirements.length === 0) {
-    const items = order.items.map((item) => ({
-      menuItem: item.menuItem,
-      comboId: item.comboId,
-      quantity: item.quantity,
-    }));
-    const details = await collectOrderDetails(items, session, { allowUnavailable: true });
-    requirements = details.requirements;
+    try {
+      const items = order.items.map((item) => ({
+        menuItem: item.menuItem,
+        comboId: item.comboId,
+        quantity: item.quantity,
+      }));
+      const details = await collectOrderDetails(items, session, { allowUnavailable: true });
+      requirements = details.requirements;
+    } catch (error) {
+      console.warn(
+        `Không thể dựng lại yêu cầu hoàn kho cho đơn ${order._id}; có thể món/combo đã bị xóa:`,
+        error.message
+      );
+      requirements = [];
+    }
   }
 
-  await restoreStock(requirements, session);
+  if (requirements.length > 0) {
+    await restoreStock(requirements, session);
+  }
 
   order.inventoryDeducted = false;
 };
@@ -285,18 +315,37 @@ const releaseExpiredPaymentReservations = async () => {
         await order.save({ session });
       });
     } catch (error) {
-      console.warn(`Khong the tu dong hoan kho don thanh toan qua han ${staleOrder._id}:`, error.message);
+      console.warn(`Không thể tự động hoàn kho đơn thanh toán quá hạn ${staleOrder._id}:`, error.message);
     }
   }
 };
 
-// @desc    Tao don hang moi
+const getAllowedNextStatuses = (order) => {
+  if (!order) return [];
+  if (order.status === 'pending') return ['confirmed', 'cancelled'];
+  if (order.status === 'confirmed') {
+    return order.isCustomerOrder ? ['delivering', 'cancelled'] : ['completed', 'cancelled'];
+  }
+  if (order.status === 'delivering') return ['completed', 'cancelled'];
+  return [];
+};
+
+// @desc    Tạo đơn hàng mới
 // @route   POST /api/orders
 // @access  Private (Admin, Staff)
+const buildOrderDateRange = (startDate, endDate) => {
+  const start = startDate ? new Date(startDate) : new Date();
+  const end = endDate ? new Date(endDate) : new Date(start);
+  start.setHours(0, 0, 0, 0);
+  end.setHours(23, 59, 59, 999);
+  return { start, end };
+};
+
 const createOrder = async (req, res) => {
   try {
     const createdOrderId = await runWithOptionalTransaction(async (session) => {
       const { customer, items, promotionId, paymentMethod } = req.body;
+      await requireActiveShiftForUser(req.user, session);
       const staff = req.user._id;
 
       const { subtotal, orderItems, requirements } = await collectOrderDetails(items, session);
@@ -318,6 +367,7 @@ const createOrder = async (req, res) => {
         paymentStatus: 'paid',
         inventoryDeducted: true,
         status: 'completed',
+        completedAt: new Date(),
       }], { session });
 
       return order._id;
@@ -329,7 +379,7 @@ const createOrder = async (req, res) => {
 
     res.status(201).json(populatedOrder);
   } catch (error) {
-    console.error('Loi tao don:', error.message);
+    console.error('Lỗi tạo đơn:', error.message);
     res.status(400).json({ message: error.message });
   }
 };
@@ -342,22 +392,16 @@ const getOrders = async (req, res) => {
     await releaseExpiredPaymentReservations();
 
     const { startDate, endDate } = req.query;
-    const filter = {};
-    if (startDate && endDate) {
-      const start = new Date(startDate);
-      start.setHours(0, 0, 0, 0);
-      const end = new Date(endDate);
-      end.setHours(23, 59, 59, 999);
-      filter.createdAt = { $gte: start, $lte: end };
-    }
+    const { start, end } = buildOrderDateRange(startDate, endDate);
+    const filter = { createdAt: { $gte: start, $lte: end } };
     const orders = await Order.find(filter)
       .populate('staff', 'name')
       .populate('items.menuItem', 'name price')
       .sort('-createdAt');
     res.json(orders);
   } catch (error) {
-    console.error('Loi lay danh sach don hang:', error);
-    res.status(500).json({ message: 'Loi server' });
+    console.error('Lỗi lấy danh sách đơn hàng:', error);
+    res.status(500).json({ message: 'Lỗi server' });
   }
 };
 
@@ -369,15 +413,15 @@ const getOrderById = async (req, res) => {
     const order = await Order.findById(req.params.id)
       .populate('staff', 'name')
       .populate('items.menuItem', 'name price');
-    if (!order) return res.status(404).json({ message: 'Khong tim thay hoa don' });
+    if (!order) return res.status(404).json({ message: 'Không tìm thấy hóa đơn' });
     res.json(order);
   } catch (error) {
-    console.error('Loi lay danh sach don hang dang cho:', error);
-    res.status(500).json({ message: 'Loi server' });
+    console.error('Lỗi lấy danh sách đơn hàng đang chờ:', error);
+    res.status(500).json({ message: 'Lỗi server' });
   }
 };
 
-// @desc    Lay danh sach don hang tu khach dang cho xac nhan
+// @desc    Lấy danh sách đơn hàng từ khách đang chờ xác nhận
 // @route   GET /api/orders/pending
 // @access  Private (Admin, Staff)
 const getPendingOrders = async (req, res) => {
@@ -389,7 +433,7 @@ const getPendingOrders = async (req, res) => {
       .sort('-createdAt');
     res.json(orders);
   } catch (error) {
-    res.status(500).json({ message: 'Loi server' });
+    res.status(500).json({ message: 'Lỗi server' });
   }
 };
 
@@ -397,7 +441,7 @@ const preparePendingOrder = async (order, user, session = null) => {
   if (order.status !== 'pending') return;
 
   if (order.paymentMethod === 'qr' && order.paymentStatus !== 'paid') {
-    throw new Error('Don hang QR chua thanh toan thanh cong');
+    throw new Error('Đơn hàng QR chưa thanh toán thành công');
   }
 
   if (!order.inventoryDeducted) {
@@ -416,16 +460,17 @@ const preparePendingOrder = async (order, user, session = null) => {
   order.staffSnapshot = buildStaffSnapshot(user);
 };
 
-// @desc    Xac nhan don hang tu khach va tru kho
+// @desc    Xác nhận đơn hàng từ khách và trừ kho
 // @route   PUT /api/orders/:id/confirm
 // @access  Private (Admin, Staff)
 const confirmOrder = async (req, res) => {
   try {
     const confirmedOrderId = await runWithOptionalTransaction(async (session) => {
+      await requireActiveShiftForUser(req.user, session);
       const order = await Order.findById(req.params.id).session(session);
-      if (!order) throw new Error('Khong tim thay don hang');
+      if (!order) throw new Error('Không tìm thấy đơn hàng');
       if (order.status !== 'pending') {
-        throw new Error('Don hang khong o trang thai cho xac nhan');
+        throw new Error('Đơn hàng không ở trạng thái chờ xác nhận');
       }
 
       await preparePendingOrder(order, req.user, session);
@@ -444,7 +489,7 @@ const confirmOrder = async (req, res) => {
   }
 };
 
-// @desc    Cap nhat trang thai don hang
+// @desc    Cập nhật trạng thái đơn hàng
 // @route   PUT /api/orders/:id/status
 // @access  Private (Admin, Staff)
 const updateOrderStatus = async (req, res) => {
@@ -453,23 +498,29 @@ const updateOrderStatus = async (req, res) => {
     const { status } = req.body;
 
     if (!allowedStatuses.includes(status)) {
-      return res.status(400).json({ message: 'Trang thai don hang khong hop le' });
+      return res.status(400).json({ message: 'Trạng thái đơn hàng không hợp lệ' });
     }
 
     const updatedOrderId = await runWithOptionalTransaction(async (session) => {
+      await requireActiveShiftForUser(req.user, session);
       const order = await Order.findById(req.params.id).session(session);
-      if (!order) throw new Error('Khong tim thay don hang');
+      if (!order) throw new Error('Không tìm thấy đơn hàng');
       if (order.status === 'cancelled' || order.status === 'completed') {
-        throw new Error('Don hang da ket thuc, khong the cap nhat');
+        throw new Error('Đơn hàng đã kết thúc, không thể cập nhật');
       }
 
       if (status === 'pending') {
-        throw new Error('Khong the dua don hang ve trang thai cho xac nhan');
+        throw new Error('Không thể đưa đơn hàng về trạng thái chờ xác nhận');
+      }
+
+      const allowedNextStatuses = getAllowedNextStatuses(order);
+      if (!allowedNextStatuses.includes(status)) {
+        throw new Error(`Không thể chuyển đơn hàng từ ${order.status} sang ${status}`);
       }
 
       if (status === 'cancelled') {
         if (order.paymentMethod === 'qr' && order.paymentStatus === 'paid') {
-          throw new Error('Don hang VNPay da thanh toan can xu ly hoan tien truoc khi huy');
+          throw new Error('Đơn hàng VNPay đã thanh toán cần xử lý hoàn tiền trước khi hủy');
         }
 
         if (order.inventoryDeducted) {
@@ -484,12 +535,15 @@ const updateOrderStatus = async (req, res) => {
         await preparePendingOrder(order, req.user, session);
       }
 
-      if (!order.staff || !order.staffSnapshot?.name) {
+      if (!order.staff || !order.staffSnapshot?.name || status === 'completed') {
         order.staff = req.user._id;
         order.staffSnapshot = buildStaffSnapshot(req.user);
       }
 
       order.status = status;
+      if (status === 'completed') {
+        order.completedAt = new Date();
+      }
       if (status === 'completed' && (order.paymentMethod === 'cash' || order.paymentMethod === 'card')) {
         order.paymentStatus = 'paid';
       }

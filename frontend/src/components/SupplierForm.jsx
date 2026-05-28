@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { ErrorBox } from '../utils/apiError';
+import { useToast } from '../contexts/ToastContext';
 
 const emptyForm = {
   name: '',
@@ -9,10 +9,12 @@ const emptyForm = {
   address: '',
   notes: '',
 };
+const phonePattern = /^(0|\+84)[0-9]{9,10}$/;
+const emailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
-const SupplierForm = ({ supplier, onSubmit, onCancel, error }) => {
+const SupplierForm = ({ supplier, onSubmit, onCancel }) => {
+  const { showToast } = useToast();
   const [form, setForm] = useState(emptyForm);
-  const [localError, setLocalError] = useState('');
 
   useEffect(() => {
     setForm(supplier ? {
@@ -23,15 +25,15 @@ const SupplierForm = ({ supplier, onSubmit, onCancel, error }) => {
       address: supplier.address || '',
       notes: supplier.notes || '',
     } : emptyForm);
-    setLocalError('');
   }, [supplier]);
 
   const handleChange = event => setForm({ ...form, [event.target.name]: event.target.value });
 
   const handleSubmit = event => {
     event.preventDefault();
-    setLocalError('');
-    if (!form.name.trim()) return setLocalError('name: Tên nhà cung cấp là bắt buộc');
+    if (!form.name.trim()) return showToast('Tên nhà cung cấp là bắt buộc', 'error');
+    if (form.phone.trim() && !phonePattern.test(form.phone.trim().replace(/\s/g, ''))) return showToast('Số điện thoại không hợp lệ', 'error');
+    if (form.email.trim() && !emailPattern.test(form.email.trim())) return showToast('Email không hợp lệ', 'error');
     onSubmit(form);
   };
 
@@ -47,8 +49,6 @@ const SupplierForm = ({ supplier, onSubmit, onCancel, error }) => {
             Đóng
           </button>
         </div>
-
-        <ErrorBox message={localError || error} />
 
         <form onSubmit={handleSubmit} className="mt-4 grid grid-cols-1 gap-4 md:grid-cols-2">
           <Field label="Tên nhà cung cấp">

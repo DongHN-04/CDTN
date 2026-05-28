@@ -17,9 +17,36 @@ const buildAuthResponse = (user) => ({
 const registerUser = asyncHandler(async (req, res) => {
   const { name, email, password, phone, address } = req.body;
 
-  const userExists = await User.findOne({ email });
-  if (userExists) {
-    throw new ApiError(409, 'Email đã tồn tại');
+  const existingUserByEmail = await User.findOne({ email });
+  if (existingUserByEmail) {
+    throw new ApiError(409, 'Email đã tồn tại trong hệ thống');
+  }
+
+  if (phone) {
+    const existingUserByPhone = await User.findOne({ phone });
+    if (existingUserByPhone) {
+      throw new ApiError(409, 'Số điện thoại đã tồn tại trong hệ thống');
+    }
+  }
+
+  const customerLookup = [];
+  if (email) customerLookup.push({ email });
+  if (phone) customerLookup.push({ phone });
+
+  // Đăng ký khách hàng mới phải dùng email/phone chưa tồn tại trong toàn hệ thống,
+  // tránh tạo tài khoản mới gắn vào hồ sơ khách hàng cũ và làm sai thống kê khách hàng.
+  const existingCustomer = customerLookup.length
+    ? await Customer.find({ isDeleted: { $ne: true }, $or: customerLookup })
+    : [];
+  const duplicatedCustomer = existingCustomer[0];
+  if (duplicatedCustomer) {
+    if (duplicatedCustomer.email?.toLowerCase() === email) {
+      throw new ApiError(409, 'Email đã thuộc về khách hàng khác');
+    }
+    if (phone && duplicatedCustomer.phone === phone) {
+      throw new ApiError(409, 'Số điện thoại đã thuộc về khách hàng khác');
+    }
+    throw new ApiError(409, 'Thông tin đăng ký đã tồn tại trong hệ thống');
   }
 
   const user = await User.create({
@@ -31,20 +58,13 @@ const registerUser = asyncHandler(async (req, res) => {
     role: 'customer',
   });
 
-  const customer = await Customer.findOne({ email });
-  if (customer) {
-    customer.name = name || customer.name;
-    customer.phone = phone || customer.phone;
-    await customer.save();
-  } else {
-    await Customer.create({
-      name,
-      email,
-      phone: phone || '',
-      type: 'Thường',
-      notes: '',
-    });
-  }
+  await Customer.create({
+    name,
+    email,
+    phone: phone || '',
+    type: 'Thường',
+    notes: '',
+  });
 
   res.status(201).json(buildAuthResponse(user));
 });

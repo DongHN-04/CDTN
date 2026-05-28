@@ -5,16 +5,29 @@ const isPlainObject = (value) => value && typeof value === 'object' && !Array.is
 const trimString = (value) => (typeof value === 'string' ? value.trim() : value);
 const isNonEmptyString = (value) => typeof value === 'string' && value.trim().length > 0;
 const isEmail = (value) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(String(value || '').trim());
+const isPhone = (value) => /^(0|\+84)[0-9]{9,10}$/.test(String(value || '').replace(/\s/g, ''));
+const isImagePath = (value) => {
+  const text = String(value || '').trim();
+  return /^(https?:\/\/|\/uploads\/|uploads\/|\/images\/|images\/).+\.(jpe?g|png|webp)(\?.*)?$/i.test(text);
+};
 const toNumber = (value) => (value === '' || value === null || value === undefined ? NaN : Number(value));
 const isObjectId = (value) => mongoose.Types.ObjectId.isValid(String(value || ''));
 const hasField = (body, field) => Object.prototype.hasOwnProperty.call(body, field);
+
+const LIMITS = {
+  money: 100_000_000,
+  quantity: 100_000,
+  text: 255,
+  description: 1000,
+  notes: 1000,
+};
 
 const validateBody = (schema) => (req, res, next) => {
   const errors = [];
   const sanitized = schema(req.body || {}, errors);
 
   if (errors.length > 0) {
-    return next(new ApiError(400, 'Du lieu khong hop le', errors));
+    return next(new ApiError(400, 'Dữ liệu không hợp lệ', errors));
   }
 
   req.body = sanitized;
@@ -25,17 +38,29 @@ const requireNonEmpty = (errors, field, value, message) => {
   if (!isNonEmptyString(value)) errors.push({ field, message });
 };
 
-const normalizeNonNegativeNumber = (errors, field, value, message, { integer = false } = {}) => {
+const validateTextLength = (errors, field, value, max = LIMITS.text) => {
+  if (typeof value === 'string' && value.length > max) {
+    errors.push({ field, message: `Không được vượt quá ${max} ký tự` });
+  }
+};
+
+const validateOptionalPhone = (errors, field, value) => {
+  if (isNonEmptyString(value) && !isPhone(value)) {
+    errors.push({ field, message: 'Số điện thoại không hợp lệ' });
+  }
+};
+
+const normalizeNonNegativeNumber = (errors, field, value, message, { integer = false, max } = {}) => {
   const number = toNumber(value);
-  if (!Number.isFinite(number) || number < 0 || (integer && !Number.isInteger(number))) {
+  if (!Number.isFinite(number) || number < 0 || (integer && !Number.isInteger(number)) || (max !== undefined && number > max)) {
     errors.push({ field, message });
   }
   return number;
 };
 
-const normalizePositiveNumber = (errors, field, value, message, { integer = false } = {}) => {
+const normalizePositiveNumber = (errors, field, value, message, { integer = false, max } = {}) => {
   const number = toNumber(value);
-  if (!Number.isFinite(number) || number <= 0 || (integer && !Number.isInteger(number))) {
+  if (!Number.isFinite(number) || number <= 0 || (integer && !Number.isInteger(number)) || (max !== undefined && number > max)) {
     errors.push({ field, message });
   }
   return number;
@@ -60,10 +85,13 @@ const validateAuthRegister = validateBody((body, errors) => {
   const phone = trimString(body.phone || '');
   const address = trimString(body.address || '');
 
-  requireNonEmpty(errors, 'name', name, 'Ten la bat buoc');
-  if (!isEmail(email)) errors.push({ field: 'email', message: 'Email khong hop le' });
-  if (typeof password !== 'string' || password.length < 6) {
-    errors.push({ field: 'password', message: 'Mat khau phai co it nhat 6 ky tu' });
+  requireNonEmpty(errors, 'name', name, 'Tên là bắt buộc');
+  validateTextLength(errors, 'name', name);
+  if (!isEmail(email)) errors.push({ field: 'email', message: 'Email không hợp lệ' });
+  validateOptionalPhone(errors, 'phone', phone);
+  validateTextLength(errors, 'address', address, LIMITS.description);
+  if (typeof password !== 'string' || password.length < 8 || !/[A-Za-z]/.test(password) || !/[0-9]/.test(password)) {
+    errors.push({ field: 'password', message: 'Mật khẩu phải có ít nhất 8 ký tự, gồm chữ và số' });
   }
 
   return { name, email, password, phone, address };
@@ -73,8 +101,8 @@ const validateAuthLogin = validateBody((body, errors) => {
   const email = trimString(body.email)?.toLowerCase();
   const password = body.password;
 
-  if (!isEmail(email)) errors.push({ field: 'email', message: 'Email khong hop le' });
-  requireNonEmpty(errors, 'password', password, 'Mat khau la bat buoc');
+  if (!isEmail(email)) errors.push({ field: 'email', message: 'Email không hợp lệ' });
+  requireNonEmpty(errors, 'password', password, 'Mật khẩu là bắt buộc');
 
   return { email, password };
 });
@@ -84,24 +112,29 @@ const normalizePromotion = (body, errors, { partial = false } = {}) => {
 
   if (!partial || hasField(body, 'name')) {
     const name = trimString(body.name);
-    requireNonEmpty(errors, 'name', name, 'Ten khuyen mai la bat buoc');
+    requireNonEmpty(errors, 'name', name, 'Tên khuyến mãi là bắt buộc');
+    validateTextLength(errors, 'name', name, 120);
     payload.name = name;
   }
 
-  if (hasField(body, 'description')) payload.description = trimString(body.description || '');
+  if (hasField(body, 'description')) {
+    payload.description = trimString(body.description || '');
+    validateTextLength(errors, 'description', payload.description, 500);
+  }
 
   if (!partial || hasField(body, 'type')) {
     const type = trimString(body.type);
     if (!['percent', 'fixed'].includes(type)) {
-      errors.push({ field: 'type', message: 'Loai khuyen mai khong hop le' });
+      errors.push({ field: 'type', message: 'Loại khuyến mãi không hợp lệ' });
     }
     payload.type = type;
   }
 
   if (!partial || hasField(body, 'value')) {
-    const value = normalizeNonNegativeNumber(errors, 'value', body.value, 'Gia tri giam phai >= 0');
-    if ((body.type || payload.type) === 'percent' && value > 100) {
-      errors.push({ field: 'value', message: 'Giam phan tram khong duoc vuot qua 100' });
+    const type = body.type || payload.type;
+    const value = normalizePositiveNumber(errors, 'value', body.value, 'Giá trị giảm phải > 0', { max: LIMITS.money });
+    if (type === 'percent' && value > 100) {
+      errors.push({ field: 'value', message: 'Giảm phần trăm phải từ 1 đến 100' });
     }
     payload.value = value;
   }
@@ -111,24 +144,29 @@ const normalizePromotion = (body, errors, { partial = false } = {}) => {
       errors,
       'minOrderValue',
       body.minOrderValue || 0,
-      'Gia tri don toi thieu phai >= 0'
+      'Giá trị đơn tối thiểu phải >= 0 và không vượt quá 100.000.000',
+      { max: LIMITS.money }
     );
   }
 
   if (!partial || hasField(body, 'startDate')) {
     const startDate = new Date(body.startDate);
-    if (Number.isNaN(startDate.getTime())) errors.push({ field: 'startDate', message: 'Ngay bat dau khong hop le' });
+    if (Number.isNaN(startDate.getTime())) errors.push({ field: 'startDate', message: 'Ngày bắt đầu không hợp lệ' });
     payload.startDate = startOfDay(startDate);
   }
 
   if (!partial || hasField(body, 'endDate')) {
     const endDate = new Date(body.endDate);
-    if (Number.isNaN(endDate.getTime())) errors.push({ field: 'endDate', message: 'Ngay ket thuc khong hop le' });
+    if (Number.isNaN(endDate.getTime())) errors.push({ field: 'endDate', message: 'Ngày kết thúc không hợp lệ' });
     payload.endDate = endOfDay(endDate);
   }
 
   if (payload.startDate && payload.endDate && payload.endDate < payload.startDate) {
-    errors.push({ field: 'endDate', message: 'Ngay ket thuc phai sau ngay bat dau' });
+    errors.push({ field: 'endDate', message: 'Ngày kết thúc phải sau ngày bắt đầu' });
+  }
+
+  if (!partial && payload.endDate && payload.endDate < startOfDay(new Date())) {
+    errors.push({ field: 'endDate', message: 'Ngày kết thúc không được ở quá khứ' });
   }
 
   if (hasField(body, 'isActive')) payload.isActive = Boolean(body.isActive);
@@ -141,7 +179,7 @@ const validatePromotionUpdate = validateBody((body, errors) => normalizePromotio
 
 const normalizeOrderItems = (items, errors) => {
   if (!Array.isArray(items) || items.length === 0) {
-    errors.push({ field: 'items', message: 'Don hang phai co it nhat 1 mon' });
+    errors.push({ field: 'items', message: 'Đơn hàng phải có ít nhất 1 món' });
     return [];
   }
 
@@ -150,22 +188,22 @@ const normalizeOrderItems = (items, errors) => {
       errors,
       `items.${index}.quantity`,
       item.quantity,
-      'So luong phai la so nguyen duong',
-      { integer: true }
+      'Số lượng phải là số nguyên dương',
+      { integer: true, max: LIMITS.quantity }
     );
     const hasMenuItem = isNonEmptyString(item.menuItem);
     const hasCombo = isNonEmptyString(item.comboId);
 
     if (hasMenuItem === hasCombo) {
-      errors.push({ field: `items.${index}`, message: 'Moi dong chi duoc chon mon le hoac combo' });
+      errors.push({ field: `items.${index}`, message: 'Mỗi dòng chỉ được chọn món lẻ hoặc combo' });
     }
 
     if (hasMenuItem && !isObjectId(item.menuItem)) {
-      errors.push({ field: `items.${index}.menuItem`, message: 'Ma mon khong hop le' });
+      errors.push({ field: `items.${index}.menuItem`, message: 'Mã món không hợp lệ' });
     }
 
     if (hasCombo && !isObjectId(item.comboId)) {
-      errors.push({ field: `items.${index}.comboId`, message: 'Ma combo khong hop le' });
+      errors.push({ field: `items.${index}.comboId`, message: 'Mã combo không hợp lệ' });
     }
 
     return {
@@ -176,16 +214,38 @@ const normalizeOrderItems = (items, errors) => {
   });
 };
 
-const normalizeCustomer = (customer) => {
+const normalizeCustomer = (customer, errors = [], { deliveryRequired = false } = {}) => {
   if (!isPlainObject(customer)) {
-    return { name: 'Khach le', phone: '', address: '' };
+    if (deliveryRequired) {
+      errors.push({ field: 'customer', message: 'Thông tin người nhận là bắt buộc' });
+    }
+    return { name: 'Khách lẻ', phone: '', email: '', address: '' };
   }
 
-  return {
-    name: trimString(customer.name || 'Khach le'),
+  const payload = {
+    name: trimString(customer.name || (deliveryRequired ? '' : 'Khách lẻ')),
     phone: trimString(customer.phone || ''),
+    email: trimString(customer.email || '').toLowerCase(),
     address: trimString(customer.address || ''),
   };
+
+  if (deliveryRequired) {
+    requireNonEmpty(errors, 'customer.name', payload.name, 'Tên người nhận là bắt buộc');
+    requireNonEmpty(errors, 'customer.phone', payload.phone, 'Số điện thoại là bắt buộc');
+    requireNonEmpty(errors, 'customer.address', payload.address, 'Địa chỉ giao hàng là bắt buộc');
+
+    const normalizedPhone = payload.phone.replace(/\s/g, '');
+    if (payload.phone && !isPhone(normalizedPhone)) {
+      errors.push({ field: 'customer.phone', message: 'Số điện thoại không hợp lệ' });
+    }
+    if (payload.email && !isEmail(payload.email)) {
+      errors.push({ field: 'customer.email', message: 'Email không hợp lệ' });
+    }
+    validateTextLength(errors, 'customer.name', payload.name);
+    validateTextLength(errors, 'customer.address', payload.address, LIMITS.description);
+  }
+
+  return payload;
 };
 
 const validateOrderCreate = validateBody((body, errors) => {
@@ -193,15 +253,15 @@ const validateOrderCreate = validateBody((body, errors) => {
   const promotionId = trimString(body.promotionId || '');
 
   if (!['cash', 'card', 'qr'].includes(paymentMethod)) {
-    errors.push({ field: 'paymentMethod', message: 'Phuong thuc thanh toan khong hop le' });
+    errors.push({ field: 'paymentMethod', message: 'Phương thức thanh toán không hợp lệ' });
   }
 
   if (promotionId && !isObjectId(promotionId)) {
-    errors.push({ field: 'promotionId', message: 'Ma khuyen mai khong hop le' });
+    errors.push({ field: 'promotionId', message: 'Mã khuyến mãi không hợp lệ' });
   }
 
   return {
-    customer: normalizeCustomer(body.customer),
+    customer: normalizeCustomer(body.customer, errors),
     items: normalizeOrderItems(body.items, errors),
     promotionId: promotionId || '',
     paymentMethod,
@@ -212,11 +272,11 @@ const validatePublicOrderCreate = validateBody((body, errors) => {
   const paymentMethod = trimString(body.paymentMethod || 'cash');
 
   if (!['cash', 'vnpay'].includes(paymentMethod)) {
-    errors.push({ field: 'paymentMethod', message: 'Phuong thuc thanh toan khong hop le' });
+    errors.push({ field: 'paymentMethod', message: 'Phương thức thanh toán không hợp lệ' });
   }
 
   return {
-    customer: normalizeCustomer(body.customer),
+    customer: normalizeCustomer(body.customer, errors, { deliveryRequired: true }),
     items: normalizeOrderItems(body.items, errors),
     tableNumber: trimString(body.tableNumber || ''),
     notes: trimString(body.notes || ''),
@@ -230,22 +290,24 @@ const normalizeIngredient = (body, errors, { partial = false } = {}) => {
 
   if (!partial || hasField(body, 'name')) {
     const name = trimString(body.name);
-    requireNonEmpty(errors, 'name', name, 'Ten nguyen lieu la bat buoc');
+    requireNonEmpty(errors, 'name', name, 'Tên nguyên liệu là bắt buộc');
+    validateTextLength(errors, 'name', name);
     payload.name = name;
   }
 
   if (!partial || hasField(body, 'stock')) {
-    payload.stock = normalizeNonNegativeNumber(errors, 'stock', body.stock, 'Ton kho phai >= 0');
+    payload.stock = normalizeNonNegativeNumber(errors, 'stock', body.stock, 'Tồn kho phải >= 0 và không vượt quá 100.000', { max: LIMITS.quantity });
   }
 
   if (!partial || hasField(body, 'unit')) {
     const unit = trimString(body.unit);
-    requireNonEmpty(errors, 'unit', unit, 'Don vi tinh la bat buoc');
+    requireNonEmpty(errors, 'unit', unit, 'Đơn vị tính là bắt buộc');
+    validateTextLength(errors, 'unit', unit, 50);
     payload.unit = unit;
   }
 
   if (hasField(body, 'pricePerUnit') || !partial) {
-    payload.pricePerUnit = normalizeNonNegativeNumber(errors, 'pricePerUnit', body.pricePerUnit || 0, 'Gia nhap phai >= 0');
+    payload.pricePerUnit = normalizePositiveNumber(errors, 'pricePerUnit', body.pricePerUnit || 0, 'Giá nhập phải > 0 và không vượt quá 100.000.000', { max: LIMITS.money });
   }
 
   return payload;
@@ -259,12 +321,12 @@ const normalizeMenuIngredients = (items, errors) => {
 
   return items.map((item, index) => {
     if (!isObjectId(item.ingredient)) {
-      errors.push({ field: `ingredients.${index}.ingredient`, message: 'Ma nguyen lieu khong hop le' });
+      errors.push({ field: `ingredients.${index}.ingredient`, message: 'Mã nguyên liệu không hợp lệ' });
     }
 
     return {
       ingredient: item.ingredient,
-      quantity: normalizePositiveNumber(errors, `ingredients.${index}.quantity`, item.quantity, 'Dinh luong phai > 0'),
+      quantity: normalizePositiveNumber(errors, `ingredients.${index}.quantity`, item.quantity, 'Định lượng phải > 0 và không vượt quá 100.000', { max: LIMITS.quantity }),
     };
   });
 };
@@ -274,26 +336,36 @@ const normalizeMenuItem = (body, errors, { partial = false } = {}) => {
 
   if (!partial || hasField(body, 'name')) {
     const name = trimString(body.name);
-    requireNonEmpty(errors, 'name', name, 'Ten mon la bat buoc');
+    requireNonEmpty(errors, 'name', name, 'Tên món là bắt buộc');
+    validateTextLength(errors, 'name', name);
     payload.name = name;
   }
 
   if (!partial || hasField(body, 'price')) {
-    payload.price = normalizeNonNegativeNumber(errors, 'price', body.price, 'Gia ban phai >= 0');
+    payload.price = normalizePositiveNumber(errors, 'price', body.price, 'Giá bán phải > 0 và không vượt quá 100.000.000', { max: LIMITS.money });
   }
 
-  if (hasField(body, 'description')) payload.description = trimString(body.description || '');
+  if (hasField(body, 'description')) {
+    payload.description = trimString(body.description || '');
+    validateTextLength(errors, 'description', payload.description, LIMITS.description);
+  }
 
   if (!partial || hasField(body, 'category')) {
     const category = trimString(body.category);
-    requireNonEmpty(errors, 'category', category, 'Danh muc la bat buoc');
+    requireNonEmpty(errors, 'category', category, 'Danh mục là bắt buộc');
+    validateTextLength(errors, 'category', category, 80);
     payload.category = category;
   }
 
-  if (hasField(body, 'image')) payload.image = trimString(body.image || '');
+  if (hasField(body, 'image')) {
+    payload.image = trimString(body.image || '');
+    if (payload.image && !isImagePath(payload.image)) {
+      errors.push({ field: 'image', message: 'Ảnh món ăn phải là JPG, PNG hoặc WEBP hợp lệ' });
+    }
+  }
   if (hasField(body, 'isActive')) payload.isActive = Boolean(body.isActive);
   if (hasField(body, 'soldCount')) {
-    payload.soldCount = normalizeNonNegativeNumber(errors, 'soldCount', body.soldCount || 0, 'So luong da ban phai >= 0', { integer: true });
+    payload.soldCount = normalizeNonNegativeNumber(errors, 'soldCount', body.soldCount || 0, 'Số lượng đã bán phải >= 0 và không vượt quá 100.000', { integer: true, max: LIMITS.quantity });
   }
   if (hasField(body, 'ingredients')) payload.ingredients = normalizeMenuIngredients(body.ingredients, errors);
 
@@ -308,24 +380,31 @@ const normalizeCustomerRecord = (body, errors, { partial = false } = {}) => {
 
   if (!partial || hasField(body, 'name')) {
     const name = trimString(body.name);
-    requireNonEmpty(errors, 'name', name, 'Ten khach hang la bat buoc');
+    requireNonEmpty(errors, 'name', name, 'Tên khách hàng là bắt buộc');
+    validateTextLength(errors, 'name', name);
     payload.name = name;
   }
 
-  if (hasField(body, 'phone')) payload.phone = trimString(body.phone || '');
+  if (hasField(body, 'phone')) {
+    payload.phone = trimString(body.phone || '');
+    validateOptionalPhone(errors, 'phone', payload.phone);
+  }
   if (hasField(body, 'email')) {
     const email = trimString(body.email || '');
-    if (email && !isEmail(email)) errors.push({ field: 'email', message: 'Email khong hop le' });
+    if (email && !isEmail(email)) errors.push({ field: 'email', message: 'Email không hợp lệ' });
     payload.email = email;
   }
   if (hasField(body, 'type')) {
     const type = trimString(body.type);
-    if (!['VIP', 'Regular', 'Thuong', 'Thường'].includes(type)) {
-      errors.push({ field: 'type', message: 'Loai khach hang khong hop le' });
+    if (!['VIP', 'Regular', 'Thường'].includes(type)) {
+      errors.push({ field: 'type', message: 'Loại khách hàng không hợp lệ' });
     }
     payload.type = type === 'VIP' ? 'VIP' : 'Thường';
   }
-  if (hasField(body, 'notes')) payload.notes = trimString(body.notes || '');
+  if (hasField(body, 'notes')) {
+    payload.notes = trimString(body.notes || '');
+    validateTextLength(errors, 'notes', payload.notes, LIMITS.notes);
+  }
 
   return payload;
 };
@@ -335,18 +414,18 @@ const validateCustomerUpdate = validateBody((body, errors) => normalizeCustomerR
 
 const normalizeComboItems = (items, errors) => {
   if (!Array.isArray(items) || items.length === 0) {
-    errors.push({ field: 'items', message: 'Combo phai co it nhat 1 mon' });
+    errors.push({ field: 'items', message: 'Combo phải có ít nhất 1 món' });
     return [];
   }
 
   return items.map((item, index) => {
     if (!isObjectId(item.menuItem)) {
-      errors.push({ field: `items.${index}.menuItem`, message: 'Ma mon khong hop le' });
+      errors.push({ field: `items.${index}.menuItem`, message: 'Mã món không hợp lệ' });
     }
 
     return {
       menuItem: item.menuItem,
-      quantity: normalizePositiveNumber(errors, `items.${index}.quantity`, item.quantity || 1, 'So luong phai > 0', { integer: true }),
+      quantity: normalizePositiveNumber(errors, `items.${index}.quantity`, item.quantity || 1, 'Số lượng phải > 0 và không vượt quá 100.000', { integer: true, max: LIMITS.quantity }),
     };
   });
 };
@@ -356,13 +435,22 @@ const normalizeCombo = (body, errors, { partial = false } = {}) => {
 
   if (!partial || hasField(body, 'name')) {
     const name = trimString(body.name);
-    requireNonEmpty(errors, 'name', name, 'Ten combo la bat buoc');
+    requireNonEmpty(errors, 'name', name, 'Tên combo là bắt buộc');
+    validateTextLength(errors, 'name', name);
     payload.name = name;
   }
-  if (hasField(body, 'description')) payload.description = trimString(body.description || '');
+  if (hasField(body, 'description')) {
+    payload.description = trimString(body.description || '');
+    validateTextLength(errors, 'description', payload.description, LIMITS.description);
+  }
   if (!partial || hasField(body, 'items')) payload.items = normalizeComboItems(body.items, errors);
-  if (!partial || hasField(body, 'price')) payload.price = normalizeNonNegativeNumber(errors, 'price', body.price, 'Gia combo phai >= 0');
-  if (hasField(body, 'image')) payload.image = trimString(body.image || '');
+  if (!partial || hasField(body, 'price')) payload.price = normalizePositiveNumber(errors, 'price', body.price, 'Giá combo phải > 0 và không vượt quá 100.000.000', { max: LIMITS.money });
+  if (hasField(body, 'image')) {
+    payload.image = trimString(body.image || '');
+    if (payload.image && !isImagePath(payload.image)) {
+      errors.push({ field: 'image', message: 'Ảnh combo phải là JPG, PNG hoặc WEBP hợp lệ' });
+    }
+  }
   if (hasField(body, 'isActive')) payload.isActive = Boolean(body.isActive);
 
   return payload;
@@ -376,19 +464,32 @@ const normalizeSupplier = (body, errors, { partial = false } = {}) => {
 
   if (!partial || hasField(body, 'name')) {
     const name = trimString(body.name);
-    requireNonEmpty(errors, 'name', name, 'Ten nha cung cap la bat buoc');
+    requireNonEmpty(errors, 'name', name, 'Tên nhà cung cấp là bắt buộc');
+    validateTextLength(errors, 'name', name);
     payload.name = name;
   }
-  if (hasField(body, 'contactPerson')) payload.contactPerson = trimString(body.contactPerson || '');
-  if (hasField(body, 'phone')) payload.phone = trimString(body.phone || '');
+  if (hasField(body, 'contactPerson')) {
+    payload.contactPerson = trimString(body.contactPerson || '');
+    validateTextLength(errors, 'contactPerson', payload.contactPerson);
+  }
+  if (hasField(body, 'phone')) {
+    payload.phone = trimString(body.phone || '');
+    validateOptionalPhone(errors, 'phone', payload.phone);
+  }
   if (hasField(body, 'email')) {
     const email = trimString(body.email || '');
-    if (email && !isEmail(email)) errors.push({ field: 'email', message: 'Email khong hop le' });
+    if (email && !isEmail(email)) errors.push({ field: 'email', message: 'Email không hợp lệ' });
     payload.email = email;
   }
-  if (hasField(body, 'address')) payload.address = trimString(body.address || '');
-  if (hasField(body, 'debt')) payload.debt = normalizeNonNegativeNumber(errors, 'debt', body.debt, 'Cong no phai >= 0');
-  if (hasField(body, 'notes')) payload.notes = trimString(body.notes || '');
+  if (hasField(body, 'address')) {
+    payload.address = trimString(body.address || '');
+    validateTextLength(errors, 'address', payload.address, LIMITS.description);
+  }
+  if (hasField(body, 'debt')) payload.debt = normalizeNonNegativeNumber(errors, 'debt', body.debt, 'Công nợ phải >= 0 và không vượt quá 100.000.000', { max: LIMITS.money });
+  if (hasField(body, 'notes')) {
+    payload.notes = trimString(body.notes || '');
+    validateTextLength(errors, 'notes', payload.notes, LIMITS.notes);
+  }
 
   return payload;
 };
@@ -398,33 +499,45 @@ const validateSupplierUpdate = validateBody((body, errors) => normalizeSupplier(
 
 const validatePurchaseCreate = validateBody((body, errors) => {
   const supplierId = trimString(body.supplierId);
-  if (!isObjectId(supplierId)) errors.push({ field: 'supplierId', message: 'Ma nha cung cap khong hop le' });
+  if (!isObjectId(supplierId)) errors.push({ field: 'supplierId', message: 'Mã nhà cung cấp không hợp lệ' });
+  const seenIngredients = new Set();
 
   const items = Array.isArray(body.items) ? body.items.map((item, index) => {
     if (!isObjectId(item.ingredient)) {
-      errors.push({ field: `items.${index}.ingredient`, message: 'Ma nguyen lieu khong hop le' });
+      errors.push({ field: `items.${index}.ingredient`, message: 'Mã nguyên liệu không hợp lệ' });
     }
+    if (item.ingredient && seenIngredients.has(String(item.ingredient))) {
+      errors.push({ field: `items.${index}.ingredient`, message: 'Nguyên liệu bị lặp trong phiếu nhập' });
+    }
+    seenIngredients.add(String(item.ingredient));
 
     return {
       ingredient: item.ingredient,
-      quantity: normalizePositiveNumber(errors, `items.${index}.quantity`, item.quantity, 'So luong nhap phai > 0'),
-      unitPrice: normalizeNonNegativeNumber(errors, `items.${index}.unitPrice`, item.unitPrice, 'Don gia nhap phai >= 0'),
+      quantity: normalizePositiveNumber(errors, `items.${index}.quantity`, item.quantity, 'Số lượng nhập phải > 0 và không vượt quá 100.000', { max: LIMITS.quantity }),
+      unitPrice: normalizePositiveNumber(errors, `items.${index}.unitPrice`, item.unitPrice, 'Đơn giá nhập phải > 0 và không vượt quá 100.000.000', { max: LIMITS.money }),
     };
   }) : [];
 
-  if (items.length === 0) errors.push({ field: 'items', message: 'Phieu nhap phai co it nhat 1 dong' });
+  if (items.length === 0) errors.push({ field: 'items', message: 'Phiếu nhập phải có ít nhất 1 dòng' });
+
+  const purchaseDate = body.purchaseDate ? new Date(body.purchaseDate) : undefined;
+  if (body.purchaseDate && Number.isNaN(purchaseDate.getTime())) {
+    errors.push({ field: 'purchaseDate', message: 'Ngày nhập hàng không hợp lệ' });
+  }
+  const notes = trimString(body.notes || '');
+  validateTextLength(errors, 'notes', notes, LIMITS.notes);
 
   return {
     supplierId,
     items,
-    paidAmount: normalizeNonNegativeNumber(errors, 'paidAmount', body.paidAmount || 0, 'So tien da tra phai >= 0'),
-    purchaseDate: body.purchaseDate || undefined,
-    notes: trimString(body.notes || ''),
+    paidAmount: normalizeNonNegativeNumber(errors, 'paidAmount', body.paidAmount || 0, 'Số tiền đã trả phải >= 0 và không vượt quá 100.000.000', { max: LIMITS.money }),
+    purchaseDate: purchaseDate || undefined,
+    notes,
   };
 });
 
 const validatePayDebt = validateBody((body, errors) => ({
-  amount: normalizePositiveNumber(errors, 'amount', body.amount, 'So tien thanh toan phai > 0'),
+  amount: normalizePositiveNumber(errors, 'amount', body.amount, 'Số tiền thanh toán phải > 0 và không vượt quá 100.000.000', { max: LIMITS.money }),
 }));
 
 const normalizeUser = (body, errors, { partial = false } = {}) => {
@@ -432,13 +545,14 @@ const normalizeUser = (body, errors, { partial = false } = {}) => {
 
   if (!partial || hasField(body, 'name')) {
     const name = trimString(body.name);
-    requireNonEmpty(errors, 'name', name, 'Ten nhan vien la bat buoc');
+    requireNonEmpty(errors, 'name', name, 'Tên nhân viên là bắt buộc');
+    validateTextLength(errors, 'name', name);
     payload.name = name;
   }
 
   if (!partial || hasField(body, 'email')) {
     const email = trimString(body.email)?.toLowerCase();
-    if (!isEmail(email)) errors.push({ field: 'email', message: 'Email khong hop le' });
+    if (!isEmail(email)) errors.push({ field: 'email', message: 'Email không hợp lệ' });
     payload.email = email;
   }
 
@@ -446,7 +560,7 @@ const normalizeUser = (body, errors, { partial = false } = {}) => {
     const password = body.password;
     if (!partial || isNonEmptyString(password)) {
       if (typeof password !== 'string' || password.length < 6) {
-        errors.push({ field: 'password', message: 'Mat khau phai co it nhat 6 ky tu' });
+        errors.push({ field: 'password', message: 'Mật khẩu phải có ít nhất 6 ký tự' });
       }
       payload.password = password;
     }
@@ -455,19 +569,22 @@ const normalizeUser = (body, errors, { partial = false } = {}) => {
   if (!partial || hasField(body, 'role')) {
     const role = trimString(body.role || 'staff');
     if (!['admin', 'staff', 'Nhân viên'].includes(role)) {
-      errors.push({ field: 'role', message: 'Chuc vu nhan vien khong hop le' });
+      errors.push({ field: 'role', message: 'Chức vụ nhân viên không hợp lệ' });
     }
     payload.role = role === 'admin' ? 'admin' : role;
   }
 
-  if (hasField(body, 'phone')) payload.phone = trimString(body.phone || '');
+  if (hasField(body, 'phone')) {
+    payload.phone = trimString(body.phone || '');
+    validateOptionalPhone(errors, 'phone', payload.phone);
+  }
   if (hasField(body, 'salary')) {
-    payload.salary = normalizeNonNegativeNumber(errors, 'salary', body.salary || 0, 'Luong phai >= 0');
+    payload.salary = normalizeNonNegativeNumber(errors, 'salary', body.salary || 0, 'Lương phải >= 0 và không vượt quá 100.000.000', { max: LIMITS.money });
   }
   if (hasField(body, 'status')) {
     const status = trimString(body.status || 'Đang làm việc');
     if (!['Đang làm việc', 'Đang nghỉ phép', 'Đã nghỉ việc'].includes(status)) {
-      errors.push({ field: 'status', message: 'Trang thai nhan vien khong hop le' });
+      errors.push({ field: 'status', message: 'Trạng thái nhân viên không hợp lệ' });
     }
     payload.status = status;
   }
@@ -478,39 +595,86 @@ const normalizeUser = (body, errors, { partial = false } = {}) => {
 const validateUserCreate = validateBody((body, errors) => normalizeUser(body, errors));
 const validateUserUpdate = validateBody((body, errors) => normalizeUser(body, errors, { partial: true }));
 
+const validateProfileUpdate = validateBody((body, errors) => {
+  const payload = {};
+
+  if (hasField(body, 'name')) {
+    const name = trimString(body.name);
+    requireNonEmpty(errors, 'name', name, 'Tên người dùng là bắt buộc');
+    validateTextLength(errors, 'name', name);
+    payload.name = name;
+  }
+  if (hasField(body, 'phone')) {
+    payload.phone = trimString(body.phone || '');
+    validateOptionalPhone(errors, 'phone', payload.phone);
+  }
+  if (hasField(body, 'address')) {
+    payload.address = trimString(body.address || '');
+    validateTextLength(errors, 'address', payload.address, LIMITS.description);
+  }
+  if (hasField(body, 'avatar')) {
+    payload.avatar = trimString(body.avatar || '');
+    if (payload.avatar && !isImagePath(payload.avatar)) {
+      errors.push({ field: 'avatar', message: 'Ảnh đại diện phải là JPG, PNG hoặc WEBP hợp lệ' });
+    }
+  }
+
+  return payload;
+});
+
+const validatePasswordChange = validateBody((body, errors) => {
+  const currentPassword = body.currentPassword;
+  const newPassword = body.newPassword;
+
+  requireNonEmpty(errors, 'currentPassword', currentPassword, 'Mật khẩu hiện tại là bắt buộc');
+  if (typeof newPassword !== 'string' || newPassword.length < 6) {
+    errors.push({ field: 'newPassword', message: 'Mật khẩu mới phải có ít nhất 6 ký tự' });
+  }
+  if (currentPassword && newPassword && currentPassword === newPassword) {
+    errors.push({ field: 'newPassword', message: 'Mật khẩu mới không được trùng mật khẩu hiện tại' });
+  }
+
+  return { currentPassword, newPassword };
+});
+
 const normalizeShift = (body, errors, { partial = false } = {}) => {
   const payload = {};
 
   if (!partial || hasField(body, 'name')) {
     const name = trimString(body.name);
-    requireNonEmpty(errors, 'name', name, 'Ten ca la bat buoc');
+    requireNonEmpty(errors, 'name', name, 'Tên ca là bắt buộc');
+    validateTextLength(errors, 'name', name);
     payload.name = name;
   }
 
   if (!partial || hasField(body, 'startTime')) {
     const startTime = new Date(body.startTime);
-    if (Number.isNaN(startTime.getTime())) errors.push({ field: 'startTime', message: 'Gio bat dau khong hop le' });
+    if (Number.isNaN(startTime.getTime())) errors.push({ field: 'startTime', message: 'Giờ bắt đầu không hợp lệ' });
     payload.startTime = startTime;
   }
 
   if (!partial || hasField(body, 'endTime')) {
     const endTime = new Date(body.endTime);
-    if (Number.isNaN(endTime.getTime())) errors.push({ field: 'endTime', message: 'Gio ket thuc khong hop le' });
+    if (Number.isNaN(endTime.getTime())) errors.push({ field: 'endTime', message: 'Giờ kết thúc không hợp lệ' });
     payload.endTime = endTime;
   }
 
   if (payload.startTime && payload.endTime && payload.startTime >= payload.endTime) {
-    errors.push({ field: 'endTime', message: 'Gio ket thuc phai sau gio bat dau' });
+    errors.push({ field: 'endTime', message: 'Giờ kết thúc phải sau giờ bắt đầu' });
+  }
+
+  if (!partial && payload.endTime && payload.endTime < new Date()) {
+    errors.push({ field: 'endTime', message: 'Giờ kết thúc ca không được ở quá khứ' });
   }
 
   if (hasField(body, 'staff')) {
     if (!Array.isArray(body.staff)) {
-      errors.push({ field: 'staff', message: 'Danh sach nhan vien khong hop le' });
+      errors.push({ field: 'staff', message: 'Danh sách nhân viên không hợp lệ' });
       payload.staff = [];
     } else {
       payload.staff = body.staff.filter(Boolean);
       payload.staff.forEach((id, index) => {
-        if (!isObjectId(id)) errors.push({ field: `staff.${index}`, message: 'Ma nhan vien khong hop le' });
+        if (!isObjectId(id)) errors.push({ field: `staff.${index}`, message: 'Mã nhân viên không hợp lệ' });
       });
     }
   }
@@ -522,19 +686,20 @@ const validateShiftCreate = validateBody((body, errors) => normalizeShift(body, 
 const validateShiftUpdate = validateBody((body, errors) => normalizeShift(body, errors, { partial: true }));
 const validateAssignStaff = validateBody((body, errors) => {
   const userId = trimString(body.userId);
-  if (!isObjectId(userId)) errors.push({ field: 'userId', message: 'Ma nhan vien khong hop le' });
+  if (!isObjectId(userId)) errors.push({ field: 'userId', message: 'Mã nhân viên không hợp lệ' });
   return { userId };
 });
 
 const validateCloseShift = validateBody((body, errors) => {
   const payload = {
-    actualCash: normalizeNonNegativeNumber(errors, 'actualCash', body.actualCash || 0, 'Tien thuc te phai >= 0'),
+    actualCash: normalizeNonNegativeNumber(errors, 'actualCash', body.actualCash || 0, 'Tiền thực tế phải >= 0 và không vượt quá 100.000.000', { max: LIMITS.money }),
     notes: trimString(body.notes || ''),
   };
+  validateTextLength(errors, 'notes', payload.notes, LIMITS.notes);
 
   if (hasField(body, 'endTime')) {
     const endTime = new Date(body.endTime);
-    if (Number.isNaN(endTime.getTime())) errors.push({ field: 'endTime', message: 'Gio ket thuc khong hop le' });
+    if (Number.isNaN(endTime.getTime())) errors.push({ field: 'endTime', message: 'Giờ kết thúc không hợp lệ' });
     payload.endTime = endTime;
   }
 
@@ -543,8 +708,30 @@ const validateCloseShift = validateBody((body, errors) => {
 
 const validatePaymentCreate = validateBody((body, errors) => {
   const orderId = trimString(body.orderId);
-  if (!isObjectId(orderId)) errors.push({ field: 'orderId', message: 'Ma don hang khong hop le' });
+  if (!isObjectId(orderId)) errors.push({ field: 'orderId', message: 'Mã đơn hàng không hợp lệ' });
   return { orderId };
+});
+
+const validateOrderStatusUpdate = validateBody((body, errors) => {
+  const status = trimString(body.status);
+  const allowedStatuses = ['pending', 'confirmed', 'delivering', 'completed', 'cancelled'];
+  if (!allowedStatuses.includes(status)) {
+    errors.push({ field: 'status', message: 'Trạng thái đơn hàng không hợp lệ' });
+  }
+  return { status };
+});
+
+const validateBannerCreate = validateBody((body, errors) => {
+  const image = trimString(body.image);
+  const title = trimString(body.title || '');
+
+  requireNonEmpty(errors, 'image', image, 'Hình ảnh banner là bắt buộc');
+  if (image && !isImagePath(image)) {
+    errors.push({ field: 'image', message: 'Ảnh banner phải là JPG, PNG hoặc WEBP hợp lệ' });
+  }
+  validateTextLength(errors, 'title', title, 120);
+
+  return { image, title };
 });
 
 module.exports = {
@@ -568,9 +755,13 @@ module.exports = {
   validatePayDebt,
   validateUserCreate,
   validateUserUpdate,
+  validateProfileUpdate,
+  validatePasswordChange,
   validateShiftCreate,
   validateShiftUpdate,
   validateAssignStaff,
   validateCloseShift,
   validatePaymentCreate,
+  validateOrderStatusUpdate,
+  validateBannerCreate,
 };

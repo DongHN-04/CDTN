@@ -1,6 +1,7 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import orderService from '../../services/orderService';
+import { useToast } from '../../contexts/ToastContext';
 
 const statusConfig = {
   pending: { label: 'Chờ xác nhận', badge: 'bg-blue-50 text-blue-700', dot: 'bg-blue-500' },
@@ -27,54 +28,127 @@ const formatOrderCode = (id = '') => `#SD-${id.slice(-4).toUpperCase()}`;
 const formatTime = (value) => new Date(value).toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' });
 const formatDate = (value) => new Date(value).toLocaleDateString('vi-VN');
 const pageSize = 10;
+const monthOptions = Array.from({ length: 12 }, (_, index) => index + 1);
+const toDateInputValue = (value) => {
+  if (!value) return '';
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return '';
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, '0');
+  const day = String(date.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+};
+const getDateRangeParams = ({ dateFilter, monthFilter, yearFilter }) => {
+  if (dateFilter) return { startDate: dateFilter, endDate: dateFilter };
+
+  const now = new Date();
+  const selectedYear = yearFilter !== 'all' ? Number(yearFilter) : now.getFullYear();
+
+  if (monthFilter !== 'all') {
+    const selectedMonth = Number(monthFilter);
+    const start = new Date(selectedYear, selectedMonth - 1, 1);
+    const end = new Date(selectedYear, selectedMonth, 0);
+    return {
+      startDate: toDateInputValue(start),
+      endDate: toDateInputValue(end),
+    };
+  }
+
+  if (yearFilter !== 'all') {
+    return {
+      startDate: `${selectedYear}-01-01`,
+      endDate: `${selectedYear}-12-31`,
+    };
+  }
+
+  const today = toDateInputValue(now);
+  return { startDate: today, endDate: today };
+};
 const getNextStatus = (order) => {
   if (!order?.isCustomerOrder && order?.status === 'confirmed') return 'completed';
   return nextStatus[order?.status];
 };
 
 const CustomerOrdersPage = () => {
+  const { showToast } = useToast();
   const [orders, setOrders] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState('');
+  const [, setError] = useState('');
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
+  const [dateFilter, setDateFilter] = useState('');
+  const [monthFilter, setMonthFilter] = useState('all');
+  const [yearFilter, setYearFilter] = useState('all');
   const [updatingId, setUpdatingId] = useState('');
   const [currentPage, setCurrentPage] = useState(1);
 
-  const fetchOrders = async () => {
+  const fetchOrders = useCallback(async () => {
     setLoading(true);
     setError('');
     try {
-      const data = await orderService.getOrders();
+      const params = getDateRangeParams({ dateFilter, monthFilter, yearFilter });
+      const data = await orderService.getOrders(params);
       setOrders(data);
     } catch (err) {
-      setError(err.response?.data?.message || 'Không thể tải danh sách đơn hàng');
+      const message = err.response?.data?.message || 'Không thể tải danh sách đơn hàng';
+      setError(message);
+      showToast(message, 'error');
     } finally {
       setLoading(false);
     }
-  };
+  }, [dateFilter, monthFilter, showToast, yearFilter]);
 
   useEffect(() => {
     fetchOrders();
-  }, []);
+  }, [fetchOrders]);
 
   const stats = useMemo(() => {
     const today = new Date().toDateString();
+    const scopedOrders = orders.filter(order => {
+      const orderDate = new Date(order.createdAt);
+      const orderDateValue = toDateInputValue(order.createdAt);
+      const matchesDate = !dateFilter || orderDateValue === dateFilter;
+      const matchesMonth = monthFilter === 'all' || orderDate.getMonth() + 1 === Number(monthFilter);
+      const matchesYear = yearFilter === 'all' || orderDate.getFullYear() === Number(yearFilter);
+
+      if (dateFilter || monthFilter !== 'all' || yearFilter !== 'all') {
+        return matchesDate && matchesMonth && matchesYear;
+      }
+
+      return orderDate.toDateString() === today;
+    });
+
     return {
-      pending: orders.filter(order => order.status === 'pending').length,
-      confirmed: orders.filter(order => order.status === 'confirmed').length,
-      delivering: orders.filter(order => order.status === 'delivering').length,
-      completedToday: orders.filter(order => (
-        order.status === 'completed' && new Date(order.updatedAt || order.createdAt).toDateString() === today
-      )).length,
+      pending: scopedOrders.filter(order => order.status === 'pending').length,
+      confirmed: scopedOrders.filter(order => order.status === 'confirmed').length,
+      delivering: scopedOrders.filter(order => order.status === 'delivering').length,
+      completed: scopedOrders.filter(order => order.status === 'completed').length,
     };
-  }, [orders]);
+  }, [orders, dateFilter, monthFilter, yearFilter]);
+
+  const statsSuffix = dateFilter || monthFilter !== 'all' || yearFilter !== 'all' ? 'đơn' : 'hôm nay';
+
+  const yearOptions = useMemo(() => {
+    const currentYear = new Date().getFullYear();
+    const years = orders
+      .map(order => new Date(order.createdAt).getFullYear())
+      .filter(year => Number.isFinite(year));
+    const recentYears = Array.from({ length: 6 }, (_, index) => currentYear - index);
+    if (yearFilter !== 'all') years.push(Number(yearFilter));
+    return Array.from(new Set([...recentYears, ...years])).sort((a, b) => b - a);
+  }, [orders, yearFilter]);
 
   const filteredOrders = useMemo(() => {
     const keyword = search.trim().toLowerCase();
 
     return orders.filter(order => {
+      const orderDate = new Date(order.createdAt);
+      const orderDateValue = toDateInputValue(order.createdAt);
+      const hasDateScope = dateFilter || monthFilter !== 'all' || yearFilter !== 'all';
       const matchesStatus = statusFilter === 'all' || order.status === statusFilter;
+      const matchesDate = hasDateScope ? (!dateFilter || orderDateValue === dateFilter) : orderDate.toDateString() === new Date().toDateString();
+      const matchesMonth = monthFilter === 'all' || orderDate.getMonth() + 1 === Number(monthFilter);
+      const matchesYear = yearFilter === 'all' || orderDate.getFullYear() === Number(yearFilter);
       const haystack = [
         order._id,
         formatOrderCode(order._id),
@@ -85,13 +159,17 @@ const CustomerOrdersPage = () => {
         order.staff?.name,
       ].filter(Boolean).join(' ').toLowerCase();
 
-      return matchesStatus && (!keyword || haystack.includes(keyword));
+      return matchesStatus
+        && matchesDate
+        && matchesMonth
+        && matchesYear
+        && (!keyword || haystack.includes(keyword));
     });
-  }, [orders, search, statusFilter]);
+  }, [orders, search, statusFilter, dateFilter, monthFilter, yearFilter]);
 
   useEffect(() => {
     setCurrentPage(1);
-  }, [search, statusFilter]);
+  }, [search, statusFilter, dateFilter, monthFilter, yearFilter]);
 
   const totalPages = Math.max(1, Math.ceil(filteredOrders.length / pageSize));
   const paginatedOrders = useMemo(() => {
@@ -109,8 +187,11 @@ const CustomerOrdersPage = () => {
     try {
       const updated = await orderService.updateOrderStatus(order._id, status);
       setOrders(current => current.map(item => item._id === updated._id ? updated : item));
+      showToast('Đã cập nhật trạng thái đơn hàng');
     } catch (err) {
-      setError(err.response?.data?.message || 'Không thể cập nhật đơn hàng');
+      const message = err.response?.data?.message || 'Không thể cập nhật đơn hàng';
+      setError(message);
+      showToast(message, 'error');
     } finally {
       setUpdatingId('');
     }
@@ -121,6 +202,12 @@ const CustomerOrdersPage = () => {
     if (target) updateStatus(order, target);
   };
 
+  const clearDateFilters = () => {
+    setDateFilter('');
+    setMonthFilter('all');
+    setYearFilter('all');
+  };
+
   return (
     <div className="max-w-6xl mx-auto">
       <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4 mb-8">
@@ -129,7 +216,7 @@ const CustomerOrdersPage = () => {
           <p className="mt-2 text-sm text-gray-500">Theo dõi và xử lý đơn hàng theo thời gian thực.</p>
         </div>
 
-        <div className="flex items-center gap-3">
+        <div className="flex flex-wrap items-center gap-3">
           <div className="relative">
             <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400">⌕</span>
             <input
@@ -144,13 +231,49 @@ const CustomerOrdersPage = () => {
             onChange={event => setStatusFilter(event.target.value)}
             className="rounded-xl border border-gray-200 bg-white px-3 py-2.5 text-sm font-semibold outline-none focus:border-[#c0392b]"
           >
-            <option value="all">Bộ lọc</option>
+            <option value="all">Trạng thái</option>
             <option value="pending">Chờ xác nhận</option>
             <option value="confirmed">Đang chuẩn bị</option>
             <option value="delivering">Đang giao</option>
             <option value="completed">Hoàn thành</option>
             <option value="cancelled">Đã hủy</option>
           </select>
+          <input
+            type="date"
+            value={dateFilter}
+            onChange={event => setDateFilter(event.target.value)}
+            className="rounded-xl border border-gray-200 bg-white px-3 py-2.5 text-sm font-semibold outline-none focus:border-[#c0392b]"
+            title="Lọc theo ngày"
+          />
+          <select
+            value={monthFilter}
+            onChange={event => setMonthFilter(event.target.value)}
+            className="rounded-xl border border-gray-200 bg-white px-3 py-2.5 text-sm font-semibold outline-none focus:border-[#c0392b]"
+          >
+            <option value="all">Chọn tháng</option>
+            {monthOptions.map(month => (
+              <option key={month} value={month}>Tháng {month}</option>
+            ))}
+          </select>
+          <select
+            value={yearFilter}
+            onChange={event => setYearFilter(event.target.value)}
+            className="rounded-xl border border-gray-200 bg-white px-3 py-2.5 text-sm font-semibold outline-none focus:border-[#c0392b]"
+          >
+            <option value="all">Chọn năm</option>
+            {yearOptions.map(year => (
+              <option key={year} value={year}>{year}</option>
+            ))}
+          </select>
+          {(dateFilter || monthFilter !== 'all' || yearFilter !== 'all') && (
+            <button
+              type="button"
+              onClick={clearDateFilters}
+              className="rounded-xl border border-red-100 bg-white px-3 py-2.5 text-sm font-black text-[#c0392b] hover:bg-red-50"
+            >
+              Xóa lọc
+            </button>
+          )}
         </div>
       </div>
 
@@ -158,14 +281,9 @@ const CustomerOrdersPage = () => {
         <StatCard title="Chờ xác nhận" value={stats.pending} tone="bg-blue-50" />
         <StatCard title="Đang chuẩn bị" value={stats.confirmed} tone="bg-amber-50" />
         <StatCard title="Đang giao" value={stats.delivering} tone="bg-emerald-50" />
-        <StatCard title="Hoàn thành" value={stats.completedToday} suffix="hôm nay" tone="bg-red-50" />
+        <StatCard title="Hoàn thành" value={stats.completed} suffix={statsSuffix} tone="bg-red-50" />
       </div>
 
-      {error && (
-        <div className="mb-4 rounded-xl border border-red-100 bg-red-50 px-4 py-3 text-sm font-semibold text-red-700">
-          {error}
-        </div>
-      )}
 
       <div className="overflow-hidden rounded-2xl bg-white shadow-sm ring-1 ring-gray-100">
         <table className="w-full min-w-[880px] border-collapse">

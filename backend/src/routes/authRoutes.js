@@ -4,6 +4,8 @@ const { registerUser, loginUser } = require('../controllers/authController');
 const rateLimit = require('../middleware/rateLimitMiddleware');
 const { validateAuthRegister, validateAuthLogin } = require('../middleware/validationMiddleware');
 
+const isProduction = process.env.NODE_ENV === 'production';
+
 const authLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,
   max: 20,
@@ -16,7 +18,7 @@ router
   .post(authLimiter, validateAuthLogin, loginUser)
   .all((req, res) => {
     res.status(405).json({
-      message: 'Dang nhap phai dung phuong thuc POST',
+      message: 'Đăng nhập phải dùng phương thức POST',
       method: 'POST',
       path: '/api/auth/login',
       body: {

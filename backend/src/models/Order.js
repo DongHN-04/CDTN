@@ -22,9 +22,11 @@ const orderSchema = new mongoose.Schema({
   customer: {
     name: { type: String, default: 'Khách lẻ' },
     phone: { type: String, default: '' },
+    email: { type: String, default: '' },
     address: { type: String, default: '' }
   },
   staff: { type: mongoose.Schema.Types.ObjectId, ref: 'User' }, // không bắt buộc (vì khách tự đặt)
+  customerUser: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
   staffSnapshot: {
     name: { type: String, default: '' },
     email: { type: String, default: '' },
@@ -42,6 +44,7 @@ const orderSchema = new mongoose.Schema({
   paymentMethod: { type: String, enum: ['cash', 'card', 'qr'], default: 'cash' },
   paymentStatus: { type: String, enum: ['unpaid', 'paid', 'failed'], default: 'unpaid' },
   txnRef: { type: String, default: '' },
+  completedAt: { type: Date },
   inventoryDeducted: { type: Boolean, default: false },
   status: {
     type: String,

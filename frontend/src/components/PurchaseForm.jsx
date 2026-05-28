@@ -1,18 +1,21 @@
 import React, { useEffect, useState } from 'react';
 import supplierService from '../services/supplierService';
 import inventoryService from '../services/inventoryService';
-import { ErrorBox, formatApiError } from '../utils/apiError';
+import { formatApiError } from '../utils/apiError';
+import { useToast } from '../contexts/ToastContext';
 
 const emptyItem = { ingredient: '', quantity: '', unitPrice: '' };
+const MAX_MONEY = 100000000;
+const MAX_QUANTITY = 100000;
 
 const PurchaseForm = ({ onClose, onSuccess }) => {
+  const { showToast } = useToast();
   const [suppliers, setSuppliers] = useState([]);
   const [selectedSupplier, setSelectedSupplier] = useState('');
   const [ingredients, setIngredients] = useState([]);
   const [items, setItems] = useState([emptyItem]);
   const [paidAmount, setPaidAmount] = useState(0);
   const [notes, setNotes] = useState('');
-  const [formError, setFormError] = useState('');
 
   useEffect(() => {
     supplierService.getSuppliers().then(data => setSuppliers(data || []));
@@ -44,23 +47,32 @@ const PurchaseForm = ({ onClose, onSuccess }) => {
 
   const handleSubmit = async (event) => {
     event.preventDefault();
-    setFormError('');
-
-    if (!selectedSupplier) return setFormError('supplierId: Chọn nhà cung cấp là bắt buộc');
+    if (!selectedSupplier) return showToast('Chọn nhà cung cấp là bắt buộc', 'error');
 
     const payloadItems = buildPayloadItems();
-    if (payloadItems.length === 0) return setFormError('items: Vui lòng thêm ít nhất một nguyên liệu');
+    if (payloadItems.length === 0) return showToast('Vui lòng thêm ít nhất một nguyên liệu', 'error');
+    const duplicatedIngredient = payloadItems.find((item, index) => (
+      item.ingredient && payloadItems.findIndex(other => other.ingredient === item.ingredient) !== index
+    ));
+    if (duplicatedIngredient) return showToast('Nguyên liệu bị lặp trong phiếu nhập', 'error');
 
     const invalidItem = payloadItems.find(item =>
       !item.ingredient ||
       !Number.isFinite(item.quantity) ||
       item.quantity <= 0 ||
+      item.quantity > MAX_QUANTITY ||
       !Number.isFinite(item.unitPrice) ||
-      item.unitPrice < 0
+      item.unitPrice <= 0 ||
+      item.unitPrice > MAX_MONEY
     );
 
     if (invalidItem) {
-      return setFormError('items: Mỗi dòng nhập hàng phải chọn nguyên liệu, số lượng > 0 và đơn giá >= 0');
+      return showToast('Mỗi dòng nhập hàng phải chọn nguyên liệu, số lượng > 0 và đơn giá > 0', 'error');
+    }
+
+    const paid = Number(paidAmount || 0);
+    if (!Number.isFinite(paid) || paid < 0 || paid > MAX_MONEY) {
+      return showToast('Số tiền đã trả không hợp lệ', 'error');
     }
 
     try {
@@ -73,7 +85,8 @@ const PurchaseForm = ({ onClose, onSuccess }) => {
       });
       onSuccess();
     } catch (error) {
-      setFormError(formatApiError(error, 'Lỗi nhập hàng'));
+      const message = formatApiError(error, 'Lỗi nhập hàng');
+      showToast(message, 'error');
     }
   };
 
@@ -89,8 +102,6 @@ const PurchaseForm = ({ onClose, onSuccess }) => {
             Đóng
           </button>
         </div>
-
-        <ErrorBox message={formError} />
 
         <form onSubmit={handleSubmit} className="mt-4 flex flex-col gap-5">
           <Field label="Nhà cung cấp">

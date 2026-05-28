@@ -1,6 +1,8 @@
 import React, { useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
+import { useToast } from '../contexts/ToastContext';
+import { formatApiError } from '../utils/apiError';
 
 const RegisterPage = () => {
   const [formData, setFormData] = useState({
@@ -11,9 +13,9 @@ const RegisterPage = () => {
     password: '',
     confirmPassword: '',
   });
-  const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
   const { register } = useAuth();
+  const { showToast } = useToast();
   const navigate = useNavigate();
 
   const handleChange = (e) => {
@@ -25,10 +27,8 @@ const RegisterPage = () => {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    setError('');
-
     if (formData.password !== formData.confirmPassword) {
-      return setError('Mật khẩu xác nhận không khớp');
+      return showToast('Mật khẩu xác nhận không khớp', 'error');
     }
 
     setLoading(true);
@@ -47,7 +47,7 @@ const RegisterPage = () => {
         navigate('/admin/dashboard');
       }
     } catch (err) {
-      setError(err.response?.data?.message || 'Đăng ký thất bại. Vui lòng thử lại!');
+      showToast(formatApiError(err, 'Đăng ký thất bại. Vui lòng thử lại!'), 'error');
     } finally {
       setLoading(false);
     }
@@ -92,8 +92,6 @@ const RegisterPage = () => {
             <h2 style={{ fontSize: '24px', fontWeight: 'bold', color: '#111827', margin: '0 0 8px 0' }}>Đăng ký tài khoản</h2>
             <p style={{ fontSize: '14px', color: '#6b7280', margin: '0 0 30px 0' }}>Nhập thông tin chi tiết của bạn để bắt đầu</p>
             
-            {error && <div style={errorStyle}>{error}</div>}
-
             <form onSubmit={handleSubmit}>
               
               {/* Form Grid: 2 Cột */}
@@ -255,16 +253,6 @@ const submitButtonStyle = {
   fontWeight: 'bold',
   cursor: 'pointer',
   transition: 'background-color 0.2s'
-};
-
-const errorStyle = {
-  backgroundColor: '#fef2f2',
-  color: '#b91c1c',
-  padding: '12px',
-  borderRadius: '8px',
-  marginBottom: '20px',
-  fontSize: '14px',
-  borderLeft: '4px solid #ef4444'
 };
 
 const loginLinkStyle = {

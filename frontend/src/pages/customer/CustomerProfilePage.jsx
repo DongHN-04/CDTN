@@ -12,7 +12,7 @@ const fallbackFavorites = [
   { name: 'Khoai Tây Chiên', price: 35000, image: '/images/home/product-sandwich.png' },
 ];
 
-const recentOrders = [
+/* const recentOrders = [
   {
     code: '#ORD-9824',
     status: 'Hoàn thành',
@@ -33,13 +33,26 @@ const recentOrders = [
   },
 ];
 
+*/
 const formatCurrency = value =>
   new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND' }).format(value || 0);
+
+const statusMap = {
+  pending: { label: 'Chờ xác nhận', className: 'bg-amber-50 text-amber-700' },
+  confirmed: { label: 'Đang chuẩn bị', className: 'bg-sky-50 text-sky-700' },
+  delivering: { label: 'Đang giao', className: 'bg-red-50 text-[#c0392b]' },
+  completed: { label: 'Hoàn thành', className: 'bg-emerald-50 text-emerald-700' },
+  cancelled: { label: 'Đã hủy', className: 'bg-gray-100 text-gray-600' },
+};
+
+const formatOrderCode = (id = '') => `#SD-${String(id).slice(-4).toUpperCase()}`;
+const formatOrderItems = (items = []) => items.map(item => `${item.quantity} ${item.name || 'món'}`).join(', ');
 
 const CustomerProfilePage = () => {
   const { user } = useAuth();
   const [profile, setProfile] = useState(user);
   const [favorites, setFavorites] = useState(fallbackFavorites);
+  const [orders, setOrders] = useState([]);
 
   useEffect(() => {
     const fetchProfile = async () => {
@@ -66,8 +79,18 @@ const CustomerProfilePage = () => {
       }
     };
 
+    const fetchOrders = async () => {
+      try {
+        const data = await publicService.getMyOrders();
+        setOrders(Array.isArray(data) ? data : []);
+      } catch (error) {
+        setOrders([]);
+      }
+    };
+
     fetchProfile();
     fetchFavorites();
+    fetchOrders();
   }, []);
 
   const displayName = profile?.name || user?.name || 'Khách hàng Sơn Đông';
@@ -171,32 +194,35 @@ const CustomerProfilePage = () => {
               </div>
 
               <div className="space-y-3">
-                {recentOrders.map(order => (
-                  <article key={order.code} className="grid gap-4 rounded-lg border border-red-50 p-4 sm:grid-cols-[1fr_auto] sm:items-center">
+                {orders.length === 0 ? (
+                  <div className="rounded-lg border border-dashed border-red-100 p-6 text-center text-sm font-semibold text-slate-500">
+                    Bạn chưa có đơn hàng nào.
+                  </div>
+                ) : orders.map(order => {
+                  const status = statusMap[order.status] || statusMap.pending;
+                  return (
+                  <article key={order._id} className="grid gap-4 rounded-lg border border-red-50 p-4 sm:grid-cols-[1fr_auto] sm:items-center">
                     <div className="flex gap-3">
                       <div className="grid h-11 w-11 shrink-0 place-items-center rounded-lg bg-red-50 text-[#c0392b]">
                         <PackageCheck size={19} />
                       </div>
                       <div>
                         <div className="mb-1 flex flex-wrap items-center gap-2">
-                          <p className="m-0 text-sm font-black">{order.code}</p>
-                          <span className={`rounded-full px-2 py-0.5 text-[11px] font-black ${order.statusClass}`}>{order.status}</span>
+                          <p className="m-0 text-sm font-black">{formatOrderCode(order._id)}</p>
+                          <span className={`rounded-full px-2 py-0.5 text-[11px] font-black ${status.className}`}>{status.label}</span>
                         </div>
-                        <p className="m-0 text-sm font-medium text-slate-600">{order.items}</p>
+                        <p className="m-0 text-sm font-medium text-slate-600">{formatOrderItems(order.items)}</p>
                         <p className="m-0 mt-1 inline-flex items-center gap-1 text-xs font-semibold text-slate-400">
                           <CalendarDays size={12} />
-                          {order.time}
+                          {new Date(order.createdAt).toLocaleString('vi-VN')}
                         </p>
                       </div>
                     </div>
                     <div className="text-left sm:text-right">
                       <p className="m-0 text-sm font-black text-[#c0392b]">{formatCurrency(order.total)}</p>
-                      <button className="mt-2 rounded-lg border border-red-100 px-4 py-2 text-xs font-black text-[#c0392b] hover:bg-red-50">
-                        {order.action}
-                      </button>
                     </div>
                   </article>
-                ))}
+                );})}
               </div>
             </section>
 

@@ -10,13 +10,18 @@ const {
   deleteUser
 } = require('../controllers/userController');
 const { protect, authorize } = require('../middleware/authMiddleware');
-const { validateUserCreate, validateUserUpdate } = require('../middleware/validationMiddleware');
+const {
+  validateUserCreate,
+  validateUserUpdate,
+  validateProfileUpdate,
+  validatePasswordChange,
+} = require('../middleware/validationMiddleware');
 
 router.route('/me')
   .get(protect, getMe)
-  .put(protect, updateMe);
+  .put(protect, validateProfileUpdate, updateMe);
 
-router.put('/me/password', protect, changeMyPassword);
+router.put('/me/password', protect, validatePasswordChange, changeMyPassword);
 
 router.route('/')
   .get(protect, authorize('admin'), getUsers)

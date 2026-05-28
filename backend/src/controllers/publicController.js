@@ -28,12 +28,20 @@ const buildInventoryRequirementSnapshot = (requirements = []) => requirements.ma
   requiredQty: requirement.requiredQty,
 }));
 
+const getCustomerOrderMatchFilter = (user) => {
+  const filters = [];
+  if (user?._id) filters.push({ customerUser: user._id });
+  if (user?.email) filters.push({ 'customer.email': user.email.toLowerCase() });
+  if (user?.phone) filters.push({ 'customer.phone': user.phone });
+  return filters.length ? { $or: filters } : null;
+};
+
 // @desc    Lấy thực đơn công khai
 // @route   GET /api/public/menu
 // @access  Public
 const getMenu = async (req, res) => {
   try {
-    const menuItems = await MenuItem.find({ isDeleted: { $ne: true } })
+    const menuItems = await MenuItem.find({ isActive: { $ne: false }, isDeleted: { $ne: true } })
       .populate('ingredients.ingredient', 'stock isActive isDeleted');
     // Populate ton kho toi thieu de frontend biet mon nao co the dat.
     const publicMenu = menuItems.map(item => ({
@@ -64,7 +72,7 @@ const createOrder = async (req, res) => {
     }
 
     const { subtotal, orderItems, requirements } = await collectOrderDetails(items);
-    // Khach dat hang chua tru kho ngay, nhung van phai chan neu tong nguyen lieu hien tai khong du.
+    // Khach dat hang chua tru kho ngay, nhung van phai chan neu tong nguyen lieu hien tai không đủ.
     await checkStockAvailability(requirements);
 
 
@@ -107,11 +115,18 @@ const createOrder = async (req, res) => {
       appliedPromoCode = promotion.name;
     }
 
+    const loggedInCustomer = req.user?.role === 'customer' ? req.user : null;
+    const orderCustomer = {
+      ...(customer || { name: 'Khách lẻ', phone: '', address: '' }),
+      email: loggedInCustomer?.email || customer?.email || '',
+    };
+
     const deliveryFee = customer?.address ? 15000 : 0;
     const finalTotal = Math.max(0, subtotal + deliveryFee - orderDiscount);
 
     const order = await Order.create({
-      customer: customer || { name: 'Khách lẻ', phone: '', address: '' },
+      customer: orderCustomer,
+      customerUser: loggedInCustomer?._id,
       items: orderItems,
       inventoryRequirements: buildInventoryRequirementSnapshot(requirements),
       subtotal,
@@ -126,9 +141,35 @@ const createOrder = async (req, res) => {
       status: 'pending'
     });
 
-    const customerPhone = customer?.phone?.trim();
-    const customerEmail = customer?.email?.trim().toLowerCase();
-    if (customer?.name && (customerPhone || customerEmail)) {
+    const customerPhone = orderCustomer?.phone?.trim();
+    const customerEmail = orderCustomer?.email?.trim().toLowerCase();
+    if (orderCustomer?.name && (customerPhone || customerEmail)) {
+      const existingCustomer = await Customer.findOne({
+        isDeleted: { $ne: true },
+        $or: [
+          ...(customerEmail ? [{ email: customerEmail }] : []),
+          ...(customerPhone ? [{ phone: customerPhone }] : []),
+        ],
+      });
+
+      if (!existingCustomer) {
+        await Customer.create({
+          name: orderCustomer.name,
+          phone: customerPhone || '',
+          email: customerEmail || '',
+          type: 'Thường',
+          notes: '',
+          isActive: true,
+          isDeleted: false,
+        });
+      } else if (loggedInCustomer && customerEmail && existingCustomer.email?.toLowerCase() === customerEmail) {
+        existingCustomer.name = orderCustomer.name || existingCustomer.name;
+        existingCustomer.phone = customerPhone || existingCustomer.phone;
+        await existingCustomer.save();
+      }
+    }
+
+    if (false && customer?.name && (customerPhone || customerEmail)) {
       const filter = customerEmail ? { email: customerEmail } : { phone: customerPhone };
       await Customer.findOneAndUpdate(
         filter,
@@ -156,6 +197,22 @@ const createOrder = async (req, res) => {
 // @desc    Lấy danh sách combo công khai
 // @route   GET /api/public/combos
 // @access  Public
+const getMyOrders = async (req, res) => {
+  try {
+    const filter = getCustomerOrderMatchFilter(req.user);
+    if (!filter) return res.json([]);
+
+    const orders = await Order.find({
+      ...filter,
+      isCustomerOrder: true,
+    }).sort('-createdAt').limit(20);
+
+    res.json(orders);
+  } catch (error) {
+    res.status(500).json({ message: 'Lỗi server khi lấy đơn hàng của bạn' });
+  }
+};
+
 const getCombos = async (req, res) => {
   try {
     const combos = await Combo.find({ isActive: true, isDeleted: { $ne: true } }).populate({
@@ -239,4 +296,4 @@ const getHomepageData = async (req, res) => {
   }
 };
 
-module.exports = { getMenu, createOrder, getCombos, getPromotions, getHomepageData };
+module.exports = { getMenu, createOrder, getMyOrders, getCombos, getPromotions, getHomepageData };

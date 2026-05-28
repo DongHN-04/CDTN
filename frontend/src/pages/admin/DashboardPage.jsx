@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { Flame, Search, ShoppingCart, TrendingUp, Users, WalletCards } from 'lucide-react';
 import {
   Bar,
@@ -13,6 +13,7 @@ import {
 } from 'recharts';
 import reportService from '../../services/reportService';
 import orderService from '../../services/orderService';
+import { useToast } from '../../contexts/ToastContext';
 
 const dayLabels = ['CN', 'T2', 'T3', 'T4', 'T5', 'T6', 'T7'];
 const statusLabels = {
@@ -62,18 +63,15 @@ const getOrderDateKey = (order) => {
 };
 
 const DashboardPage = () => {
+  const { showToast } = useToast();
   const [report, setReport] = useState(null);
   const [weekReport, setWeekReport] = useState(null);
   const [orders, setOrders] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState('');
+  const [, setError] = useState('');
   const [search, setSearch] = useState('');
 
-  useEffect(() => {
-    fetchOverview();
-  }, []);
-
-  const fetchOverview = async () => {
+  const fetchOverview = useCallback(async () => {
     setLoading(true);
     setError('');
     try {
@@ -92,11 +90,17 @@ const DashboardPage = () => {
       setWeekReport(weekReportData);
       setOrders(orderData || []);
     } catch (err) {
-      setError(err.response?.data?.message || 'Không thể tải dữ liệu tổng quan');
+      const message = err.response?.data?.message || 'Không thể tải dữ liệu tổng quan';
+      setError(message);
+      showToast(message, 'error');
     } finally {
       setLoading(false);
     }
-  };
+  }, [showToast]);
+
+  useEffect(() => {
+    fetchOverview();
+  }, [fetchOverview]);
 
   const recentOrders = useMemo(() => {
     const keyword = search.trim().toLowerCase();
@@ -192,15 +196,10 @@ const DashboardPage = () => {
         </div>
       </div>
 
-      {error && (
-        <div className="mb-5 rounded-xl border border-red-100 bg-red-50 px-4 py-3 text-sm font-bold text-red-700">
-          {error}
-        </div>
-      )}
 
       <div className="mb-8 grid grid-cols-1 gap-6 md:grid-cols-2 xl:grid-cols-4">
         <MetricCard title="Tổng doanh thu" value={formatCurrency(totalRevenue)} trend={formatGrowth(report?.growth?.revenue)} icon={<WalletCards size={22} />} tone="bg-red-50 text-[#c70d1a]" />
-        <MetricCard title="Tổng đơn hàng" value={Number(totalOrders).toLocaleString('vi-VN')} trend={formatGrowth(report?.growth?.orders)} icon={<ShoppingCart size={22} />} tone="bg-red-50 text-[#c70d1a]" />
+        <MetricCard title="Đơn đã thanh toán" value={Number(totalOrders).toLocaleString('vi-VN')} trend={formatGrowth(report?.growth?.orders)} icon={<ShoppingCart size={22} />} tone="bg-red-50 text-[#c70d1a]" />
         <MetricCard title="Khách hàng mới" value={Number(newCustomers).toLocaleString('vi-VN')} trend={formatGrowth(report?.growth?.customers)} icon={<Users size={22} />} tone="bg-sky-50 text-sky-700" />
         <MetricCard title="Món bán chạy" value={topItem?.name || 'Chưa có'} subText={topItem ? `Đã bán ${topItem.totalQuantity} suất` : 'Chưa có dữ liệu'} icon={<Flame size={22} />} tone="bg-red-50 text-[#c70d1a]" />
       </div>

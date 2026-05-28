@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useEffect, useReducer } from 'react';
+import React, { createContext, useCallback, useContext, useEffect, useReducer } from 'react';
 import { useAuth } from './AuthContext';
 
 const CartContext = createContext();
@@ -101,6 +101,35 @@ const cartReducer = (state, action) => {
         storageKey: action.payload?.storageKey,
       };
 
+    case 'REFRESH_PRODUCTS': {
+      const menuMap = new Map((action.payload?.menuItems || []).map(item => [item._id, item]));
+      const comboMap = new Map((action.payload?.combos || []).map(combo => [combo._id, combo]));
+
+      return {
+        ...state,
+        items: state.items.map(item => {
+          if (item.type === 'combo') {
+            const freshCombo = comboMap.get(item.comboId);
+            return freshCombo
+              ? {
+                  ...item,
+                  name: freshCombo.name,
+                  price: freshCombo.price,
+                  image: freshCombo.image || '',
+                  items: freshCombo.items,
+                  isAvailable: freshCombo.isAvailable,
+                }
+              : { ...item, isAvailable: false };
+          }
+
+          const freshItem = menuMap.get(item.menuItem?._id);
+          return freshItem
+            ? { ...item, menuItem: freshItem }
+            : { ...item, menuItem: { ...(item.menuItem || {}), isAvailable: false } };
+        }),
+      };
+    }
+
     default:
       return state;
   }
@@ -164,7 +193,11 @@ export const CartProvider = ({ children }) => {
   const updateQuantity = (id, quantity) =>
     dispatch({ type: 'UPDATE_QUANTITY', payload: { id, quantity } });
 
-  const clearCart = () => dispatch({ type: 'CLEAR_CART' });
+  const clearCart = useCallback(() => dispatch({ type: 'CLEAR_CART' }), []);
+
+  const refreshCartProducts = useCallback(({ menuItems = [], combos = [] }) => {
+    dispatch({ type: 'REFRESH_PRODUCTS', payload: { menuItems, combos } });
+  }, []);
 
   const getCartTotal = () => {
     return state.items.reduce((total, item) => {
@@ -191,6 +224,7 @@ export const CartProvider = ({ children }) => {
         removeItem,
         updateQuantity,
         clearCart,
+        refreshCartProducts,
         getCartTotal,
         getItemCount,
       }}

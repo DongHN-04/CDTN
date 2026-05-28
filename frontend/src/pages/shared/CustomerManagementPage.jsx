@@ -1,8 +1,10 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { PlusCircle } from 'lucide-react';
 import customerService from '../../services/customerService';
 import { useAuth } from '../../contexts/AuthContext';
 import ConfirmDeleteModal from '../../components/ConfirmDeleteModal';
+import { useToast } from '../../contexts/ToastContext';
+import { formatApiError } from '../../utils/apiError';
 
 const pageSize = 5;
 const formatCurrency = (value = 0) => `${Number(value || 0).toLocaleString('vi-VN')}đ`;
@@ -33,29 +35,32 @@ const CustomerManagementPage = () => {
   const [editingCustomer, setEditingCustomer] = useState(null);
   const [showForm, setShowForm] = useState(false);
   const [formData, setFormData] = useState(emptyForm);
-  const [error, setError] = useState('');
+  const [, setError] = useState('');
   const [search, setSearch] = useState('');
   const [typeFilter, setTypeFilter] = useState('all');
   const [deleteModal, setDeleteModal] = useState({ isOpen: false, customer: null, loading: false });
   const [currentPage, setCurrentPage] = useState(1);
   const { user } = useAuth();
+  const { showToast } = useToast();
 
-  useEffect(() => {
-    fetchCustomers();
-  }, []);
-
-  const fetchCustomers = async () => {
+  const fetchCustomers = useCallback(async () => {
     setLoading(true);
     setError('');
     try {
       const data = await customerService.getCustomers();
       setCustomers(data || []);
     } catch (err) {
-      setError(err.response?.data?.message || 'Không thể tải danh sách khách hàng');
+      const message = err.response?.data?.message || 'Không thể tải danh sách khách hàng';
+      setError(message);
+      showToast(message, 'error');
     } finally {
       setLoading(false);
     }
-  };
+  }, [showToast]);
+
+  useEffect(() => {
+    fetchCustomers();
+  }, [fetchCustomers]);
 
   const openCreate = () => {
     setEditingCustomer(null);
@@ -92,9 +97,12 @@ const CustomerManagementPage = () => {
       setDeleteModal(current => ({ ...current, loading: true }));
       await customerService.deleteCustomer(deleteModal.customer._id);
       setDeleteModal({ isOpen: false, customer: null, loading: false });
+      showToast('Đã xóa khách hàng');
       fetchCustomers();
     } catch (err) {
-      setError(err.response?.data?.message || 'Không thể xóa khách hàng');
+      const message = err.response?.data?.message || 'Không thể xóa khách hàng';
+      setError(message);
+      showToast(message, 'error');
       setDeleteModal({ isOpen: false, customer: null, loading: false });
     }
   };
@@ -105,6 +113,17 @@ const CustomerManagementPage = () => {
 
     if (!formData.name.trim()) {
       setError('Tên khách hàng là bắt buộc');
+      showToast('Tên khách hàng là bắt buộc', 'error');
+      return;
+    }
+    if (formData.phone.trim() && !/^(0|\+84)[0-9]{9,10}$/.test(formData.phone.trim().replace(/\s/g, ''))) {
+      setError('Số điện thoại không hợp lệ');
+      showToast('Số điện thoại không hợp lệ', 'error');
+      return;
+    }
+    if (formData.email.trim() && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formData.email.trim())) {
+      setError('Email không hợp lệ');
+      showToast('Email không hợp lệ', 'error');
       return;
     }
 
@@ -115,9 +134,12 @@ const CustomerManagementPage = () => {
         await customerService.createCustomer(formData);
       }
       closeForm();
+      showToast(editingCustomer ? 'Đã cập nhật khách hàng' : 'Đã thêm khách hàng');
       fetchCustomers();
     } catch (err) {
-      setError(err.response?.data?.message || 'Không thể lưu khách hàng');
+      const message = formatApiError(err, 'Không thể lưu khách hàng');
+      setError(message);
+      showToast(message, 'error');
     }
   };
 
@@ -204,11 +226,6 @@ const CustomerManagementPage = () => {
         </div>
       </div>
 
-      {error && (
-        <div className="mb-5 rounded-xl border border-red-100 bg-red-50 px-4 py-3 text-sm font-bold text-red-700">
-          {error}
-        </div>
-      )}
 
       <div className="mb-7 grid grid-cols-1 gap-5 md:grid-cols-3">
         <StatCard title="Tổng khách hàng" value={stats.total} icon="♙" tone="bg-red-50 text-[#c70d1a]" />

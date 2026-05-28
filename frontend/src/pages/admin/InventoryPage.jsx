@@ -1,8 +1,9 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import inventoryService from '../../services/inventoryService';
 import IngredientForm from '../../components/IngredientForm';
 import ConfirmDeleteModal from '../../components/ConfirmDeleteModal';
 import { formatApiError } from '../../utils/apiError';
+import { useToast } from '../../contexts/ToastContext';
 
 const LOW_STOCK_THRESHOLD = 10;
 const pageSize = 5;
@@ -17,33 +18,36 @@ const getStatus = (stock = 0) => {
 };
 
 const InventoryPage = () => {
+  const { showToast } = useToast();
   const [ingredients, setIngredients] = useState([]);
   const [loading, setLoading] = useState(true);
   const [selected, setSelected] = useState(null);
   const [showForm, setShowForm] = useState(false);
   const [formError, setFormError] = useState('');
-  const [pageError, setPageError] = useState('');
+  const [, setPageError] = useState('');
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
   const [deleteModal, setDeleteModal] = useState({ isOpen: false, ingredient: null, loading: false });
   const [currentPage, setCurrentPage] = useState(1);
 
-  const fetchData = async () => {
+  const fetchData = useCallback(async () => {
     setLoading(true);
     setPageError('');
     try {
       const data = await inventoryService.getIngredients();
       setIngredients(data || []);
     } catch (error) {
-      setPageError(formatApiError(error, 'Không thể tải dữ liệu kho'));
+      const message = formatApiError(error, 'Không thể tải dữ liệu kho');
+      setPageError(message);
+      showToast(message, 'error');
     } finally {
       setLoading(false);
     }
-  };
+  }, [showToast]);
 
   useEffect(() => {
     fetchData();
-  }, []);
+  }, [fetchData]);
 
   const openCreate = () => {
     setSelected(null);
@@ -69,8 +73,11 @@ const InventoryPage = () => {
       await inventoryService.deleteIngredient(deleteModal.ingredient._id);
       setIngredients(current => current.filter(item => item._id !== deleteModal.ingredient._id));
       setDeleteModal({ isOpen: false, ingredient: null, loading: false });
+      showToast('Đã xóa nguyên liệu');
     } catch (error) {
-      setPageError(formatApiError(error, 'Không thể xóa nguyên liệu'));
+      const message = formatApiError(error, 'Không thể xóa nguyên liệu');
+      setPageError(message);
+      showToast(message, 'error');
       setDeleteModal({ isOpen: false, ingredient: null, loading: false });
     }
   };
@@ -87,8 +94,11 @@ const InventoryPage = () => {
         setIngredients(current => [created, ...current]);
       }
       setShowForm(false);
+      showToast(selected ? 'Đã cập nhật nguyên liệu' : 'Đã thêm nguyên liệu');
     } catch (error) {
-      setFormError(formatApiError(error, 'Lỗi lưu nguyên liệu'));
+      const message = formatApiError(error, 'Lỗi lưu nguyên liệu');
+      setFormError(message);
+      showToast(message, 'error');
     }
   };
 
@@ -175,11 +185,6 @@ const InventoryPage = () => {
         </div>
       </div>
 
-      {pageError && (
-        <div className="mb-5 rounded-xl border border-red-100 bg-red-50 px-4 py-3 text-sm font-bold text-red-700">
-          {pageError}
-        </div>
-      )}
 
       <div className="mb-7 grid grid-cols-1 gap-5 md:grid-cols-3">
         <StatCard title="Tổng nguyên liệu" value={stats.total} hint={`+ ${filteredIngredients.length} đang hiển thị`} icon="▣" />

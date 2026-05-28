@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import * as XLSX from 'xlsx';
 import supplierService from '../../services/supplierService';
+import { useToast } from '../../contexts/ToastContext';
 
 const PAGE_SIZE = 5;
 
@@ -21,9 +22,10 @@ const getPaymentStatus = (purchase) => {
 };
 
 const PurchaseHistoryPage = () => {
+  const { showToast } = useToast();
   const [purchases, setPurchases] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState('');
+  const [, setError] = useState('');
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
   const [page, setPage] = useState(1);
@@ -37,14 +39,16 @@ const PurchaseHistoryPage = () => {
         const data = await supplierService.getPurchases();
         setPurchases(data || []);
       } catch (err) {
-        setError(err.response?.data?.message || 'Không thể tải lịch sử nhập hàng');
+        const message = err.response?.data?.message || 'Không thể tải lịch sử nhập hàng';
+        setError(message);
+        showToast(message, 'error');
       } finally {
         setLoading(false);
       }
     };
 
     fetchPurchases();
-  }, []);
+  }, [showToast]);
 
   const monthlyStats = useMemo(() => {
     const now = new Date();
@@ -163,11 +167,6 @@ const PurchaseHistoryPage = () => {
         </div>
       </div>
 
-      {error && (
-        <div className="mb-5 rounded-xl border border-red-100 bg-red-50 px-4 py-3 text-sm font-bold text-red-700">
-          {error}
-        </div>
-      )}
 
       <div className="mb-8 grid grid-cols-1 gap-5 lg:grid-cols-[1fr_240px]">
         <section className="rounded-2xl bg-white p-6 shadow-sm ring-1 ring-gray-100">

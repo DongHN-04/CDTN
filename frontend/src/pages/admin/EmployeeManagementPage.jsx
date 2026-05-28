@@ -1,7 +1,8 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { PlusCircle } from 'lucide-react';
 import userService from '../../services/userService';
 import ConfirmDeleteModal from '../../components/ConfirmDeleteModal';
+import { useToast } from '../../contexts/ToastContext';
 
 const emptyForm = {
   name: '',
@@ -35,9 +36,10 @@ const getInitials = (name = '') => {
 };
 
 const EmployeeManagementPage = () => {
+  const { showToast } = useToast();
   const [employees, setEmployees] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState('');
+  const [, setError] = useState('');
   const [search, setSearch] = useState('');
   const [positionFilter, setPositionFilter] = useState('all');
   const [statusFilter, setStatusFilter] = useState('all');
@@ -47,22 +49,24 @@ const EmployeeManagementPage = () => {
   const [deleteModal, setDeleteModal] = useState({ isOpen: false, employee: null });
   const [currentPage, setCurrentPage] = useState(1);
 
-  useEffect(() => {
-    fetchEmployees();
-  }, []);
-
-  const fetchEmployees = async () => {
+  const fetchEmployees = useCallback(async () => {
     setLoading(true);
     setError('');
     try {
       const data = await userService.getUsers();
       setEmployees(data || []);
     } catch (err) {
-      setError(err.response?.data?.message || 'Không thể tải danh sách nhân viên');
+      const message = err.response?.data?.message || 'Không thể tải danh sách nhân viên';
+      setError(message);
+      showToast(message, 'error');
     } finally {
       setLoading(false);
     }
-  };
+  }, [showToast]);
+
+  useEffect(() => {
+    fetchEmployees();
+  }, [fetchEmployees]);
 
   const enrichedEmployees = useMemo(() => (
     employees.map(employee => ({
@@ -142,11 +146,28 @@ const EmployeeManagementPage = () => {
 
     if (!formData.name.trim() || !formData.email.trim()) {
       setError('Tên và email là bắt buộc');
+      showToast('Tên và email là bắt buộc', 'error');
+      return;
+    }
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formData.email.trim())) {
+      setError('Email không hợp lệ');
+      showToast('Email không hợp lệ', 'error');
+      return;
+    }
+    if (formData.phone.trim() && !/^(0|\+84)[0-9]{9,10}$/.test(formData.phone.trim().replace(/\s/g, ''))) {
+      setError('Số điện thoại không hợp lệ');
+      showToast('Số điện thoại không hợp lệ', 'error');
+      return;
+    }
+    if (formData.salary !== '' && (Number(formData.salary) < 0 || Number(formData.salary) > 100000000)) {
+      setError('Lương phải từ 0 đến 100.000.000');
+      showToast('Lương phải từ 0 đến 100.000.000', 'error');
       return;
     }
 
     if (!editingEmployee && formData.password.length < 6) {
       setError('Mật khẩu phải có ít nhất 6 ký tự');
+      showToast('Mật khẩu phải có ít nhất 6 ký tự', 'error');
       return;
     }
 
@@ -167,10 +188,13 @@ const EmployeeManagementPage = () => {
         const created = await userService.createUser(payload);
         setEmployees(current => [created, ...current]);
       }
+      showToast(editingEmployee ? 'Đã cập nhật nhân viên' : 'Đã thêm nhân viên');
       closeForm();
     } catch (err) {
       const details = err.response?.data?.details;
-      setError(details?.[0]?.message || err.response?.data?.message || 'Không thể lưu thông tin nhân viên');
+      const message = details?.[0]?.message || err.response?.data?.message || 'Không thể lưu thông tin nhân viên';
+      setError(message);
+      showToast(message, 'error');
     }
   };
 
@@ -181,8 +205,11 @@ const EmployeeManagementPage = () => {
       await userService.deleteUser(deleteModal.employee._id);
       setEmployees(current => current.filter(employee => employee._id !== deleteModal.employee._id));
       setDeleteModal({ isOpen: false, employee: null });
+      showToast('Đã xóa nhân viên');
     } catch (err) {
-      setError(err.response?.data?.message || 'Không thể xóa nhân viên');
+      const message = err.response?.data?.message || 'Không thể xóa nhân viên';
+      setError(message);
+      showToast(message, 'error');
       setDeleteModal({ isOpen: false, employee: null });
     }
   };
@@ -204,11 +231,6 @@ const EmployeeManagementPage = () => {
         </button>
       </div>
 
-      {error && (
-        <div className="mb-5 rounded-xl border border-red-100 bg-red-50 px-4 py-3 text-sm font-bold text-red-700">
-          {error}
-        </div>
-      )}
 
       <div className="mb-7 grid grid-cols-1 gap-5 md:grid-cols-2 xl:grid-cols-4">
         <StatCard title="Tổng nhân sự" value={stats.total} icon="♟" tone="bg-red-50 text-[#c70d1a]" />

@@ -24,7 +24,7 @@ router.route('/')
   .post(protect, authorize('admin'), validateShiftCreate, createShift);
 
 router.put('/:id/assign', protect, authorize('admin'), validateAssignStaff, assignStaff);
-router.put('/:id/close', protect, validateCloseShift, closeShift);
+router.put('/:id/close', protect, authorize('admin', 'staff'), validateCloseShift, closeShift);
 
 router.route('/:id')
   .put(protect, authorize('admin'), validateShiftUpdate, updateShift)

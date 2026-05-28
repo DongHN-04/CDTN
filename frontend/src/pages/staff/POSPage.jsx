@@ -19,6 +19,7 @@ import orderService from '../../services/orderService';
 import promotionService from '../../services/promotionService';
 import { getImageUrl } from '../../utils/imageUrl';
 import { ALL_MENU_CATEGORY, COMBO_CATEGORY, MENU_CATEGORIES, normalizeCategory } from '../../constants/menuCategories';
+import { useToast } from '../../contexts/ToastContext';
 
 const categories = [ALL_MENU_CATEGORY, ...MENU_CATEGORIES, COMBO_CATEGORY];
 
@@ -29,6 +30,7 @@ const getCartLineId = item => (item.type === 'combo' ? item.comboId : item.menuI
 
 const POSPage = () => {
   const { items, addItem, addCombo, removeItem, updateQuantity, clearCart, getCartTotal, getItemCount } = useCart();
+  const { showToast } = useToast();
 
   const [menuItems, setMenuItems] = useState([]);
   const [combos, setCombos] = useState([]);
@@ -41,7 +43,6 @@ const POSPage = () => {
   const [paymentMethod, setPaymentMethod] = useState('cash');
   const [loading, setLoading] = useState(false);
   const [dataLoading, setDataLoading] = useState(true);
-  const [message, setMessage] = useState('');
 
   useEffect(() => {
     const fetchData = async () => {
@@ -59,14 +60,14 @@ const POSPage = () => {
         setPromotions(promoData.filter(promo => promo.isActive !== false));
       } catch (error) {
         console.error('Lỗi tải dữ liệu POS:', error);
-        setMessage('Không thể tải dữ liệu quầy bán hàng. Vui lòng thử lại.');
+        showToast('Không thể tải dữ liệu quầy bán hàng. Vui lòng thử lại.', 'error');
       } finally {
         setDataLoading(false);
       }
     };
 
     fetchData();
-  }, []);
+  }, [showToast]);
 
   const cartTotal = getCartTotal();
   const grandTotal = Math.max(cartTotal - discount, 0);
@@ -120,34 +121,34 @@ const POSPage = () => {
   }, [combos, menuItems, search, selectedCategory]);
 
   const handleProductClick = product => {
-    setMessage('');
     if (product.productType === 'item' && product.isAvailable === false) {
-      setMessage('Món này đang hết hàng do không đủ nguyên liệu trong kho.');
+      showToast('Món này đang hết hàng do không đủ nguyên liệu trong kho.', 'error');
       return;
     }
     if (product.productType === 'combo') {
       if (product.isAvailable === false) {
-        setMessage('Combo này đang hết hàng do không đủ nguyên liệu trong kho.');
+        showToast('Combo này đang hết hàng do không đủ nguyên liệu trong kho.', 'error');
         return;
       }
       if (!product.items || product.items.length === 0) {
-        setMessage('Combo này chưa có món, không thể thêm vào giỏ.');
+        showToast('Combo này chưa có món, không thể thêm vào giỏ.', 'error');
         return;
       }
       addCombo(product, 1);
+      showToast(`Đã thêm "${product.name}" vào giỏ hàng!`);
       return;
     }
     addItem(product, 1);
+    showToast(`Đã thêm "${product.name}" vào giỏ hàng!`);
   };
 
   const handleCheckout = async () => {
     if (!items.length) {
-      setMessage('Giỏ hàng đang trống.');
+      showToast('Giỏ hàng đang trống.', 'error');
       return;
     }
 
     setLoading(true);
-    setMessage('');
     try {
       const orderItems = items.map(item => {
         if (item.type === 'combo') return { comboId: item.comboId, quantity: item.quantity };
@@ -162,13 +163,13 @@ const POSPage = () => {
         promotionId: selectedPromoId !== 'auto' ? selectedPromoId : null,
       });
 
-      setMessage(`Đã tạo hóa đơn #${order._id.slice(-6)} với tổng tiền ${formatCurrency(order.total || grandTotal)}.`);
+      showToast(`Đã tạo hóa đơn #${order._id.slice(-6)} với tổng tiền ${formatCurrency(order.total || grandTotal)}.`);
       clearCart();
       setCustomer({ name: '', phone: '' });
       setSelectedPromoId('auto');
     } catch (error) {
       const errMsg = error.response?.data?.message || error.message || 'Không thể tạo đơn hàng.';
-      setMessage(errMsg);
+      showToast(errMsg, 'error');
     } finally {
       setLoading(false);
     }
@@ -440,12 +441,6 @@ const POSPage = () => {
               <Printer size={17} />
               {loading ? 'Đang thanh toán...' : 'Thanh toán'}
             </button>
-
-            {message && (
-              <p className={`mt-3 rounded-lg px-3 py-2 text-sm font-semibold ${message.startsWith('Đã') ? 'bg-emerald-50 text-emerald-700' : 'bg-red-50 text-red-700'}`}>
-                {message}
-              </p>
-            )}
           </div>
         </aside>
       </div>

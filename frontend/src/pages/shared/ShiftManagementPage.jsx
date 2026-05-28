@@ -4,6 +4,7 @@ import userService from '../../services/userService';
 import { useAuth } from '../../contexts/AuthContext';
 import { PlusCircle } from 'lucide-react';
 import ConfirmDeleteModal from '../../components/ConfirmDeleteModal';
+import { useToast } from '../../contexts/ToastContext';
 
 const shiftSlots = [
   { id: 'morning', label: 'Ca Sáng', time: '08:00 - 13:00', color: 'bg-[#0089a8]', dot: 'bg-[#0089a8]' },
@@ -49,19 +50,21 @@ const getSlotId = (shift) => {
 
 const ShiftManagementPage = () => {
   const { user } = useAuth();
+  const { showToast } = useToast();
   const isAdmin = user?.role === 'admin';
 
   const [shifts, setShifts] = useState([]);
   const [staffList, setStaffList] = useState([]);
   const [weekStart, setWeekStart] = useState(getMonday(new Date()));
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState('');
+  const [, setError] = useState('');
   const [showForm, setShowForm] = useState(false);
   const [editingShift, setEditingShift] = useState(null);
   const [form, setForm] = useState({ name: '', startTime: '', endTime: '', staff: [] });
   const [selectedShiftForAssign, setSelectedShiftForAssign] = useState(null);
   const [selectedShiftForSummary, setSelectedShiftForSummary] = useState(null);
   const [selectedStaffId, setSelectedStaffId] = useState('');
+  const [closeShiftModal, setCloseShiftModal] = useState({ shift: null, actualCash: '0', loading: false });
   const [deleteModal, setDeleteModal] = useState({ isOpen: false, shift: null, loading: false });
 
   const fetchShifts = useCallback(async () => {
@@ -71,11 +74,13 @@ const ShiftManagementPage = () => {
       const data = isAdmin ? await shiftService.getShifts() : await shiftService.getMyShifts();
       setShifts(data || []);
     } catch (err) {
-      setError(err.response?.data?.message || 'Không thể tải danh sách ca làm việc');
+      const message = err.response?.data?.message || 'Không thể tải danh sách ca làm việc';
+      setError(message);
+      showToast(message, 'error');
     } finally {
       setLoading(false);
     }
-  }, [isAdmin]);
+  }, [isAdmin, showToast]);
 
   const fetchStaff = useCallback(async () => {
     if (!isAdmin) return;
@@ -83,9 +88,11 @@ const ShiftManagementPage = () => {
       const users = await userService.getUsers();
       setStaffList((users || []).filter(item => item.role === 'staff' || item.role === 'admin'));
     } catch (err) {
-      setError(err.response?.data?.message || 'Không thể tải danh sách nhân viên');
+      const message = err.response?.data?.message || 'Không thể tải danh sách nhân viên';
+      setError(message);
+      showToast(message, 'error');
     }
-  }, [isAdmin]);
+  }, [isAdmin, showToast]);
 
   useEffect(() => {
     fetchShifts();
@@ -166,9 +173,12 @@ const ShiftManagementPage = () => {
         await shiftService.createShift(form);
       }
       closeForm();
+      showToast(editingShift ? 'Đã cập nhật ca làm việc' : 'Đã tạo ca làm việc');
       fetchShifts();
     } catch (err) {
-      setError(err.response?.data?.message || 'Không thể lưu ca làm việc');
+      const message = err.response?.data?.message || 'Không thể lưu ca làm việc';
+      setError(message);
+      showToast(message, 'error');
     }
   };
 
@@ -183,9 +193,12 @@ const ShiftManagementPage = () => {
       setDeleteModal(current => ({ ...current, loading: true }));
       await shiftService.deleteShift(deleteModal.shift._id);
       setDeleteModal({ isOpen: false, shift: null, loading: false });
+      showToast('Đã xóa ca làm việc');
       fetchShifts();
     } catch (err) {
-      setError(err.response?.data?.message || 'Không thể xóa ca');
+      const message = err.response?.data?.message || 'Không thể xóa ca';
+      setError(message);
+      showToast(message, 'error');
       setDeleteModal({ isOpen: false, shift: null, loading: false });
     }
   };
@@ -193,6 +206,7 @@ const ShiftManagementPage = () => {
   const handleAssignStaff = async () => {
     if (!selectedStaffId) {
       setError('Vui lòng chọn nhân viên');
+      showToast('Vui lòng chọn nhân viên', 'error');
       return;
     }
 
@@ -200,34 +214,44 @@ const ShiftManagementPage = () => {
       await shiftService.assignStaff(selectedShiftForAssign._id, selectedStaffId);
       setSelectedShiftForAssign(null);
       setSelectedStaffId('');
+      showToast('Đã phân ca nhân viên');
       fetchShifts();
     } catch (err) {
-      setError(err.response?.data?.message || 'Không thể phân ca');
+      const message = err.response?.data?.message || 'Không thể phân ca';
+      setError(message);
+      showToast(message, 'error');
     }
   };
 
-  const handleCloseShift = async (shift) => {
-    const names = shift.staff?.map(item => item.name).join(', ') || 'Chưa có';
-    const confirmMessage = `Đóng ca "${shift.name}"?\nNhân viên: ${names}\nBắt đầu: ${new Date(shift.startTime).toLocaleString('vi-VN')}`;
-    if (!window.confirm(confirmMessage)) return;
+  const handleCloseShift = (shift) => {
+    setCloseShiftModal({ shift, actualCash: String(shift.actualCash || shift.totalCash || 0), loading: false });
+  };
 
-    const actualCash = prompt('Nhập tổng tiền mặt thực tế (VNĐ):', '0');
-    if (actualCash === null) return;
+  const confirmCloseShift = async () => {
+    const shift = closeShiftModal.shift;
+    if (!shift) return;
+
+    const actualCash = Number(closeShiftModal.actualCash);
+    if (!Number.isFinite(actualCash) || actualCash < 0) {
+      showToast('Tiền mặt thực tế không hợp lệ', 'error');
+      return;
+    }
 
     try {
+      setCloseShiftModal(current => ({ ...current, loading: true }));
       const closedShift = await shiftService.closeShift(shift._id, {
         endTime: new Date().toISOString(),
-        actualCash: Number(actualCash),
+        actualCash,
       });
-      alert(
-        `Đã đóng ca "${closedShift.name}"\n` +
-        `Tiền mặt hệ thống: ${formatCurrency(closedShift.totalCash)}\n` +
-        `Tiền thực tế: ${formatCurrency(closedShift.actualCash)}\n` +
-        `Chênh lệch: ${formatCurrency(closedShift.difference)}`
-      );
+      setCloseShiftModal({ shift: null, actualCash: '0', loading: false });
+      setSelectedShiftForSummary(closedShift);
+      showToast(`Đã đóng ca "${closedShift.name}"`);
       fetchShifts();
     } catch (err) {
-      setError(err.response?.data?.message || 'Không thể đóng ca');
+      const message = err.response?.data?.message || 'Không thể đóng ca';
+      setError(message);
+      showToast(message, 'error');
+      setCloseShiftModal(current => ({ ...current, loading: false }));
     }
   };
 
@@ -290,11 +314,6 @@ const ShiftManagementPage = () => {
         </div>
       </div>
 
-      {error && (
-        <div className="mb-5 rounded-xl border border-red-100 bg-red-50 px-4 py-3 text-sm font-bold text-red-700">
-          {error}
-        </div>
-      )}
 
       <div className="mb-6 grid grid-cols-1 gap-4 md:grid-cols-3 xl:grid-cols-6">
         <SummaryCard label="Tổng ca" value={weekSummary.total} />
@@ -407,6 +426,15 @@ const ShiftManagementPage = () => {
         />
       )}
 
+      {closeShiftModal.shift && (
+        <CloseShiftModal
+          modal={closeShiftModal}
+          setModal={setCloseShiftModal}
+          onConfirm={confirmCloseShift}
+          onClose={() => setCloseShiftModal({ shift: null, actualCash: '0', loading: false })}
+        />
+      )}
+
       <ConfirmDeleteModal
         isOpen={deleteModal.isOpen}
         title="Xóa ca?"
@@ -482,6 +510,9 @@ const ShiftFormModal = ({ form, setForm, staffList, editingShift, onSubmit, onCl
           </Field>
         </div>
         <Field label="Nhân viên trong ca">
+          <p className="-mt-1 mb-1 text-xs font-semibold text-gray-400">
+            Có thể chọn cả admin nếu admin trực tiếp xử lý đơn trong ca.
+          </p>
           <select
             multiple
             value={form.staff}
@@ -509,7 +540,7 @@ const AssignModal = ({ shift, staffList, selectedStaffId, setSelectedStaffId, on
   <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/35 px-4">
     <div className="w-full max-w-md rounded-2xl bg-white p-6 shadow-2xl">
       <h2 className="m-0 text-xl font-black text-gray-950">Phân ca cho "{shift.name}"</h2>
-      <p className="mt-1 text-sm text-gray-500">Chọn nhân viên để thêm vào ca này.</p>
+      <p className="mt-1 text-sm text-gray-500">Chọn nhân viên hoặc admin để thêm vào ca này.</p>
 
       <select value={selectedStaffId} onChange={event => setSelectedStaffId(event.target.value)} className={`${inputClass} mt-5`}>
         <option value="">Chọn nhân viên</option>
@@ -525,6 +556,54 @@ const AssignModal = ({ shift, staffList, selectedStaffId, setSelectedStaffId, on
     </div>
   </div>
 );
+
+const CloseShiftModal = ({ modal, setModal, onConfirm, onClose }) => {
+  const shift = modal.shift;
+  const staffText = shift.staff?.length
+    ? shift.staff.map(staff => staff.name || staff.email).join(', ')
+    : 'Chưa phân ca';
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/35 px-4">
+      <div className="w-full max-w-md rounded-2xl bg-white p-6 shadow-2xl">
+        <h2 className="m-0 text-xl font-black text-gray-950">Đóng ca "{shift.name}"</h2>
+        <p className="mt-2 text-sm font-bold text-gray-500">Nhân viên: {staffText}</p>
+        <p className="mt-1 text-sm font-bold text-gray-500">
+          Tiền mặt hệ thống: {formatCurrency(shift.totalCash)}
+        </p>
+
+        <Field label="Tiền mặt thực tế (VNĐ)">
+          <input
+            type="number"
+            min="0"
+            value={modal.actualCash}
+            onChange={event => setModal(current => ({ ...current, actualCash: event.target.value }))}
+            className={inputClass}
+          />
+        </Field>
+
+        <div className="mt-6 flex justify-end gap-3">
+          <button
+            type="button"
+            onClick={onClose}
+            disabled={modal.loading}
+            className="rounded-xl bg-gray-100 px-5 py-3 text-sm font-black text-gray-600 disabled:opacity-60"
+          >
+            Hủy
+          </button>
+          <button
+            type="button"
+            onClick={onConfirm}
+            disabled={modal.loading}
+            className="rounded-xl bg-[#c70d1a] px-5 py-3 text-sm font-black text-white disabled:opacity-60"
+          >
+            {modal.loading ? 'Đang đóng...' : 'Xác nhận'}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+};
 
 const ShiftSummaryModal = ({ shift, onClose }) => {
   const staffText = shift.staff?.length

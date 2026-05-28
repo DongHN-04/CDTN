@@ -1,10 +1,11 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { Edit3, PlusCircle, Search, Trash2 } from 'lucide-react';
 import menuService from '../../services/menuService';
 import MenuForm from '../../components/MenuForm';
 import ConfirmDeleteModal from '../../components/ConfirmDeleteModal';
 import { getImageUrl } from '../../utils/imageUrl';
 import { ALL_MENU_CATEGORY, MENU_CATEGORIES } from '../../constants/menuCategories';
+import { useToast } from '../../contexts/ToastContext';
 
 const categories = [ALL_MENU_CATEGORY, ...MENU_CATEGORIES];
 const pageSize = 5;
@@ -32,10 +33,10 @@ const statusClass = {
 };
 
 const MenuManagementPage = () => {
+  const { showToast } = useToast();
   const [menuItems, setMenuItems] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
-  const [notice, setNotice] = useState('');
   const [search, setSearch] = useState('');
   const [activeCategory, setActiveCategory] = useState('Tất cả');
   const [selected, setSelected] = useState(null);
@@ -43,23 +44,24 @@ const MenuManagementPage = () => {
   const [currentPage, setCurrentPage] = useState(1);
   const [deleteModal, setDeleteModal] = useState({ isOpen: false, item: null, loading: false });
 
-  useEffect(() => {
-    fetchMenu();
-  }, []);
-
-  const fetchMenu = async () => {
+  const fetchMenu = useCallback(async () => {
     setLoading(true);
     setError('');
-    setNotice('');
     try {
       const data = await menuService.getMenuItems();
       setMenuItems(data || []);
     } catch (err) {
-      setError(err.response?.data?.message || 'Không thể tải danh sách món');
+      const message = err.response?.data?.message || 'Không thể tải danh sách món';
+      setError(message);
+      showToast(message, 'error');
     } finally {
       setLoading(false);
     }
-  };
+  }, [showToast]);
+
+  useEffect(() => {
+    fetchMenu();
+  }, [fetchMenu]);
 
   const filteredItems = useMemo(() => {
     const keyword = normalizeText(search);
@@ -101,7 +103,6 @@ const MenuManagementPage = () => {
 
   const handleFormSubmit = async (formData) => {
     setError('');
-    setNotice('');
     try {
       if (selected) {
         const updated = await menuService.updateMenuItem(selected._id, formData);
@@ -110,10 +111,13 @@ const MenuManagementPage = () => {
         const created = await menuService.createMenuItem(formData);
         setMenuItems(current => [created, ...current]);
       }
+      showToast(selected ? 'Đã cập nhật món' : 'Đã thêm món');
       closeForm();
     } catch (err) {
       const details = err.response?.data?.details;
-      setError(details?.[0]?.message || err.response?.data?.message || 'Không thể lưu món');
+      const message = details?.[0]?.message || err.response?.data?.message || 'Không thể lưu món';
+      setError(message);
+      showToast(message, 'error');
     }
   };
 
@@ -129,13 +133,15 @@ const MenuManagementPage = () => {
       const result = await menuService.deleteMenuItem(deleteModal.item._id);
       setMenuItems(current => current.filter(menuItem => menuItem._id !== deleteModal.item._id));
       const pausedCombos = Number(result?.pausedCombos || 0);
-      setNotice(pausedCombos > 0
-        ? `Da xoa mon va tam ngung ${pausedCombos} combo co chua mon nay.`
-        : 'Da xoa mon khoi thuc don.'
+      showToast(pausedCombos > 0
+        ? `Đã xóa món và tạm ngừng ${pausedCombos} combo liên quan.`
+        : 'Đã xóa món khỏi thực đơn.'
       );
       setDeleteModal({ isOpen: false, item: null, loading: false });
     } catch (err) {
-      setError(err.response?.data?.message || 'Không thể xóa món');
+      const message = err.response?.data?.message || 'Không thể xóa món';
+      setError(message);
+      showToast(message, 'error');
       setDeleteModal({ isOpen: false, item: null, loading: false });
     }
   };
@@ -161,17 +167,6 @@ const MenuManagementPage = () => {
           Thêm món mới
         </button>
       </div>
-
-      {error && (
-        <div className="mb-5 rounded-xl border border-red-100 bg-red-50 px-4 py-3 text-sm font-bold text-red-700">
-          {error}
-        </div>
-      )}
-      {notice && (
-        <div className="mb-5 rounded-xl border border-emerald-100 bg-emerald-50 px-4 py-3 text-sm font-bold text-emerald-700">
-          {notice}
-        </div>
-      )}
 
       <div className="mb-6 max-w-xl">
         <div className="relative">

@@ -7,7 +7,7 @@ const rateLimit = require('../middleware/rateLimitMiddleware');
 const paymentCreateLimiter = rateLimit({
   windowMs: 10 * 60 * 1000,
   max: 30,
-  message: 'Ban tao giao dich thanh toan qua nhieu lan, vui long thu lai sau',
+  message: 'Bạn tạo giao dịch thanh toán quá nhiều lần, vui lòng thử lại sau',
 });
 
 router.post('/create', paymentCreateLimiter, validatePaymentCreate, createPayment);

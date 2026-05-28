@@ -4,6 +4,7 @@ import { ArrowRight, CalendarDays, Gift, ShoppingCart, Tag, TicketPercent, Truck
 import publicService from '../../services/publicService';
 import { useCart } from '../../contexts/CartContext';
 import { useAuth } from '../../contexts/AuthContext';
+import { useToast } from '../../contexts/ToastContext';
 import { getImageUrl } from '../../utils/imageUrl';
 
 const fallbackPromotions = [
@@ -104,10 +105,10 @@ const getPromoTheme = index => {
 const PromotionsPage = () => {
   const { addCombo } = useCart();
   const { user } = useAuth();
+  const { showToast } = useToast();
   const [promotions, setPromotions] = useState([]);
   const [combos, setCombos] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [message, setMessage] = useState('');
 
   useEffect(() => {
     const fetchData = async () => {
@@ -145,15 +146,15 @@ const PromotionsPage = () => {
 
   const handleAddCombo = combo => {
     if (!combo.items?.length && combo._id?.startsWith('combo-')) {
-      setMessage('Combo mẫu dùng để giới thiệu. Vui lòng xem thực đơn để đặt món.');
+      showToast('Combo mẫu dùng để giới thiệu. Vui lòng xem thực đơn để đặt món.', 'error');
       return;
     }
     if (combo.isAvailable === false) {
-      setMessage('Combo này đang hết hàng do không đủ nguyên liệu trong kho.');
+      showToast('Combo này đang hết hàng do không đủ nguyên liệu trong kho.', 'error');
       return;
     }
     addCombo(combo, 1);
-    setMessage(`Đã thêm ${combo.name} vào giỏ hàng.`);
+    showToast(`Đã thêm ${combo.name} vào giỏ hàng.`);
   };
 
   return (
@@ -313,9 +314,6 @@ const PromotionsPage = () => {
             })}
           </div>
 
-          {message && (
-            <p className="mt-5 rounded-lg bg-red-50 px-4 py-3 text-sm font-bold text-[#c70d18]">{message}</p>
-          )}
         </div>
       </section>
     </div>

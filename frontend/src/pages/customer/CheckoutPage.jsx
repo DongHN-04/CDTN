@@ -13,6 +13,7 @@ import {
   ShoppingBag,
 } from 'lucide-react';
 import { useCart } from '../../contexts/CartContext';
+import { useAuth } from '../../contexts/AuthContext';
 import paymentService from '../../services/paymentService';
 import publicService from '../../services/publicService';
 import { getImageUrl } from '../../utils/imageUrl';
@@ -43,11 +44,12 @@ const districts = [
 const formatPrice = (value) => `${Number(value || 0).toLocaleString('vi-VN')}đ`;
 
 const CheckoutPage = () => {
-  const { items, clearCart, getCartTotal } = useCart();
+  const { items, clearCart, getCartTotal, refreshCartProducts } = useCart();
+  const { user } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
 
-  const initialDiscount = location.state?.discount || Number(localStorage.getItem('discountAmount')) || 0;
+  const initialDiscount = 0;
   const initialPromo = location.state?.promoCode || localStorage.getItem('appliedPromo') || '';
 
   const [name, setName] = useState(localStorage.getItem('customerName') || '');
@@ -61,7 +63,6 @@ const CheckoutPage = () => {
   const [discount, setDiscount] = useState(initialDiscount);
   const [promotions, setPromotions] = useState([]);
   const [loading, setLoading] = useState(false);
-  const [error, setError] = useState('');
   const [toast, setToast] = useState({ show: false, message: '', type: 'success' });
 
   const subtotal = getCartTotal();
@@ -79,6 +80,32 @@ const CheckoutPage = () => {
       .then((data) => setPromotions(Array.isArray(data) ? data : []))
       .catch(() => setPromotions([]));
   }, []);
+
+  useEffect(() => {
+    Promise.all([publicService.getMenu(), publicService.getCombos()])
+      .then(([menuItems, combos]) => refreshCartProducts({ menuItems, combos }))
+      .catch(() => {});
+  }, [refreshCartProducts]);
+
+  useEffect(() => {
+    const code = normalizePromoCode(promoCode);
+    if (!code) {
+      setDiscount(0);
+      return;
+    }
+
+    const result = findUsablePromotion(promotions, code, subtotal);
+    if (result.error) {
+      setDiscount(0);
+      localStorage.removeItem('discountAmount');
+      return;
+    }
+
+    setPromoCode(result.promotion.name);
+    setDiscount(result.discount);
+    localStorage.setItem('appliedPromo', result.promotion.name);
+    localStorage.setItem('discountAmount', String(result.discount));
+  }, [promoCode, promotions, subtotal]);
 
   const orderItems = useMemo(() => (
     items
@@ -131,12 +158,11 @@ const CheckoutPage = () => {
   const handleSubmitOrder = async () => {
     const validationError = validateForm();
     if (validationError) {
-      setError(validationError);
+      showToast(validationError, 'error');
       return;
     }
 
     setLoading(true);
-    setError('');
 
     const fullAddress = `${address.trim()}, ${district}, ${city}`;
 
@@ -149,6 +175,7 @@ const CheckoutPage = () => {
         customer: {
           name: name.trim(),
           phone: phone.trim(),
+          email: user?.role === 'customer' ? user.email : '',
           address: fullAddress,
         },
         notes: notes.trim(),
@@ -157,21 +184,19 @@ const CheckoutPage = () => {
         items: orderItems,
       });
 
-      localStorage.removeItem('appliedPromo');
-      localStorage.removeItem('discountAmount');
-
       if (paymentMethod === 'vnpay') {
         const { paymentUrl } = await paymentService.createPayment({ orderId: order._id });
         if (!paymentUrl) throw new Error('Không nhận được đường dẫn thanh toán VNPay.');
-        clearCart();
         window.location.assign(paymentUrl);
         return;
       }
 
+      localStorage.removeItem('appliedPromo');
+      localStorage.removeItem('discountAmount');
       clearCart();
       navigate(`/payment-result?status=order-pending&orderId=${order._id}`, { replace: true });
     } catch (err) {
-      setError(err.response?.data?.message || err.message || 'Có lỗi xảy ra khi đặt hàng. Vui lòng thử lại.');
+      showToast(err.response?.data?.message || err.message || 'Có lỗi xảy ra khi đặt hàng. Vui lòng thử lại.', 'error');
     } finally {
       setLoading(false);
     }
@@ -425,13 +450,6 @@ const CheckoutPage = () => {
                   {formatPrice(total)}
                 </span>
               </div>
-
-              {error && (
-                <div className="flex items-start gap-2 rounded-xl border border-rose-100 bg-rose-50 p-3.5 text-xs font-semibold text-rose-600">
-                  <AlertCircle size={16} className="mt-0.5 shrink-0" />
-                  <span>{error}</span>
-                </div>
-              )}
 
               <button
                 type="button"

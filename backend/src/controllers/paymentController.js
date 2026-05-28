@@ -49,16 +49,16 @@ const createPayment = async (req, res) => {
 
     const { orderId } = req.body;
     const order = await Order.findById(orderId);
-    if (!order) return res.status(404).json({ message: 'Khong tim thay don hang' });
+    if (!order) return res.status(404).json({ message: 'Không tìm thấy đơn hàng' });
 
     if (await cancelExpiredPaymentReservation(order)) {
-      return res.status(400).json({ message: 'Don hang thanh toan VNPay da qua han va bi huy' });
+      return res.status(400).json({ message: 'Đơn hàng thanh toán VNPay đã quá hạn và bị hủy' });
     }
 
-    if (order.total <= 0) return res.status(400).json({ message: 'Gia tri don hang khong hop le' });
-    if (order.status !== 'pending') return res.status(400).json({ message: 'Chi thanh toan online cho don dang cho xac nhan' });
-    if (order.paymentMethod !== 'qr') return res.status(400).json({ message: 'Don hang khong chon thanh toan VNPay' });
-    if (order.paymentStatus === 'paid') return res.status(400).json({ message: 'Don hang da duoc thanh toan' });
+    if (order.total <= 0) return res.status(400).json({ message: 'Giá trị đơn hàng không hợp lệ' });
+    if (order.status !== 'pending') return res.status(400).json({ message: 'Chỉ thanh toán online cho đơn đang chờ xác nhận' });
+    if (order.paymentMethod !== 'qr') return res.status(400).json({ message: 'Đơn hàng không chọn thanh toán VNPay' });
+    if (order.paymentStatus === 'paid') return res.status(400).json({ message: 'Đơn hàng đã được thanh toán' });
 
     let ipAddr =
       req.headers['x-forwarded-for']?.split(',')[0].trim() ||
@@ -80,7 +80,7 @@ const createPayment = async (req, res) => {
       vnp_Amount: order.total,
       vnp_IpAddr: ipAddr,
       vnp_TxnRef: txnRef,
-      vnp_OrderInfo: `Thanh toan don hang ${orderId}`,
+      vnp_OrderInfo: `Thanh toán đơn hàng ${orderId}`,
       vnp_OrderType: ProductCode.Other,
       vnp_ReturnUrl: process.env.VNPAY_RETURN_URL,
       vnp_Locale: VnpLocale.VN,
@@ -90,10 +90,10 @@ const createPayment = async (req, res) => {
 
     await runWithOptionalTransaction(async (session) => {
       const orderInTx = await Order.findById(orderId).session(session);
-      if (!orderInTx) throw new Error('Khong tim thay don hang');
-      if (orderInTx.status !== 'pending') throw new Error('Chi thanh toan online cho don dang cho xac nhan');
-      if (orderInTx.paymentMethod !== 'qr') throw new Error('Don hang khong chon thanh toan VNPay');
-      if (orderInTx.paymentStatus === 'paid') throw new Error('Don hang da duoc thanh toan');
+      if (!orderInTx) throw new Error('Không tìm thấy đơn hàng');
+      if (orderInTx.status !== 'pending') throw new Error('Chỉ thanh toán online cho đơn đang chờ xác nhận');
+      if (orderInTx.paymentMethod !== 'qr') throw new Error('Đơn hàng không chọn thanh toán VNPay');
+      if (orderInTx.paymentStatus === 'paid') throw new Error('Đơn hàng đã được thanh toán');
 
       if (!orderInTx.inventoryDeducted) {
         const items = orderInTx.items.map((item) => ({
@@ -120,7 +120,7 @@ const createPayment = async (req, res) => {
     res.json({ paymentUrl });
   } catch (error) {
     console.error('Loi createPayment:', error);
-    res.status(400).json({ message: error.message || 'Loi server' });
+    res.status(400).json({ message: error.message || 'Lỗi server' });
   }
 };
 
@@ -210,7 +210,7 @@ const paymentReturn = async (req, res) => {
     );
   } catch (error) {
     console.error('Loi paymentReturn:', error);
-    res.status(500).json({ message: 'Loi server' });
+    res.status(500).json({ message: 'Lỗi server' });
   }
 };
 

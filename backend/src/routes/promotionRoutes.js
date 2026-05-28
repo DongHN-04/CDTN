@@ -11,12 +11,16 @@ const {
   deleteBanner,
   setActiveBanner
 } = require('../controllers/promotionController');
-const { validatePromotionCreate, validatePromotionUpdate } = require('../middleware/validationMiddleware');
+const {
+  validatePromotionCreate,
+  validatePromotionUpdate,
+  validateBannerCreate,
+} = require('../middleware/validationMiddleware');
 
 // Banner routes
 router.route('/banners')
   .get(protect, authorize('admin', 'staff'), getBanners)
-  .post(protect, authorize('admin'), createBanner);
+  .post(protect, authorize('admin'), validateBannerCreate, createBanner);
 
 router.route('/banners/:id')
   .delete(protect, authorize('admin'), deleteBanner);

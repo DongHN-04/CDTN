@@ -14,6 +14,7 @@ import {
 import { useAuth } from '../../contexts/AuthContext';
 import userService from '../../services/userService';
 import uploadService from '../../services/uploadService';
+import { useToast } from '../../contexts/ToastContext';
 
 const formatDate = value => {
   if (!value) return 'Chưa cập nhật';
@@ -52,11 +53,12 @@ const statusClasses = {
 
 const ProfilePage = () => {
   const { user, updateCurrentUser } = useAuth();
+  const { showToast } = useToast();
   const [profile, setProfile] = useState(user);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
-  const [error, setError] = useState('');
-  const [success, setSuccess] = useState('');
+  const [, setError] = useState('');
+  const [, setSuccess] = useState('');
   const [isEditing, setIsEditing] = useState(false);
   const [isChangingPassword, setIsChangingPassword] = useState(false);
   const [formData, setFormData] = useState({ name: '', phone: '', address: '', avatar: '' });
@@ -75,7 +77,9 @@ const ProfilePage = () => {
       } catch (err) {
         if (mounted) {
           setProfile(user);
-          setError(err.response?.data?.message || 'Không thể tải hồ sơ mới nhất');
+          const message = err.response?.data?.message || 'Không thể tải hồ sơ mới nhất';
+          setError(message);
+      showToast(message, 'error');
         }
       } finally {
         if (mounted) setLoading(false);
@@ -86,7 +90,7 @@ const ProfilePage = () => {
     return () => {
       mounted = false;
     };
-  }, [user]);
+  }, [user, showToast]);
 
   const displayName = profile?.name || 'Người dùng Sơn Đông';
   const roleLabel = profile?.position || roleLabels[profile?.role] || 'Chưa cập nhật';
@@ -133,6 +137,7 @@ const ProfilePage = () => {
     event.preventDefault();
     if (!formData.name.trim()) {
       setError('Họ tên không được để trống');
+      showToast('Họ tên không được để trống', 'error');
       return;
     }
 
@@ -153,9 +158,12 @@ const ProfilePage = () => {
       setProfile(updated);
       updateCurrentUser(updated);
       setSuccess('Đã cập nhật hồ sơ');
+      showToast('Đã cập nhật hồ sơ');
       setIsEditing(false);
     } catch (err) {
-      setError(err.response?.data?.message || 'Không thể cập nhật hồ sơ');
+      const message = err.response?.data?.message || 'Không thể cập nhật hồ sơ';
+      setError(message);
+      showToast(message, 'error');
     } finally {
       setSaving(false);
     }
@@ -177,10 +185,12 @@ const ProfilePage = () => {
     event.preventDefault();
     if (passwordData.newPassword !== passwordData.confirmPassword) {
       setError('Mật khẩu xác nhận không khớp');
+      showToast('Mật khẩu xác nhận không khớp', 'error');
       return;
     }
     if (passwordData.newPassword.length < 6) {
       setError('Mật khẩu mới phải có ít nhất 6 ký tự');
+      showToast('Mật khẩu mới phải có ít nhất 6 ký tự', 'error');
       return;
     }
 
@@ -193,9 +203,12 @@ const ProfilePage = () => {
         newPassword: passwordData.newPassword,
       });
       setSuccess('Đã đổi mật khẩu');
+      showToast('Đã đổi mật khẩu');
       setIsChangingPassword(false);
     } catch (err) {
-      setError(err.response?.data?.message || 'Không thể đổi mật khẩu');
+      const message = err.response?.data?.message || 'Không thể đổi mật khẩu';
+      setError(message);
+      showToast(message, 'error');
     } finally {
       setSaving(false);
     }
@@ -211,16 +224,6 @@ const ProfilePage = () => {
 
   return (
     <div className="mx-auto max-w-5xl space-y-6">
-      {error && (
-        <div className="rounded-lg border border-amber-100 bg-amber-50 px-4 py-3 text-sm font-bold text-amber-700">
-          {error}
-        </div>
-      )}
-      {success && (
-        <div className="rounded-lg border border-emerald-100 bg-emerald-50 px-4 py-3 text-sm font-bold text-emerald-700">
-          {success}
-        </div>
-      )}
 
       <section className="rounded-lg border border-red-100 bg-white p-5 shadow-sm">
         <div className="flex flex-col gap-5 md:flex-row md:items-center">

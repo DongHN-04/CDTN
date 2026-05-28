@@ -1,19 +1,19 @@
 import React, { useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
+import { useToast } from '../contexts/ToastContext';
 
 const LoginPage = () => {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false); // State cho nút ẩn/hiện mật khẩu
-  const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
   const { login } = useAuth();
+  const { showToast } = useToast();
   const navigate = useNavigate();
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    setError('');
     setLoading(true);
 
     try {
@@ -24,7 +24,7 @@ const LoginPage = () => {
         navigate('/'); 
       }
     } catch (err) {
-      setError(err.response?.data?.message || 'Đăng nhập thất bại. Vui lòng kiểm tra lại!');
+      showToast(err.response?.data?.message || 'Đăng nhập thất bại. Vui lòng kiểm tra lại!', 'error');
     } finally {
       setLoading(false);
     }
@@ -56,8 +56,6 @@ const LoginPage = () => {
       {/* Login Form Card */}
       <div style={formCardStyle}>
         <h2 style={{ fontSize: '22px', marginBottom: '30px', color: '#111827' }}>Đăng nhập hệ thống</h2>
-        
-        {error && <div style={errorStyle}>{error}</div>}
         
         <form onSubmit={handleSubmit}>
           
@@ -279,16 +277,6 @@ const buttonStyle = {
   fontWeight: 'bold',
   transition: 'background 0.3s',
   boxShadow: '0 4px 6px -1px rgba(192, 57, 43, 0.2)'
-};
-
-const errorStyle = {
-  background: '#fef2f2',
-  color: '#b91c1c',
-  padding: '12px',
-  borderRadius: '8px',
-  marginBottom: '20px',
-  fontSize: '14px',
-  borderLeft: '4px solid #ef4444'
 };
 
 const footerStyle = {

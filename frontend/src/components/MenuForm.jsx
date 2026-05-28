@@ -1,20 +1,22 @@
 import React, { useEffect, useState } from 'react';
 import inventoryService from '../services/inventoryService';
 import uploadService from '../services/uploadService';
-import { ErrorBox } from '../utils/apiError';
+import { useToast } from '../contexts/ToastContext';
 import { getImageUrl } from '../utils/imageUrl';
 import { MENU_CATEGORIES } from '../constants/menuCategories';
 
 const emptyForm = { name: '', price: 0, description: '', category: MENU_CATEGORIES[0], image: '' };
+const MAX_MONEY = 100000000;
+const MAX_QUANTITY = 100000;
 
-const MenuForm = ({ menuItem, onSubmit, onCancel, error }) => {
+const MenuForm = ({ menuItem, onSubmit, onCancel }) => {
+  const { showToast } = useToast();
   const [form, setForm] = useState(emptyForm);
   const [ingredientsList, setIngredientsList] = useState([]);
   const [selectedIngredients, setSelectedIngredients] = useState([]);
   const [imageFile, setImageFile] = useState(null);
   const [imagePreview, setImagePreview] = useState('');
   const [uploading, setUploading] = useState(false);
-  const [localError, setLocalError] = useState('');
 
   useEffect(() => {
     inventoryService.getIngredients().then(data => setIngredientsList(data || []));
@@ -40,7 +42,6 @@ const MenuForm = ({ menuItem, onSubmit, onCancel, error }) => {
     }
 
     setImageFile(null);
-    setLocalError('');
   }, [menuItem]);
 
   const handleImageChange = (event) => {
@@ -66,15 +67,13 @@ const MenuForm = ({ menuItem, onSubmit, onCancel, error }) => {
 
   const handleSubmit = async (event) => {
     event.preventDefault();
-    setLocalError('');
-
-    if (!form.name.trim()) return setLocalError('name: Tên món là bắt buộc');
-    if (!form.category.trim()) return setLocalError('category: Danh mục là bắt buộc');
-    if (Number(form.price) < 0) return setLocalError('price: Giá bán phải >= 0');
+    if (!form.name.trim()) return showToast('Tên món là bắt buộc', 'error');
+    if (!form.category.trim()) return showToast('Danh mục là bắt buộc', 'error');
+    if (Number(form.price) <= 0 || Number(form.price) > MAX_MONEY) return showToast('Giá bán phải lớn hơn 0 và không vượt quá 100.000.000', 'error');
 
     for (const ing of selectedIngredients) {
-      if (!ing.ingredient || Number(ing.quantity) <= 0) {
-        return setLocalError('ingredients: Chọn nguyên liệu và số lượng > 0');
+      if (!ing.ingredient || Number(ing.quantity) <= 0 || Number(ing.quantity) > MAX_QUANTITY) {
+        return showToast('Chọn nguyên liệu và số lượng phải từ 1 đến 100.000', 'error');
       }
     }
 
@@ -84,7 +83,7 @@ const MenuForm = ({ menuItem, onSubmit, onCancel, error }) => {
       try {
         imageUrl = await uploadService.uploadImage(imageFile);
       } catch (uploadError) {
-        setLocalError('image: Upload ảnh thất bại: ' + (uploadError.response?.data?.message || uploadError.message));
+        showToast(`Upload ảnh thất bại: ${uploadError.response?.data?.message || uploadError.message}`, 'error');
         setUploading(false);
         return;
       }
@@ -114,8 +113,6 @@ const MenuForm = ({ menuItem, onSubmit, onCancel, error }) => {
             Đóng
           </button>
         </div>
-
-        <ErrorBox message={localError || error} />
 
         <form onSubmit={handleSubmit} className="mt-4 flex flex-col gap-5">
           <div className="grid grid-cols-1 gap-4 md:grid-cols-2">

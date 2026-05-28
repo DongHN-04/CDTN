@@ -42,6 +42,14 @@ const protect = async (req, res, next) => {
   }
 };
 
+const optionalProtect = async (req, res, next) => {
+  if (!req.headers.authorization || !req.headers.authorization.startsWith('Bearer')) {
+    return next();
+  }
+
+  return protect(req, res, next);
+};
+
 /**
  * Middleware phân quyền: chỉ cho phép các role được chỉ định truy cập
  * @param  {...String} roles - Danh sách các role được phép (ví dụ: 'admin', 'staff')
@@ -63,4 +71,4 @@ const authorize = (...roles) => {
   };
 };
 
-module.exports = { protect, authorize };
+module.exports = { protect, optionalProtect, authorize };

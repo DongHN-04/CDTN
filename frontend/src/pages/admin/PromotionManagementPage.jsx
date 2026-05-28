@@ -1,9 +1,10 @@
-import React, { useEffect, useMemo, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { ImagePlus, MoreVertical, Pencil, PlusCircle, Search, Trash2 } from 'lucide-react';
 import promotionService from '../../services/promotionService';
 import uploadService from '../../services/uploadService';
 import { getImageUrl } from '../../utils/imageUrl';
 import ConfirmDeleteModal from '../../components/ConfirmDeleteModal';
+import { useToast } from '../../contexts/ToastContext';
 
 const pageSize = 6;
 
@@ -58,6 +59,7 @@ const getDiscountText = (promotion) => {
 };
 
 const PromotionManagementPage = () => {
+  const { showToast } = useToast();
   const [promotions, setPromotions] = useState([]);
   const [loading, setLoading] = useState(true);
   const [editingId, setEditingId] = useState(null);
@@ -65,7 +67,7 @@ const PromotionManagementPage = () => {
   const [form, setForm] = useState(initialForm);
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
-  const [error, setError] = useState('');
+  const [, setError] = useState('');
   const [banners, setBanners] = useState([defaultBanner]);
   const [activeBannerIndex, setActiveBannerIndex] = useState(0);
   const [uploadingBanner, setUploadingBanner] = useState(false);
@@ -73,20 +75,22 @@ const PromotionManagementPage = () => {
   const [currentPage, setCurrentPage] = useState(1);
   const bannerInputRef = useRef(null);
 
-  const fetchPromotions = async () => {
+  const fetchPromotions = useCallback(async () => {
     setLoading(true);
     setError('');
     try {
       const data = await promotionService.getPromotions();
       setPromotions(data);
     } catch (err) {
-      setError(err.response?.data?.message || 'Không thể tải danh sách khuyến mãi');
+      const message = err.response?.data?.message || 'Không thể tải danh sách khuyến mãi';
+      setError(message);
+      showToast(message, 'error');
     } finally {
       setLoading(false);
     }
-  };
+  }, [showToast]);
 
-  const fetchBanners = async () => {
+  const fetchBanners = useCallback(async () => {
     try {
       const data = await promotionService.getBanners();
       if (data && data.length > 0) {
@@ -100,12 +104,12 @@ const PromotionManagementPage = () => {
     } catch (err) {
       console.error('Không thể tải banner:', err);
     }
-  };
+  }, []);
 
   useEffect(() => {
     fetchPromotions();
     fetchBanners();
-  }, []);
+  }, [fetchPromotions, fetchBanners]);
 
   const openCreate = () => {
     setEditingId(null);
@@ -147,8 +151,11 @@ const PromotionManagementPage = () => {
       setPromotions(current => current.filter(promotion => promotion._id !== deleteModal.target._id));
       if (editingId === deleteModal.target._id) closeForm();
       setDeleteModal({ isOpen: false, type: '', target: null, loading: false });
+      showToast('Đã xóa khuyến mãi');
     } catch (err) {
-      setError(err.response?.data?.message || 'Không thể xóa khuyến mãi');
+      const message = err.response?.data?.message || 'Không thể xóa khuyến mãi';
+      setError(message);
+      showToast(message, 'error');
       setDeleteModal({ isOpen: false, type: '', target: null, loading: false });
     }
   };
@@ -156,6 +163,31 @@ const PromotionManagementPage = () => {
   const handleSubmit = async (event) => {
     event.preventDefault();
     setError('');
+    const value = Number(form.value);
+    const minOrderValue = Number(form.minOrderValue || 0);
+    const startDate = new Date(form.startDate);
+    const endDate = new Date(form.endDate);
+
+    if (!form.name.trim()) {
+      setError('Tên khuyến mãi là bắt buộc');
+      showToast('Tên khuyến mãi là bắt buộc', 'error');
+      return;
+    }
+    if (!Number.isFinite(value) || value <= 0 || value > 100000000 || (form.type === 'percent' && value > 100)) {
+      setError('Giá trị giảm không hợp lệ');
+      showToast('Giá trị giảm không hợp lệ', 'error');
+      return;
+    }
+    if (!Number.isFinite(minOrderValue) || minOrderValue < 0 || minOrderValue > 100000000) {
+      setError('Giá trị đơn tối thiểu không hợp lệ');
+      showToast('Giá trị đơn tối thiểu không hợp lệ', 'error');
+      return;
+    }
+    if (Number.isNaN(startDate.getTime()) || Number.isNaN(endDate.getTime()) || endDate < startDate) {
+      setError('Ngày kết thúc phải sau ngày bắt đầu');
+      showToast('Ngày kết thúc phải sau ngày bắt đầu', 'error');
+      return;
+    }
 
     try {
       if (editingId) {
@@ -165,9 +197,12 @@ const PromotionManagementPage = () => {
         const created = await promotionService.createPromotion(form);
         setPromotions(current => [created, ...current]);
       }
+      showToast(editingId ? 'Đã cập nhật khuyến mãi' : 'Đã tạo khuyến mãi');
       closeForm();
     } catch (err) {
-      setError(err.response?.data?.message || 'Không thể lưu khuyến mãi');
+      const message = err.response?.data?.message || 'Không thể lưu khuyến mãi';
+      setError(message);
+      showToast(message, 'error');
     }
   };
 
@@ -208,8 +243,11 @@ const PromotionManagementPage = () => {
       await promotionService.setActiveBanner(targetBanner._id);
       setActiveBannerIndex(index);
       window.dispatchEvent(new Event('promotion-banner-updated'));
+      showToast('Đã kích hoạt banner');
     } catch (err) {
-      setError(err.response?.data?.message || 'Không thể kích hoạt banner');
+      const message = err.response?.data?.message || 'Không thể kích hoạt banner';
+      setError(message);
+      showToast(message, 'error');
     }
   };
 
@@ -224,8 +262,11 @@ const PromotionManagementPage = () => {
       const title = featuredPromotion?.name || 'Banner khuyến mãi';
       await promotionService.createBanner({ image: imageUrl, title });
       await fetchBanners();
+      showToast('Đã tải banner mới');
     } catch (err) {
-      setError(err.response?.data?.message || 'Không thể tải banner mới');
+      const message = err.response?.data?.message || 'Không thể tải banner mới';
+      setError(message);
+      showToast(message, 'error');
     } finally {
       setUploadingBanner(false);
       event.target.value = '';
@@ -250,8 +291,11 @@ const PromotionManagementPage = () => {
       await promotionService.deleteBanner(deleteModal.target._id);
       await fetchBanners();
       setDeleteModal({ isOpen: false, type: '', target: null, loading: false });
+      showToast('Đã xóa banner');
     } catch (err) {
-      setError(err.response?.data?.message || 'Không thể xóa banner');
+      const message = err.response?.data?.message || 'Không thể xóa banner';
+      setError(message);
+      showToast(message, 'error');
       setDeleteModal({ isOpen: false, type: '', target: null, loading: false });
     }
   };
@@ -290,11 +334,6 @@ const PromotionManagementPage = () => {
         </button>
       </div>
 
-      {error && (
-        <div className="mb-5 rounded-xl border border-red-100 bg-red-50 px-4 py-3 text-sm font-semibold text-red-700">
-          {error}
-        </div>
-      )}
 
       {showForm && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/35 px-4 py-8">

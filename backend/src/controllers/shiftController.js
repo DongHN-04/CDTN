@@ -7,6 +7,38 @@ const formatTime = (date) => {
     return new Date(date).toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' });
 };
 
+const normalizeStaffIds = (staff = []) => {
+    if (!Array.isArray(staff)) return [];
+    return [...new Set(staff.filter(Boolean).map(staffId => staffId.toString()))];
+};
+
+const validateShiftStaff = async (staff = [], startTime, endTime, excludeShiftId = null) => {
+    const staffIds = normalizeStaffIds(staff);
+
+    for (const userId of staffIds) {
+        const user = await User.findById(userId);
+        if (!user || user.isDeleted === true || (user.role !== 'staff' && user.role !== 'admin')) {
+            throw new Error('Nhân viên không hợp lệ');
+        }
+
+        // Một người chỉ được nằm trong một ca mở tại cùng một khoảng thời gian.
+        const overlappingShift = await Shift.findOne({
+            ...(excludeShiftId ? { _id: { $ne: excludeShiftId } } : {}),
+            staff: userId,
+            status: 'open',
+            isDeleted: { $ne: true },
+            startTime: { $lt: endTime },
+            endTime: { $gt: startTime }
+        });
+
+        if (overlappingShift) {
+            throw new Error(`Nhân viên ${user.name} đã có ca "${overlappingShift.name}" (${formatTime(overlappingShift.startTime)} - ${formatTime(overlappingShift.endTime)}) trùng với khoảng thời gian này.`);
+        }
+    }
+
+    return staffIds;
+};
+
 // @desc    Lấy tất cả ca làm việc (Admin)
 // @route   GET /api/shifts
 // @access  Private (Admin)
@@ -42,19 +74,22 @@ const getMyShifts = async (req, res) => {
 const createShift = async (req, res) => {
     try {
         const { name, startTime, endTime, staff } = req.body;
+        const nextStartTime = new Date(startTime);
+        const nextEndTime = new Date(endTime);
 
         if (!name || !startTime || !endTime) {
             return res.status(400).json({ message: 'Tên, thời gian bắt đầu và kết thúc là bắt buộc' });
         }
-        if (new Date(startTime) >= new Date(endTime)) {
+        if (nextStartTime >= nextEndTime) {
             return res.status(400).json({ message: 'Thời gian kết thúc phải sau thời gian bắt đầu' });
         }
 
+        const validStaff = await validateShiftStaff(staff || [], nextStartTime, nextEndTime);
         const shift = await Shift.create({
             name,
-            startTime,
-            endTime,
-            staff: staff || [],
+            startTime: nextStartTime,
+            endTime: nextEndTime,
+            staff: validStaff,
             status: 'open',
         });
         const populated = await Shift.findById(shift._id).populate('staff', 'name email');
@@ -74,14 +109,18 @@ const updateShift = async (req, res) => {
         if (shift.status === 'closed') return res.status(400).json({ message: 'Ca đã đóng, không thể sửa' });
 
         const { name, startTime, endTime, staff } = req.body;
-        if (startTime && endTime && new Date(startTime) >= new Date(endTime)) {
+        const nextStartTime = startTime ? new Date(startTime) : shift.startTime;
+        const nextEndTime = endTime ? new Date(endTime) : shift.endTime;
+        if (nextStartTime >= nextEndTime) {
             return res.status(400).json({ message: 'Thời gian kết thúc phải sau thời gian bắt đầu' });
         }
 
+        const validStaff = staff ? await validateShiftStaff(staff, nextStartTime, nextEndTime, shift._id) : null;
+
         shift.name = name || shift.name;
-        shift.startTime = startTime || shift.startTime;
-        shift.endTime = endTime || shift.endTime;
-        if (staff) shift.staff = staff;
+        shift.startTime = nextStartTime;
+        shift.endTime = nextEndTime;
+        if (staff) shift.staff = validStaff;
 
         await shift.save();
         const populated = await Shift.findById(shift._id).populate('staff', 'name email');
@@ -113,6 +152,7 @@ const assignStaff = async (req, res) => {
             _id: { $ne: shift._id },
             staff: userId,
             status: 'open',
+            isDeleted: { $ne: true },
             startTime: { $lt: shift.endTime },
             endTime: { $gt: shift.startTime }
         });
@@ -123,7 +163,8 @@ const assignStaff = async (req, res) => {
             });
         }
 
-        if (!shift.staff.includes(userId)) {
+        const existsInShift = shift.staff.some(staffId => staffId.toString() === userId.toString());
+        if (!existsInShift) {
             shift.staff.push(userId);
             await shift.save();
         }
@@ -158,18 +199,27 @@ const closeShift = async (req, res) => {
         // Tính tổng tiền mặt từ các đơn hàng trong khoảng thời gian ca
         const shiftEndTime = req.body.endTime || new Date();
 
-        const cashOrders = await Order.find({
-            paymentMethod: 'cash',
+        const shiftStaffIds = (shift.staff || []).map(staffId => staffId.toString());
+        if (shiftStaffIds.length === 0) {
+            return res.status(400).json({ message: 'Ca chưa có nhân viên, không thể đóng ca' });
+        }
+
+        const baseOrderFilter = {
+            staff: { $in: shiftStaffIds },
             status: 'completed',
             paymentStatus: 'paid',
-            createdAt: { $gte: shift.startTime, $lte: shiftEndTime },
+            $or: [
+                { completedAt: { $gte: shift.startTime, $lte: shiftEndTime } },
+                { completedAt: { $exists: false }, createdAt: { $gte: shift.startTime, $lte: shiftEndTime } },
+            ],
+        };
+
+        const cashOrders = await Order.find({
+            ...baseOrderFilter,
+            paymentMethod: 'cash',
         });
 
-        const revenueOrders = await Order.find({
-            status: 'completed',
-            paymentStatus: 'paid',
-            createdAt: { $gte: shift.startTime, $lte: shiftEndTime },
-        });
+        const revenueOrders = await Order.find(baseOrderFilter);
 
         const totalCash = cashOrders.reduce((sum, order) => sum + order.total, 0);
         const totalRevenue = revenueOrders.reduce((sum, order) => sum + order.total, 0);

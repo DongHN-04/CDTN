@@ -18,7 +18,7 @@ const defaultImages = {
 const formatPrice = (val) => val.toLocaleString('vi-VN') + ' VNĐ';
 
 const CartPage = () => {
-  const { items, removeItem, updateQuantity, getCartTotal } = useCart();
+  const { items, removeItem, updateQuantity, getCartTotal, refreshCartProducts } = useCart();
   const [promoInput, setPromoInput] = useState('');
   const [appliedPromo, setAppliedPromo] = useState('');
   const [discountAmount, setDiscountAmount] = useState(0);
@@ -41,6 +41,12 @@ const CartPage = () => {
       .then(data => setPromotions(data || []))
       .catch(() => setPromotions([]));
   }, []);
+
+  useEffect(() => {
+    Promise.all([publicService.getMenu(), publicService.getCombos()])
+      .then(([menuItems, combos]) => refreshCartProducts({ menuItems, combos }))
+      .catch(() => {});
+  }, [refreshCartProducts]);
 
   useEffect(() => {
     if (!appliedPromo) return;

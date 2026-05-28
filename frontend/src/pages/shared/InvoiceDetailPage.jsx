@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import { ArrowLeft, Banknote, CalendarClock, ReceiptText, UserRound } from 'lucide-react';
 import orderService from '../../services/orderService';
+import { useToast } from '../../contexts/ToastContext';
 
 const statusConfig = {
   pending: { label: 'Chờ xác nhận', className: 'bg-blue-50 text-blue-700' },
@@ -38,6 +39,7 @@ const formatDateTime = (value) => {
 
 const InvoiceDetailPage = () => {
   const { id } = useParams();
+  const { showToast } = useToast();
   const [order, setOrder] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -52,7 +54,11 @@ const InvoiceDetailPage = () => {
         const data = await orderService.getOrderById(id);
         if (mounted) setOrder(data);
       } catch (err) {
-        if (mounted) setError(err.response?.data?.message || 'Không thể tải chi tiết đơn hàng');
+        if (mounted) {
+          const message = err.response?.data?.message || 'Không thể tải chi tiết đơn hàng';
+          setError(message);
+      showToast(message, 'error');
+        }
       } finally {
         if (mounted) setLoading(false);
       }
@@ -62,7 +68,7 @@ const InvoiceDetailPage = () => {
     return () => {
       mounted = false;
     };
-  }, [id]);
+  }, [id, showToast]);
 
   const status = statusConfig[order?.status] || statusConfig.pending;
   const items = order?.items || [];
@@ -91,9 +97,6 @@ const InvoiceDetailPage = () => {
           <ArrowLeft size={17} />
           Quay lại danh sách
         </Link>
-        <div className="rounded-2xl border border-red-100 bg-red-50 p-6 text-sm font-bold text-red-700">
-          {error || 'Không tìm thấy đơn hàng.'}
-        </div>
       </div>
     );
   }

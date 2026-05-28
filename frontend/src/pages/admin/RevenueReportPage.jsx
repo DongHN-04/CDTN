@@ -1,5 +1,6 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import reportService from '../../services/reportService';
+import { useToast } from '../../contexts/ToastContext';
 
 const formatCurrency = (value = 0, compact = false) => {
   const number = Number(value || 0);
@@ -49,9 +50,10 @@ const groupByMonth = (source) => {
 };
 
 const RevenueReportPage = () => {
+  const { showToast } = useToast();
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState('');
+  const [, setError] = useState('');
   const [selectedYear, setSelectedYear] = useState(new Date().getFullYear());
   const [selectedMonth, setSelectedMonth] = useState(new Date().getMonth() + 1);
   const [chartMode, setChartMode] = useState('day');
@@ -71,14 +73,16 @@ const RevenueReportPage = () => {
         const result = await reportService.getReports(params);
         setData(result);
       } catch (err) {
-        setError(err.response?.data?.message || 'Không thể tải báo cáo doanh thu');
+        const message = err.response?.data?.message || 'Không thể tải báo cáo doanh thu';
+        setError(message);
+      showToast(message, 'error');
       } finally {
         setLoading(false);
       }
     };
 
     fetchReport();
-  }, [selectedYear, selectedMonth]);
+  }, [selectedYear, selectedMonth, showToast]);
 
   const chartData = useMemo(() => {
     const dailySource = data?.dailyRevenue || [];
@@ -157,11 +161,6 @@ const RevenueReportPage = () => {
         </div>
       </div>
 
-      {error && (
-        <div className="mb-5 rounded-xl border border-red-100 bg-red-50 px-4 py-3 text-sm font-bold text-red-700">
-          {error}
-        </div>
-      )}
 
       {loading ? (
         <div className="rounded-2xl bg-white p-10 text-center text-sm font-bold text-gray-500 shadow-sm">Đang tải báo cáo...</div>

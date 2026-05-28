@@ -9,6 +9,14 @@ const getPromotions = asyncHandler(async (req, res) => {
 });
 
 const createPromotion = asyncHandler(async (req, res) => {
+  const existing = await Promotion.findOne({
+    name: new RegExp(`^${req.body.name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}$`, 'i'),
+    isDeleted: { $ne: true },
+  });
+  if (existing) {
+    throw new ApiError(400, 'Mã khuyến mãi đã tồn tại');
+  }
+
   const promotion = await Promotion.create(req.body);
   res.status(201).json(promotion);
 });
@@ -17,6 +25,17 @@ const updatePromotion = asyncHandler(async (req, res) => {
   const promotion = await Promotion.findById(req.params.id);
   if (!promotion) {
     throw new ApiError(404, 'Không tìm thấy khuyến mãi');
+  }
+
+  if (req.body.name) {
+    const existing = await Promotion.findOne({
+      _id: { $ne: promotion._id },
+      name: new RegExp(`^${req.body.name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}$`, 'i'),
+      isDeleted: { $ne: true },
+    });
+    if (existing) {
+      throw new ApiError(400, 'Mã khuyến mãi đã tồn tại');
+    }
   }
 
   Object.assign(promotion, req.body);

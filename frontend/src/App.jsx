@@ -1,6 +1,7 @@
 import { BrowserRouter, Routes, Route } from 'react-router-dom';
 import { AuthProvider } from './contexts/AuthContext';
 import { CartProvider } from './contexts/CartContext';
+import { ToastProvider } from './contexts/ToastContext';
 
 // Layouts
 import CustomerLayout from './components/Layout/CustomerLayout';
@@ -49,8 +50,9 @@ function App() {
   return (
     <AuthProvider>
       <CartProvider>
-        <BrowserRouter>
-          <Routes>
+        <ToastProvider>
+          <BrowserRouter>
+            <Routes>
             {/* ========== PUBLIC ROUTES (CUSTOMER SIDE) ========== */}
             <Route element={<CustomerLayout />}>
               <Route path="/" element={<HomePage />} />
@@ -224,8 +226,9 @@ function App() {
             </Route>
 
             <Route path="*" element={<NotFoundPage />} />
-          </Routes>
-        </BrowserRouter>
+            </Routes>
+          </BrowserRouter>
+        </ToastProvider>
       </CartProvider>
     </AuthProvider>
   );

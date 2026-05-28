@@ -11,7 +11,7 @@ const getSuppliers = async (req, res) => {
         const suppliers = await Supplier.find({ isDeleted: { $ne: true } }).sort('-createdAt');
         res.json(suppliers);
     } catch (error) {
-        res.status(500).json({ message: 'Loi server' });
+        res.status(500).json({ message: 'Lỗi server' });
     }
 };
 
@@ -21,10 +21,10 @@ const getSuppliers = async (req, res) => {
 const getSupplierById = async (req, res) => {
     try {
         const supplier = await Supplier.findById(req.params.id);
-        if (!supplier) return res.status(404).json({ message: 'Khong tim thay nha cung cap' });
+        if (!supplier) return res.status(404).json({ message: 'Không tìm thấy nhà cung cấp' });
         res.json(supplier);
     } catch (error) {
-        res.status(500).json({ message: 'Loi server' });
+        res.status(500).json({ message: 'Lỗi server' });
     }
 };
 
@@ -36,7 +36,7 @@ const createSupplier = async (req, res) => {
         const supplier = await Supplier.create({ ...req.body, isActive: true, isDeleted: false });
         res.status(201).json(supplier);
     } catch (error) {
-        res.status(400).json({ message: 'Du lieu khong hop le' });
+        res.status(400).json({ message: 'Dữ liệu không hợp lệ' });
     }
 };
 
@@ -46,10 +46,10 @@ const createSupplier = async (req, res) => {
 const updateSupplier = async (req, res) => {
     try {
         const supplier = await Supplier.findByIdAndUpdate(req.params.id, req.body, { new: true });
-        if (!supplier) return res.status(404).json({ message: 'Khong tim thay' });
+        if (!supplier) return res.status(404).json({ message: 'Không tìm thấy' });
         res.json(supplier);
     } catch (error) {
-        res.status(400).json({ message: 'Cap nhat that bai' });
+        res.status(400).json({ message: 'Cập nhật thất bại' });
     }
 };
 
@@ -59,7 +59,7 @@ const updateSupplier = async (req, res) => {
 const deleteSupplier = async (req, res) => {
     try {
         const supplier = await Supplier.findById(req.params.id);
-        if (!supplier) return res.status(404).json({ message: 'Khong tim thay' });
+        if (!supplier) return res.status(404).json({ message: 'Không tìm thấy' });
 
         const purchaseCount = await Purchase.countDocuments({ supplier: supplier._id });
         if (purchaseCount > 0 || Number(supplier.debt || 0) > 0) {
@@ -67,15 +67,15 @@ const deleteSupplier = async (req, res) => {
             supplier.isDeleted = true;
             await supplier.save();
             return res.json({
-                message: 'Nha cung cap da phat sinh phieu nhap/cong no nen da duoc ngung hoat dong thay vi xoa vinh vien',
+                message: 'Nhà cung cấp đã phát sinh phiếu nhập/công nợ nên đã được ngừng hoạt động thay vì xóa vĩnh viễn',
                 mode: 'soft-deleted',
             });
         }
 
         await supplier.deleteOne();
-        res.json({ message: 'Da xoa nha cung cap', mode: 'hard-deleted' });
+        res.json({ message: 'Đã xóa nhà cung cấp', mode: 'hard-deleted' });
     } catch (error) {
-        res.status(500).json({ message: 'Loi server' });
+        res.status(500).json({ message: 'Lỗi server' });
     }
 };
 
@@ -87,12 +87,12 @@ const createPurchase = async (req, res) => {
     try {
         const { supplierId, items, paidAmount, purchaseDate, notes } = req.body;
         const supplier = await Supplier.findById(supplierId);
-        if (!supplier) return res.status(404).json({ message: 'Khong tim thay nha cung cap' });
+        if (!supplier) return res.status(404).json({ message: 'Không tìm thấy nhà cung cấp' });
         if (supplier.isActive === false || supplier.isDeleted === true) {
             return res.status(400).json({ message: 'Nha cung cap da ngung hoat dong' });
         }
         if (!Array.isArray(items) || items.length === 0) {
-            return res.status(400).json({ message: 'Danh sach nhap hang khong hop le' });
+            return res.status(400).json({ message: 'Danh sách nhập hàng không hợp lệ' });
         }
 
         let totalAmount = 0;
@@ -102,19 +102,19 @@ const createPurchase = async (req, res) => {
         // Kiem tra toan bo dong nhap truoc, sau do moi cap nhat kho/cong no.
         for (const item of items) {
             const ingredient = await Ingredient.findById(item.ingredient);
-            if (!ingredient) throw new Error(`Nguyen lieu khong ton tai: ${item.ingredient}`);
+            if (!ingredient) throw new Error(`Nguyên liệu không tồn tại: ${item.ingredient}`);
             if (ingredient.isActive === false || ingredient.isDeleted === true) {
-                throw new Error(`Nguyen lieu da ngung su dung: ${ingredient.name}`);
+                throw new Error(`Nguyên liệu đã ngừng sử dụng: ${ingredient.name}`);
             }
 
             const quantity = Number(item.quantity);
             const unitPrice = Number(item.unitPrice);
 
             if (!Number.isFinite(quantity) || quantity <= 0) {
-                throw new Error('So luong nhap phai lon hon 0');
+                throw new Error('Số lượng nhập phải lớn hơn 0');
             }
             if (!Number.isFinite(unitPrice) || unitPrice < 0) {
-                throw new Error('Don gia nhap khong hop le');
+                throw new Error('Đơn giá nhập không hợp lệ');
             }
 
             const totalPrice = quantity * unitPrice;
@@ -130,7 +130,7 @@ const createPurchase = async (req, res) => {
 
         const paid = Number(paidAmount || 0);
         if (!Number.isFinite(paid) || paid < 0 || paid > totalAmount) {
-            return res.status(400).json({ message: 'So tien da tra khong hop le' });
+            return res.status(400).json({ message: 'Số tiền đã trả không hợp lệ' });
         }
 
         let purchaseId;
@@ -188,7 +188,7 @@ const getPurchases = async (req, res) => {
             .sort('-purchaseDate');
         res.json(purchases);
     } catch (error) {
-        res.status(500).json({ message: 'Loi server' });
+        res.status(500).json({ message: 'Lỗi server' });
     }
 };
 
@@ -198,22 +198,22 @@ const getPurchases = async (req, res) => {
 const payDebt = async (req, res) => {
     try {
         const supplier = await Supplier.findById(req.params.id);
-        if (!supplier) return res.status(404).json({ message: 'Khong tim thay nha cung cap' });
+        if (!supplier) return res.status(404).json({ message: 'Không tìm thấy nhà cung cấp' });
 
         const amount = Number(req.body.amount);
         if (!Number.isFinite(amount) || amount <= 0) {
-            return res.status(400).json({ message: 'So tien thanh toan khong hop le' });
+            return res.status(400).json({ message: 'Số tiền thanh toán không hợp lệ' });
         }
 
         if (amount > supplier.debt) {
-            return res.status(400).json({ message: 'So tien thanh toan lon hon cong no hien tai' });
+            return res.status(400).json({ message: 'Số tiền thanh toán lớn hơn công nợ hiện tại' });
         }
 
         supplier.debt -= amount;
         await supplier.save();
 
         res.json({
-            message: `Da thanh toan ${amount.toLocaleString()} cho ${supplier.name}`,
+            message: `Đã thanh toán ${amount.toLocaleString()} cho ${supplier.name}`,
             debt: supplier.debt
         });
     } catch (error) {

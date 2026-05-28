@@ -1,10 +1,11 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import supplierService from '../../services/supplierService';
 import SupplierForm from '../../components/SupplierForm';
 import PurchaseForm from '../../components/PurchaseForm';
 import { formatApiError } from '../../utils/apiError';
 import { PlusCircle } from 'lucide-react';
 import ConfirmDeleteModal from '../../components/ConfirmDeleteModal';
+import { useToast } from '../../contexts/ToastContext';
 
 const pageSize = 5;
 const formatCurrency = (value = 0, compact = false) => {
@@ -16,6 +17,7 @@ const formatCurrency = (value = 0, compact = false) => {
 };
 
 const SupplierManagementPage = () => {
+  const { showToast } = useToast();
   const [suppliers, setSuppliers] = useState([]);
   const [purchases, setPurchases] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -23,18 +25,16 @@ const SupplierManagementPage = () => {
   const [editingSupplier, setEditingSupplier] = useState(null);
   const [showPurchaseForm, setShowPurchaseForm] = useState(false);
   const [payingSupplier, setPayingSupplier] = useState(null);
+  const [payDebtAmount, setPayDebtAmount] = useState('');
+  const [payDebtLoading, setPayDebtLoading] = useState(false);
   const [formError, setFormError] = useState('');
-  const [pageError, setPageError] = useState('');
+  const [, setPageError] = useState('');
   const [search, setSearch] = useState('');
   const [debtFilter, setDebtFilter] = useState('all');
   const [deleteModal, setDeleteModal] = useState({ isOpen: false, supplier: null, loading: false });
   const [currentPage, setCurrentPage] = useState(1);
 
-  useEffect(() => {
-    fetchData();
-  }, []);
-
-  const fetchData = async () => {
+  const fetchData = useCallback(async () => {
     setLoading(true);
     setPageError('');
     try {
@@ -45,11 +45,13 @@ const SupplierManagementPage = () => {
       setSuppliers(supplierData || []);
       setPurchases(purchaseData || []);
     } catch (error) {
-      setPageError(formatApiError(error, 'Không thể tải dữ liệu nhà cung cấp'));
+      const message = formatApiError(error, 'Không thể tải dữ liệu nhà cung cấp');
+      setPageError(message);
+      showToast(message, 'error');
     } finally {
       setLoading(false);
     }
-  };
+  }, [showToast]);
 
   const openCreate = () => {
     setEditingSupplier(null);
@@ -74,9 +76,12 @@ const SupplierManagementPage = () => {
       setDeleteModal(current => ({ ...current, loading: true }));
       await supplierService.deleteSupplier(deleteModal.supplier._id);
       setDeleteModal({ isOpen: false, supplier: null, loading: false });
+      showToast('Đã xóa nhà cung cấp');
       fetchData();
     } catch (error) {
-      setPageError(formatApiError(error, 'Không thể xóa nhà cung cấp'));
+      const message = formatApiError(error, 'Không thể xóa nhà cung cấp');
+      setPageError(message);
+      showToast(message, 'error');
       setDeleteModal({ isOpen: false, supplier: null, loading: false });
     }
   };
@@ -91,27 +96,49 @@ const SupplierManagementPage = () => {
       }
       setShowForm(false);
       setEditingSupplier(null);
+      showToast(editingSupplier ? 'Đã cập nhật nhà cung cấp' : 'Đã thêm nhà cung cấp');
       fetchData();
     } catch (error) {
-      setFormError(formatApiError(error, 'Lỗi lưu nhà cung cấp'));
+      const message = formatApiError(error, 'Lỗi lưu nhà cung cấp');
+      setFormError(message);
+      showToast(message, 'error');
     }
   };
 
   const handlePurchaseSuccess = () => {
     setShowPurchaseForm(false);
+    showToast('Đã nhập hàng');
     fetchData();
   };
 
+  useEffect(() => {
+    fetchData();
+  }, [fetchData]);
+
   const handlePayDebt = async () => {
-    const amount = prompt('Nhập số tiền thanh toán (VNĐ):');
-    if (!amount) return;
+    const amount = Number(payDebtAmount);
+    if (!Number.isFinite(amount) || amount <= 0) {
+      showToast('Số tiền thanh toán không hợp lệ', 'error');
+      return;
+    }
+    if (amount > Number(payingSupplier.debt || 0)) {
+      showToast('Số tiền thanh toán lớn hơn công nợ hiện tại', 'error');
+      return;
+    }
 
     try {
-      await supplierService.payDebt(payingSupplier._id, Number(amount));
+      setPayDebtLoading(true);
+      await supplierService.payDebt(payingSupplier._id, amount);
       setPayingSupplier(null);
+      setPayDebtAmount('');
+      showToast('Đã thanh toán công nợ');
       fetchData();
     } catch (error) {
-      setPageError(formatApiError(error, 'Lỗi thanh toán công nợ'));
+      const message = formatApiError(error, 'Lỗi thanh toán công nợ');
+      setPageError(message);
+      showToast(message, 'error');
+    } finally {
+      setPayDebtLoading(false);
     }
   };
 
@@ -200,11 +227,6 @@ const SupplierManagementPage = () => {
         </div>
       </div>
 
-      {pageError && (
-        <div className="mb-5 rounded-xl border border-red-100 bg-red-50 px-4 py-3 text-sm font-bold text-red-700">
-          {pageError}
-        </div>
-      )}
 
       <div className="mb-7 grid grid-cols-1 gap-5 md:grid-cols-3">
         <StatCard title="Tổng nhà cung cấp" value={stats.total} hint={`${filteredSuppliers.length} nhà cung cấp đang hiển thị`} icon="▣" />
@@ -241,20 +263,18 @@ const SupplierManagementPage = () => {
                 <th className="px-4 py-3">Logo</th>
                 <th className="px-4 py-3">Nhà cung cấp</th>
                 <th className="px-4 py-3">Liên hệ</th>
-                <th className="px-4 py-3">Nguyên liệu</th>
                 <th className="px-4 py-3">Trạng thái</th>
-                <th className="px-4 py-3">Uy tín</th>
                 <th className="px-4 py-3 text-right">Hành động</th>
               </tr>
             </thead>
             <tbody>
               {loading ? (
                 <tr>
-                  <td colSpan="7" className="px-4 py-10 text-center text-sm font-bold text-gray-500">Đang tải...</td>
+                  <td colSpan="5" className="px-4 py-10 text-center text-sm font-bold text-gray-500">Đang tải...</td>
                 </tr>
               ) : filteredSuppliers.length === 0 ? (
                 <tr>
-                  <td colSpan="7" className="px-4 py-10 text-center text-sm font-bold text-gray-500">Không có nhà cung cấp phù hợp.</td>
+                  <td colSpan="5" className="px-4 py-10 text-center text-sm font-bold text-gray-500">Không có nhà cung cấp phù hợp.</td>
                 </tr>
               ) : (
                 paginatedSuppliers.map((supplier, index) => (
@@ -264,7 +284,10 @@ const SupplierManagementPage = () => {
                     index={(currentPage - 1) * pageSize + index}
                     onEdit={() => openEdit(supplier)}
                     onDelete={() => handleDelete(supplier)}
-                    onPayDebt={() => setPayingSupplier(supplier)}
+                    onPayDebt={() => {
+                      setPayingSupplier(supplier);
+                      setPayDebtAmount(String(supplier.debt || ''));
+                    }}
                   />
                 ))
               )}
@@ -342,8 +365,14 @@ const SupplierManagementPage = () => {
       {payingSupplier && (
         <PayDebtModal
           supplier={payingSupplier}
+          amount={payDebtAmount}
+          setAmount={setPayDebtAmount}
+          loading={payDebtLoading}
           onConfirm={handlePayDebt}
-          onClose={() => setPayingSupplier(null)}
+          onClose={() => {
+            setPayingSupplier(null);
+            setPayDebtAmount('');
+          }}
         />
       )}
 
@@ -390,16 +419,9 @@ const SupplierRow = ({ supplier, index, onEdit, onDelete, onPayDebt }) => {
         <div className="text-xs text-gray-500">{supplier.email || 'Chưa có email'}</div>
       </td>
       <td className="px-4 py-4">
-        <span className="rounded-full bg-[#f6f1ef] px-3 py-1 text-xs font-black text-red-950">Thực phẩm</span>
-      </td>
-      <td className="px-4 py-4">
         <span className={`rounded-full px-3 py-1 text-xs font-black ${hasDebt ? 'bg-amber-50 text-amber-700' : 'bg-sky-50 text-sky-700'}`}>
           {hasDebt ? `Nợ ${formatCurrency(supplier.debt)}` : 'Đang hợp tác'}
         </span>
-      </td>
-      <td className="px-4 py-4">
-        <div className="text-amber-400">★★★★<span className="text-gray-300">★</span></div>
-        <div className="text-xs font-bold text-gray-400">4.0/5.0</div>
       </td>
       <td className="px-4 py-4">
         <div className="flex justify-end gap-2">
@@ -412,15 +434,28 @@ const SupplierRow = ({ supplier, index, onEdit, onDelete, onPayDebt }) => {
   );
 };
 
-const PayDebtModal = ({ supplier, onConfirm, onClose }) => (
+const PayDebtModal = ({ supplier, amount, setAmount, loading, onConfirm, onClose }) => (
   <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/35 px-4">
     <div className="w-full max-w-md rounded-2xl bg-white p-6 shadow-2xl">
       <h2 className="m-0 text-xl font-black text-gray-950">Thanh toán công nợ</h2>
       <p className="mt-2 text-sm font-bold text-gray-500">Nhà cung cấp: {supplier.name}</p>
       <p className="mt-1 text-sm font-bold text-gray-500">Công nợ hiện tại: {formatCurrency(supplier.debt)}</p>
+      <label className="mt-5 flex flex-col gap-1.5">
+        <span className="text-xs font-black uppercase tracking-wider text-gray-500">Số tiền thanh toán (VNĐ)</span>
+        <input
+          type="number"
+          min="1"
+          max={Number(supplier.debt || 0)}
+          value={amount}
+          onChange={event => setAmount(event.target.value)}
+          className="w-full rounded-xl border border-gray-200 bg-white px-3 py-3 text-sm font-semibold text-gray-800 outline-none transition focus:border-[#c0392b] focus:ring-2 focus:ring-red-100"
+        />
+      </label>
       <div className="mt-6 flex justify-end gap-3">
-        <button onClick={onClose} className="rounded-xl bg-gray-100 px-5 py-3 text-sm font-black text-gray-600">Hủy</button>
-        <button onClick={onConfirm} className="rounded-xl bg-[#c70d1a] px-5 py-3 text-sm font-black text-white">Xác nhận</button>
+        <button onClick={onClose} disabled={loading} className="rounded-xl bg-gray-100 px-5 py-3 text-sm font-black text-gray-600 disabled:opacity-60">Hủy</button>
+        <button onClick={onConfirm} disabled={loading} className="rounded-xl bg-[#c70d1a] px-5 py-3 text-sm font-black text-white disabled:opacity-60">
+          {loading ? 'Đang xử lý...' : 'Xác nhận'}
+        </button>
       </div>
     </div>
   </div>

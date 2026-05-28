@@ -60,7 +60,7 @@ const getMenuItems = async (req, res) => {
     const decoratedItems = await attachMenuBusinessFields(menuItems);
     res.json(decoratedItems);
   } catch (error) {
-    res.status(500).json({ message: 'Loi server' });
+    res.status(500).json({ message: 'Lỗi server' });
   }
 };
 
@@ -71,7 +71,7 @@ const createMenuItem = async (req, res) => {
       for (const item of ingredients) {
         const ing = await Ingredient.findById(item.ingredient);
         if (!ing) {
-          return res.status(400).json({ message: `Nguyen lieu ID ${item.ingredient} khong ton tai` });
+          return res.status(400).json({ message: `Nguyên liệu ID ${item.ingredient} khong ton tai` });
         }
       }
     }
@@ -90,7 +90,7 @@ const createMenuItem = async (req, res) => {
     const [decorated] = await attachMenuBusinessFields([populated]);
     res.status(201).json(decorated);
   } catch (error) {
-    res.status(400).json({ message: 'Du lieu khong hop le' });
+    res.status(400).json({ message: 'Dữ liệu không hợp lệ' });
   }
 };
 
@@ -98,7 +98,7 @@ const updateMenuItem = async (req, res) => {
   try {
     const menuItem = await MenuItem.findById(req.params.id);
     if (!menuItem) {
-      return res.status(404).json({ message: 'Khong tim thay mon an' });
+      return res.status(404).json({ message: 'Không tìm thấy món ăn' });
     }
 
     menuItem.name = req.body.name || menuItem.name;
@@ -111,7 +111,7 @@ const updateMenuItem = async (req, res) => {
       for (const item of req.body.ingredients) {
         const ing = await Ingredient.findById(item.ingredient);
         if (!ing) {
-          return res.status(400).json({ message: `Nguyen lieu ID ${item.ingredient} khong ton tai` });
+          return res.status(400).json({ message: `Nguyên liệu ID ${item.ingredient} khong ton tai` });
         }
       }
       menuItem.ingredients = req.body.ingredients;
@@ -122,7 +122,7 @@ const updateMenuItem = async (req, res) => {
     const [decorated] = await attachMenuBusinessFields([populated]);
     res.json(decorated);
   } catch (error) {
-    res.status(400).json({ message: 'Cap nhat that bai' });
+    res.status(400).json({ message: 'Cập nhật thất bại' });
   }
 };
 
@@ -130,7 +130,7 @@ const deleteMenuItem = async (req, res) => {
   try {
     const menuItem = await MenuItem.findById(req.params.id);
     if (!menuItem) {
-      return res.status(404).json({ message: 'Khong tim thay mon an' });
+      return res.status(404).json({ message: 'Không tìm thấy món ăn' });
     }
 
     const [orderCount, comboCount] = await Promise.all([
@@ -151,7 +151,7 @@ const deleteMenuItem = async (req, res) => {
       await menuItem.save();
 
       return res.json({
-        message: 'Mon an da phat sinh du lieu lien quan nen da duoc ngung ban thay vi xoa vinh vien',
+        message: 'Món ăn đã phát sinh dữ liệu liên quan nên đã được ngừng bán thay vì xóa vĩnh viễn',
         mode: 'soft-deleted',
         pausedCombos: comboUpdate.modifiedCount || 0,
       });
@@ -160,12 +160,12 @@ const deleteMenuItem = async (req, res) => {
     await menuItem.deleteOne();
 
     res.json({
-      message: 'Da xoa mon an',
+      message: 'Đã xóa món ăn',
       mode: 'hard-deleted',
       pausedCombos: comboUpdate.modifiedCount || 0,
     });
   } catch (error) {
-    res.status(500).json({ message: 'Loi server' });
+    res.status(500).json({ message: 'Lỗi server' });
   }
 };
 

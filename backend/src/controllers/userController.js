@@ -1,7 +1,53 @@
 const User = require('../models/User');
+const Customer = require('../models/Customer');
 const generateToken = require('../utils/generateToken');
 const Order = require('../models/Order');
 const Shift = require('../models/Shift');
+
+const buildUserContactFilter = ({ email, phone }, excludeUserId = null) => {
+  const or = [];
+  if (email) or.push({ email: email.toLowerCase() });
+  if (phone) or.push({ phone });
+  if (or.length === 0) return null;
+
+  const filter = { isDeleted: { $ne: true }, $or: or };
+  if (excludeUserId) filter._id = { $ne: excludeUserId };
+  return filter;
+};
+
+const buildCustomerContactFilter = ({ email, phone }) => {
+  const or = [];
+  if (email) or.push({ email: email.toLowerCase() });
+  if (phone) or.push({ phone });
+  if (or.length === 0) return null;
+  return { isDeleted: { $ne: true }, $or: or };
+};
+
+const getContactDuplicateMessage = (duplicate, { email, phone }) => {
+  if (email && duplicate.email?.toLowerCase() === email.toLowerCase()) return 'Email đã tồn tại trong hệ thống';
+  if (phone && duplicate.phone === phone) return 'Số điện thoại đã tồn tại trong hệ thống';
+  return 'Email hoặc số điện thoại đã tồn tại trong hệ thống';
+};
+
+const assertUniqueAccountContact = async ({ email, phone }, { excludeUserId = null, allowCustomerEmail = '' } = {}) => {
+  const userFilter = buildUserContactFilter({ email, phone }, excludeUserId);
+  const duplicateUser = userFilter ? await User.findOne(userFilter) : null;
+  if (duplicateUser) {
+    return getContactDuplicateMessage(duplicateUser, { email, phone });
+  }
+
+  const customerFilter = buildCustomerContactFilter({ email, phone });
+  const duplicateCustomer = customerFilter ? await Customer.findOne(customerFilter) : null;
+  const isAllowedLinkedCustomer = duplicateCustomer
+    && allowCustomerEmail
+    && duplicateCustomer.email?.toLowerCase() === allowCustomerEmail.toLowerCase();
+
+  if (duplicateCustomer && !isAllowedLinkedCustomer) {
+    return getContactDuplicateMessage(duplicateCustomer, { email, phone });
+  }
+
+  return '';
+};
 
 // @desc    Lay ho so cua nguoi dung dang dang nhap
 // @route   GET /api/users/me
@@ -11,11 +57,11 @@ const getMe = async (req, res) => {
     // Luon lay lai tu DB de frontend khong phu thuoc vao user cu trong localStorage.
     const user = await User.findById(req.user._id).select('-password');
     if (!user) {
-      return res.status(404).json({ message: 'Khong tim thay nguoi dung' });
+      return res.status(404).json({ message: 'Không tìm thấy người dùng' });
     }
     res.json(user);
   } catch (error) {
-    res.status(500).json({ message: 'Loi server' });
+    res.status(500).json({ message: 'Lỗi server' });
   }
 };
 
@@ -26,10 +72,20 @@ const updateMe = async (req, res) => {
   try {
     const user = await User.findById(req.user._id);
     if (!user || user.isDeleted === true) {
-      return res.status(404).json({ message: 'Khong tim thay nguoi dung' });
+      return res.status(404).json({ message: 'Không tìm thấy người dùng' });
     }
 
     const { name, phone, address, avatar } = req.body;
+    if (phone !== undefined) {
+      const duplicateMessage = await assertUniqueAccountContact(
+        { phone },
+        { excludeUserId: user._id, allowCustomerEmail: user.role === 'customer' ? user.email : '' }
+      );
+      if (duplicateMessage) {
+        return res.status(400).json({ message: duplicateMessage });
+      }
+    }
+
     if (name !== undefined) user.name = name;
     if (phone !== undefined) user.phone = phone;
     if (address !== undefined) user.address = address;
@@ -51,7 +107,7 @@ const updateMe = async (req, res) => {
       updatedAt: updatedUser.updatedAt,
     });
   } catch (error) {
-    res.status(400).json({ message: 'Cap nhat ho so that bai', error: error.message });
+    res.status(400).json({ message: 'Cập nhật hồ sơ thất bại', error: error.message });
   }
 };
 
@@ -62,27 +118,27 @@ const changeMyPassword = async (req, res) => {
   try {
     const { currentPassword, newPassword } = req.body;
     if (!currentPassword || !newPassword) {
-      return res.status(400).json({ message: 'Vui long nhap day du mat khau hien tai va mat khau moi' });
+      return res.status(400).json({ message: 'Vui lòng nhập đầy đủ mật khẩu hiện tại và mật khẩu mới' });
     }
     if (newPassword.length < 6) {
-      return res.status(400).json({ message: 'Mat khau moi phai co it nhat 6 ky tu' });
+      return res.status(400).json({ message: 'Mật khẩu mới phải có ít nhất 6 ký tự' });
     }
 
     const user = await User.findById(req.user._id);
     if (!user || user.isDeleted === true) {
-      return res.status(404).json({ message: 'Khong tim thay nguoi dung' });
+      return res.status(404).json({ message: 'Không tìm thấy người dùng' });
     }
 
     const isMatch = await user.matchPassword(currentPassword);
     if (!isMatch) {
-      return res.status(400).json({ message: 'Mat khau hien tai khong dung' });
+      return res.status(400).json({ message: 'Mật khẩu hiện tại không đúng' });
     }
 
     user.password = newPassword;
     await user.save();
-    res.json({ message: 'Da doi mat khau thanh cong' });
+    res.json({ message: 'Đã đổi mật khẩu thành công' });
   } catch (error) {
-    res.status(400).json({ message: 'Doi mat khau that bai', error: error.message });
+    res.status(400).json({ message: 'Đổi mật khẩu thất bại', error: error.message });
   }
 };
 
@@ -107,9 +163,9 @@ const createUser = async (req, res) => {
   const { name, email, password, role, phone, salary, status } = req.body;
 
   try {
-    const userExists = await User.findOne({ email });
-    if (userExists) {
-      return res.status(400).json({ message: 'Email đã tồn tại' });
+    const duplicateMessage = await assertUniqueAccountContact({ email, phone });
+    if (duplicateMessage) {
+      return res.status(400).json({ message: duplicateMessage });
     }
 
     // Tách role tiếng Việt từ Frontend thành role hệ thống và chức vụ hiển thị
@@ -155,9 +211,20 @@ const updateUser = async (req, res) => {
       return res.status(404).json({ message: 'Không tìm thấy người dùng' });
     }
 
+    const nextEmail = req.body.email || user.email;
+    const nextPhone = req.body.phone ?? user.phone;
+    const duplicateMessage = await assertUniqueAccountContact(
+      { email: nextEmail, phone: nextPhone },
+      { excludeUserId: user._id, allowCustomerEmail: user.role === 'customer' ? user.email : '' }
+    );
+    if (duplicateMessage) {
+      return res.status(400).json({ message: duplicateMessage });
+    }
+
     // Cập nhật các trường được phép
     user.name = req.body.name || user.name;
-    user.phone = req.body.phone || user.phone;
+    user.email = nextEmail;
+    user.phone = nextPhone;
     
     // Cập nhật lương nếu có
     if (req.body.salary !== undefined) {

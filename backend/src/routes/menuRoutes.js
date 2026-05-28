@@ -5,7 +5,7 @@ const { getMenuItems, createMenuItem, updateMenuItem, deleteMenuItem } = require
 const { validateMenuItemCreate, validateMenuItemUpdate } = require('../middleware/validationMiddleware');
 
 router.route('/')
-  .get(protect, getMenuItems)
+  .get(protect, authorize('admin', 'staff'), getMenuItems)
   .post(protect, authorize('admin'), validateMenuItemCreate, createMenuItem);
 
 router.route('/:id')

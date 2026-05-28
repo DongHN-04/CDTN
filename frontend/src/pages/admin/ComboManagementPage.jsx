@@ -5,6 +5,7 @@ import uploadService from '../../services/uploadService';
 import { getImageUrl } from '../../utils/imageUrl';
 import { PlusCircle } from 'lucide-react';
 import ConfirmDeleteModal from '../../components/ConfirmDeleteModal';
+import { useToast } from '../../contexts/ToastContext';
 
 const emptyForm = {
   name: '',
@@ -31,6 +32,7 @@ const isNewCombo = (combo) => {
 };
 
 const ComboManagementPage = () => {
+  const { showToast } = useToast();
   const [combos, setCombos] = useState([]);
   const [allMenuItems, setAllMenuItems] = useState([]);
   const [form, setForm] = useState(emptyForm);
@@ -38,7 +40,7 @@ const ComboManagementPage = () => {
   const [showForm, setShowForm] = useState(false);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
-  const [error, setError] = useState('');
+  const [, setError] = useState('');
   const [deleteModal, setDeleteModal] = useState({ isOpen: false, combo: null, loading: false });
   const [currentPage, setCurrentPage] = useState(1);
   const fileInputRef = useRef(null);
@@ -55,14 +57,16 @@ const ComboManagementPage = () => {
         setCombos(comboData || []);
         setAllMenuItems(menuData || []);
       } catch (err) {
-        setError(err.response?.data?.message || 'Không thể tải dữ liệu combo');
+        const message = err.response?.data?.message || 'Không thể tải dữ liệu combo';
+        setError(message);
+      showToast(message, 'error');
       } finally {
         setLoading(false);
       }
     };
 
     fetchData();
-  }, []);
+  }, [showToast]);
 
   const stats = useMemo(() => ({
     total: combos.length,
@@ -148,7 +152,9 @@ const ComboManagementPage = () => {
       const image = await uploadService.uploadImage(file);
       setForm(current => ({ ...current, image }));
     } catch (err) {
-      setError(err.response?.data?.message || 'Không thể tải ảnh combo');
+      const message = err.response?.data?.message || 'Không thể tải ảnh combo';
+      setError(message);
+      showToast(message, 'error');
     } finally {
       setSaving(false);
       event.target.value = '';
@@ -170,6 +176,17 @@ const ComboManagementPage = () => {
 
     if (!payload.name.trim() || payload.price <= 0 || payload.items.length === 0) {
       setError('Tên combo, giá bán và ít nhất một món là bắt buộc');
+      showToast('Tên combo, giá bán và ít nhất một món là bắt buộc', 'error');
+      return;
+    }
+    if (payload.price > 100000000) {
+      setError('Giá combo không được vượt quá 100.000.000');
+      showToast('Giá combo không được vượt quá 100.000.000', 'error');
+      return;
+    }
+    if (payload.items.some(item => item.quantity <= 0 || item.quantity > 100000)) {
+      setError('Số lượng món trong combo phải từ 1 đến 100.000');
+      showToast('Số lượng món trong combo phải từ 1 đến 100.000', 'error');
       return;
     }
 
@@ -182,9 +199,12 @@ const ComboManagementPage = () => {
         const created = await comboService.createCombo(payload);
         setCombos(current => [created, ...current]);
       }
+      showToast(editingId ? 'Đã cập nhật combo' : 'Đã tạo combo');
       closeForm();
     } catch (err) {
-      setError(err.response?.data?.message || 'Không thể lưu combo');
+      const message = err.response?.data?.message || 'Không thể lưu combo';
+      setError(message);
+      showToast(message, 'error');
     } finally {
       setSaving(false);
     }
@@ -202,8 +222,11 @@ const ComboManagementPage = () => {
       await comboService.deleteCombo(deleteModal.combo._id);
       setCombos(current => current.filter(item => item._id !== deleteModal.combo._id));
       setDeleteModal({ isOpen: false, combo: null, loading: false });
+      showToast('Đã xóa combo');
     } catch (err) {
-      setError(err.response?.data?.message || 'Không thể xóa combo');
+      const message = err.response?.data?.message || 'Không thể xóa combo';
+      setError(message);
+      showToast(message, 'error');
       setDeleteModal({ isOpen: false, combo: null, loading: false });
     }
   };
@@ -240,11 +263,6 @@ const ComboManagementPage = () => {
         </button>
       </div>
 
-      {error && !showForm && (
-        <div className="mb-5 rounded-xl border border-red-100 bg-red-50 px-4 py-3 text-sm font-bold text-red-700">
-          {error}
-        </div>
-      )}
 
       {loading ? (
         <div className="rounded-2xl bg-white p-10 text-center text-sm font-bold text-gray-500 shadow-sm">Đang tải combo...</div>
@@ -296,11 +314,6 @@ const ComboManagementPage = () => {
               <button onClick={closeForm} className="rounded-lg bg-gray-100 px-3 py-2 text-sm font-black text-gray-600">Đóng</button>
             </div>
 
-            {error && (
-              <div className="mb-4 rounded-xl border border-red-100 bg-red-50 px-4 py-3 text-sm font-bold text-red-700">
-                {error}
-              </div>
-            )}
 
             <form onSubmit={handleSubmit} className="flex flex-col gap-5">
               <div className="grid grid-cols-1 gap-4 md:grid-cols-2">

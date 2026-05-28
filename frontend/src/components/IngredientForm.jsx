@@ -1,11 +1,13 @@
 import React, { useEffect, useState } from 'react';
-import { ErrorBox } from '../utils/apiError';
+import { useToast } from '../contexts/ToastContext';
 
 const emptyForm = { name: '', stock: 0, unit: '', pricePerUnit: 0 };
+const MAX_MONEY = 100000000;
+const MAX_QUANTITY = 100000;
 
-const IngredientForm = ({ ingredient, onSubmit, onCancel, error }) => {
+const IngredientForm = ({ ingredient, onSubmit, onCancel }) => {
+  const { showToast } = useToast();
   const [form, setForm] = useState(emptyForm);
-  const [localError, setLocalError] = useState('');
 
   useEffect(() => {
     setForm(ingredient ? {
@@ -14,19 +16,16 @@ const IngredientForm = ({ ingredient, onSubmit, onCancel, error }) => {
       unit: ingredient.unit || '',
       pricePerUnit: ingredient.pricePerUnit ?? 0,
     } : emptyForm);
-    setLocalError('');
   }, [ingredient]);
 
   const handleChange = event => setForm({ ...form, [event.target.name]: event.target.value });
 
   const handleSubmit = event => {
     event.preventDefault();
-    setLocalError('');
-
-    if (!form.name.trim()) return setLocalError('name: Tên nguyên liệu là bắt buộc');
-    if (!form.unit.trim()) return setLocalError('unit: Đơn vị tính là bắt buộc');
-    if (Number(form.stock) < 0) return setLocalError('stock: Tồn kho phải >= 0');
-    if (Number(form.pricePerUnit) < 0) return setLocalError('pricePerUnit: Giá nhập phải >= 0');
+    if (!form.name.trim()) return showToast('Tên nguyên liệu là bắt buộc', 'error');
+    if (!form.unit.trim()) return showToast('Đơn vị tính là bắt buộc', 'error');
+    if (Number(form.stock) < 0 || Number(form.stock) > MAX_QUANTITY) return showToast('Tồn kho phải từ 0 đến 100.000', 'error');
+    if (Number(form.pricePerUnit) <= 0 || Number(form.pricePerUnit) > MAX_MONEY) return showToast('Giá nhập phải lớn hơn 0 và không vượt quá 100.000.000', 'error');
 
     onSubmit({
       ...form,
@@ -47,8 +46,6 @@ const IngredientForm = ({ ingredient, onSubmit, onCancel, error }) => {
             Đóng
           </button>
         </div>
-
-        <ErrorBox message={localError || error} />
 
         <form onSubmit={handleSubmit} className="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-2">
           <Field label="Tên nguyên liệu">
