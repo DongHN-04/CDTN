@@ -1,9 +1,11 @@
-import React, { useState, useEffect } from 'react';
+import React, { useMemo, useState, useEffect } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { useCart } from '../../contexts/CartContext';
+import { useAuth } from '../../contexts/AuthContext';
 import publicService from '../../services/publicService';
 import { getImageUrl } from '../../utils/imageUrl';
 import { findUsablePromotion, normalizePromoCode } from '../../utils/promotionUtils';
+import { getSavedPromotions } from '../../utils/savedPromotions';
 
 // Định nghĩa defaultImages
 const defaultImages = {
@@ -19,10 +21,12 @@ const formatPrice = (val) => val.toLocaleString('vi-VN') + ' VNĐ';
 
 const CartPage = () => {
   const { items, removeItem, updateQuantity, getCartTotal, refreshCartProducts } = useCart();
+  const { user } = useAuth();
   const [promoInput, setPromoInput] = useState('');
   const [appliedPromo, setAppliedPromo] = useState('');
   const [discountAmount, setDiscountAmount] = useState(0);
   const [promotions, setPromotions] = useState([]);
+  const [savedPromotions, setSavedPromotions] = useState([]);
   const [toast, setToast] = useState({ show: false, message: '', type: 'success' });
   const navigate = useNavigate();
 
@@ -30,9 +34,10 @@ const CartPage = () => {
   useEffect(() => {
     const savedPromo = localStorage.getItem('appliedPromo');
     const savedDiscount = localStorage.getItem('discountAmount');
-    if (savedPromo && savedDiscount) {
+    if (savedPromo) {
       setAppliedPromo(savedPromo);
-      setDiscountAmount(Number(savedDiscount));
+      setPromoInput(savedPromo);
+      setDiscountAmount(Number(savedDiscount || 0));
     }
   }, []);
 
@@ -43,6 +48,10 @@ const CartPage = () => {
   }, []);
 
   useEffect(() => {
+    setSavedPromotions(getSavedPromotions(user));
+  }, [user]);
+
+  useEffect(() => {
     Promise.all([publicService.getMenu(), publicService.getCombos()])
       .then(([menuItems, combos]) => refreshCartProducts({ menuItems, combos }))
       .catch(() => {});
@@ -51,8 +60,11 @@ const CartPage = () => {
   useEffect(() => {
     if (!appliedPromo) return;
 
-    const { discount, error } = findUsablePromotion(promotions, appliedPromo, getCartTotal());
+    const currentSubtotal = getCartTotal();
+    const currentDiscountBase = currentSubtotal + (currentSubtotal > 0 ? 15000 : 0);
+    const { discount, error } = findUsablePromotion(promotions, appliedPromo, currentDiscountBase);
     if (error || discount <= 0) {
+      setPromoInput('');
       setAppliedPromo('');
       setDiscountAmount(0);
       localStorage.removeItem('appliedPromo');
@@ -60,16 +72,30 @@ const CartPage = () => {
       return;
     }
 
+    setPromoInput(appliedPromo);
     setDiscountAmount(discount);
     localStorage.setItem('discountAmount', String(discount));
   }, [items, promotions, appliedPromo, getCartTotal]);
 
-  const handleApplyPromo = () => {
-    const code = normalizePromoCode(promoInput);
-    if (!code) return;
+  const handleApplyPromo = (selectedCode = promoInput) => {
+    const code = normalizePromoCode(selectedCode);
+    if (!code) {
+      setAppliedPromo('');
+      setDiscountAmount(0);
+      localStorage.removeItem('appliedPromo');
+      localStorage.removeItem('discountAmount');
+      return;
+    }
 
-    const { promotion, discount, error } = findUsablePromotion(promotions, code, getCartTotal());
+    const currentSubtotal = getCartTotal();
+    const currentDiscountBase = currentSubtotal + (currentSubtotal > 0 ? 15000 : 0);
+    const { promotion, discount, error } = findUsablePromotion(promotions, code, currentDiscountBase);
     if (error) {
+      setPromoInput('');
+      setAppliedPromo('');
+      setDiscountAmount(0);
+      localStorage.removeItem('appliedPromo');
+      localStorage.removeItem('discountAmount');
       showToast(error, 'error');
       return;
     }
@@ -127,7 +153,12 @@ const CartPage = () => {
   // Tính toán các thông số tiền tệ
   const subtotal = getCartTotal();
   const deliveryFee = subtotal > 0 ? 15000 : 0; // Đồng bộ với phí giao hàng backend đang tính cho đơn giao tận nơi.
-  const total = Math.max(0, subtotal + deliveryFee - discountAmount);
+  const discountBase = subtotal + deliveryFee;
+  const total = Math.max(0, discountBase - discountAmount);
+  const savedUsablePromotions = useMemo(() => {
+    const savedCodes = new Set(savedPromotions.map(promo => normalizePromoCode(promo.name)));
+    return promotions.filter(promo => savedCodes.has(normalizePromoCode(promo.name)));
+  }, [promotions, savedPromotions]);
 
   return (
     <div className="max-w-[1200px] mx-auto px-5 py-12 font-sans">
@@ -255,21 +286,22 @@ const CartPage = () => {
               <label className="text-[11px] font-black text-gray-400 uppercase tracking-wider">
                 Mã giảm giá
               </label>
-              <div className="flex gap-2">
-                <input 
-                  type="text" 
-                  placeholder="Nhập mã khuyến mãi" 
+              <select
                   value={promoInput}
-                  onChange={(e) => setPromoInput(e.target.value)}
-                  className="flex-1 bg-gray-50 border border-gray-100 rounded-xl px-4 py-2.5 text-[13px] font-semibold text-gray-700 outline-none focus:border-[#c0392b] focus:bg-white transition-all"
-                />
-                <button 
-                  onClick={handleApplyPromo}
-                  className="bg-gray-100 hover:bg-gray-200 text-gray-700 font-extrabold text-[13px] px-5 py-2.5 rounded-xl border-none cursor-pointer transition-colors shrink-0"
+                  onChange={(e) => {
+                    const selectedCode = e.target.value;
+                    setPromoInput(selectedCode);
+                    handleApplyPromo(selectedCode);
+                  }}
+                  className="w-full rounded-xl border border-red-100 bg-red-50/40 px-4 py-2.5 text-[13px] font-bold text-gray-700 outline-none focus:border-[#c0392b] focus:bg-white"
                 >
-                  Áp dụng
-                </button>
-              </div>
+                  <option value="">Chọn mã giảm giá</option>
+                  {savedUsablePromotions.map(promo => (
+                    <option key={promo._id || promo.name} value={promo.name}>
+                      {promo.name} - đơn từ {Number(promo.minOrderValue || 0).toLocaleString('vi-VN')}đ
+                    </option>
+                  ))}
+              </select>
               {appliedPromo && (
                 <span className="text-emerald-600 text-xs font-bold mt-1 block">
                   ✓ Đang áp dụng mã: <strong className="font-extrabold">{appliedPromo}</strong>

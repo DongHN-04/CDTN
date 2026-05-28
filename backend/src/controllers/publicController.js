@@ -82,6 +82,8 @@ const createOrder = async (req, res) => {
 
     let orderDiscount = 0;
     let appliedPromoCode = '';
+    const deliveryFee = customer?.address ? 15000 : 0;
+    const discountBase = subtotal + deliveryFee;
 
     // Luôn tính lại khuyến mãi ở backend để khách không thể tự sửa số tiền giảm trên trình duyệt.
     if (promoCode) {
@@ -99,19 +101,19 @@ const createOrder = async (req, res) => {
         return res.status(400).json({ message: 'Mã khuyến mãi không hợp lệ hoặc đã hết hạn' });
       }
 
-      if (subtotal < promotion.minOrderValue) {
+      if (discountBase < promotion.minOrderValue) {
         return res.status(400).json({
           message: `Đơn hàng cần tối thiểu ${promotion.minOrderValue.toLocaleString('vi-VN')}₫ để dùng mã này`,
         });
       }
 
       if (promotion.type === 'percent') {
-        orderDiscount = Math.round(subtotal * (promotion.value / 100));
+        orderDiscount = Math.round(discountBase * (promotion.value / 100));
       } else if (promotion.type === 'fixed') {
         orderDiscount = promotion.value;
       }
 
-      orderDiscount = Math.min(orderDiscount, subtotal);
+      orderDiscount = Math.min(orderDiscount, discountBase);
       appliedPromoCode = promotion.name;
     }
 
@@ -121,8 +123,7 @@ const createOrder = async (req, res) => {
       email: loggedInCustomer?.email || customer?.email || '',
     };
 
-    const deliveryFee = customer?.address ? 15000 : 0;
-    const finalTotal = Math.max(0, subtotal + deliveryFee - orderDiscount);
+    const finalTotal = Math.max(0, discountBase - orderDiscount);
 
     const order = await Order.create({
       customer: orderCustomer,

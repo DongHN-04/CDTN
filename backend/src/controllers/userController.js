@@ -75,7 +75,7 @@ const updateMe = async (req, res) => {
       return res.status(404).json({ message: 'Không tìm thấy người dùng' });
     }
 
-    const { name, phone, address, avatar } = req.body;
+    const { name, phone, address, addresses, avatar } = req.body;
     if (phone !== undefined) {
       const duplicateMessage = await assertUniqueAccountContact(
         { phone },
@@ -89,9 +89,30 @@ const updateMe = async (req, res) => {
     if (name !== undefined) user.name = name;
     if (phone !== undefined) user.phone = phone;
     if (address !== undefined) user.address = address;
+    if (addresses !== undefined) user.addresses = addresses;
     if (avatar !== undefined) user.avatar = avatar;
 
     const updatedUser = await user.save();
+    if (updatedUser.role === 'customer') {
+      await Customer.findOneAndUpdate(
+        { email: updatedUser.email, isDeleted: { $ne: true } },
+        {
+          $set: {
+            name: updatedUser.name,
+            phone: updatedUser.phone || '',
+            email: updatedUser.email,
+          },
+          $setOnInsert: {
+            type: 'Thường',
+            notes: '',
+            isActive: true,
+            isDeleted: false,
+          },
+        },
+        { upsert: true, new: true }
+      );
+    }
+
     res.json({
       _id: updatedUser._id,
       name: updatedUser.name,
@@ -100,6 +121,7 @@ const updateMe = async (req, res) => {
       position: updatedUser.position,
       phone: updatedUser.phone,
       address: updatedUser.address,
+      addresses: updatedUser.addresses || [],
       avatar: updatedUser.avatar,
       salary: updatedUser.salary,
       status: updatedUser.status,

@@ -6,6 +6,7 @@ import { useCart } from '../../contexts/CartContext';
 import { useAuth } from '../../contexts/AuthContext';
 import { useToast } from '../../contexts/ToastContext';
 import { getImageUrl } from '../../utils/imageUrl';
+import { getSavedPromotions, savePromotionForUser } from '../../utils/savedPromotions';
 
 const fallbackPromotions = [
   {
@@ -108,7 +109,12 @@ const PromotionsPage = () => {
   const { showToast } = useToast();
   const [promotions, setPromotions] = useState([]);
   const [combos, setCombos] = useState([]);
+  const [savedPromotions, setSavedPromotions] = useState([]);
   const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    setSavedPromotions(getSavedPromotions(user));
+  }, [user]);
 
   useEffect(() => {
     const fetchData = async () => {
@@ -156,6 +162,21 @@ const PromotionsPage = () => {
     addCombo(combo, 1);
     showToast(`Đã thêm ${combo.name} vào giỏ hàng.`);
   };
+
+  const handleSavePromotion = promo => {
+    if (user?.role !== 'customer') {
+      showToast('Vui lòng đăng nhập tài khoản khách hàng để lưu mã.', 'error');
+      return;
+    }
+
+    const next = savePromotionForUser(user, promo);
+    setSavedPromotions(next);
+    showToast(`Đã lưu mã "${promo.name}".`);
+  };
+
+  const isPromotionSaved = promo => savedPromotions.some(item => (
+    item._id === promo._id || item.name?.toUpperCase() === promo.name?.toUpperCase()
+  ));
 
   return (
     <div className="bg-[#f8f5f2] text-slate-950">
@@ -230,7 +251,7 @@ const PromotionsPage = () => {
           </div>
         ) : (
           <div className="grid gap-5 md:grid-cols-3">
-            {visiblePromotions.slice(0, 3).map((promo, index) => {
+            {visiblePromotions.map((promo, index) => {
               const theme = getPromoTheme(index);
               const Icon = theme.icon;
               return (
@@ -247,7 +268,14 @@ const PromotionsPage = () => {
                         <CalendarDays size={12} />
                         {formatDate(promo.endDate)}
                       </span>
-                      <button className="text-xs font-black text-[#c70d18]">Lưu mã</button>
+                      <button
+                        type="button"
+                        onClick={() => handleSavePromotion(promo)}
+                        disabled={isPromotionSaved(promo)}
+                        className="text-xs font-black text-[#c70d18] disabled:cursor-default disabled:text-emerald-600"
+                      >
+                        {isPromotionSaved(promo) ? 'Đã lưu' : 'Lưu mã'}
+                      </button>
                     </div>
                   </div>
                 </article>

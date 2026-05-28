@@ -612,6 +612,27 @@ const validateProfileUpdate = validateBody((body, errors) => {
     payload.address = trimString(body.address || '');
     validateTextLength(errors, 'address', payload.address, LIMITS.description);
   }
+  if (hasField(body, 'addresses')) {
+    const addresses = Array.isArray(body.addresses) ? body.addresses : [];
+    payload.addresses = addresses.slice(0, 10).map((item = {}, index) => {
+      const address = trimString(item.address || '');
+      const district = trimString(item.district || '');
+      const city = trimString(item.city || 'Hồ Chí Minh');
+      const fullAddress = trimString(item.fullAddress || [address, district, city].filter(Boolean).join(', '));
+      validateTextLength(errors, `addresses.${index}.label`, trimString(item.label || 'Địa chỉ nhận hàng'));
+      validateTextLength(errors, `addresses.${index}.address`, address, LIMITS.description);
+      validateTextLength(errors, `addresses.${index}.fullAddress`, fullAddress, LIMITS.description);
+      return {
+        id: trimString(item.id || ''),
+        label: trimString(item.label || 'Địa chỉ nhận hàng'),
+        address,
+        district,
+        city,
+        fullAddress,
+        isDefault: Boolean(item.isDefault),
+      };
+    });
+  }
   if (hasField(body, 'avatar')) {
     payload.avatar = trimString(body.avatar || '');
     if (payload.avatar && !isImagePath(payload.avatar)) {

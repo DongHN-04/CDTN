@@ -10,6 +10,7 @@ const buildAuthResponse = (user) => ({
   role: user.role,
   phone: user.phone,
   address: user.address,
+  addresses: user.addresses || [],
   avatar: user.avatar,
   token: generateToken(user._id, user.role),
 });

@@ -1,13 +1,12 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import {
-  AlertCircle,
   ArrowRight,
   Banknote,
-  CheckCircle2,
   ChevronDown,
   CreditCard,
   MapPin,
+  MoveLeft,
   ReceiptText,
   ShieldCheck,
   ShoppingBag,
@@ -18,6 +17,7 @@ import paymentService from '../../services/paymentService';
 import publicService from '../../services/publicService';
 import { getImageUrl } from '../../utils/imageUrl';
 import { findUsablePromotion, normalizePromoCode } from '../../utils/promotionUtils';
+import { normalizeCustomerAddresses, parseSavedAddress } from '../../utils/customerAddresses';
 
 const defaultImages = {
   Burger: '/images/home/product-burger.png',
@@ -43,6 +43,25 @@ const districts = [
 
 const formatPrice = (value) => `${Number(value || 0).toLocaleString('vi-VN')}đ`;
 
+const getInitialCustomerInfo = (user) => {
+  if (user?.role !== 'customer') {
+    return { name: '', phone: '', address: '', district: '' };
+  }
+
+  const savedAddresses = normalizeCustomerAddresses(user?.addresses || []);
+  const defaultAddress = savedAddresses.find(item => item.isDefault) || savedAddresses[0];
+  const parsedAddress = defaultAddress
+    ? defaultAddress
+    : parseSavedAddress(user.address || '', districts);
+
+  return {
+    name: user.name || '',
+    phone: user.phone || '',
+    address: parsedAddress.address || '',
+    district: parsedAddress.district || '',
+  };
+};
+
 const CheckoutPage = () => {
   const { items, clearCart, getCartTotal, refreshCartProducts } = useCart();
   const { user } = useAuth();
@@ -52,10 +71,11 @@ const CheckoutPage = () => {
   const initialDiscount = 0;
   const initialPromo = location.state?.promoCode || localStorage.getItem('appliedPromo') || '';
 
-  const [name, setName] = useState(localStorage.getItem('customerName') || '');
-  const [phone, setPhone] = useState(localStorage.getItem('customerPhone') || '');
-  const [address, setAddress] = useState(localStorage.getItem('customerAddress') || '');
-  const [district, setDistrict] = useState('');
+  const initialCustomer = getInitialCustomerInfo(user);
+  const [name, setName] = useState(initialCustomer.name);
+  const [phone, setPhone] = useState(initialCustomer.phone);
+  const [address, setAddress] = useState(initialCustomer.address);
+  const [district, setDistrict] = useState(initialCustomer.district);
   const [city] = useState('Hồ Chí Minh');
   const [notes, setNotes] = useState('');
   const [paymentMethod, setPaymentMethod] = useState('cash');
@@ -67,13 +87,22 @@ const CheckoutPage = () => {
 
   const subtotal = getCartTotal();
   const deliveryFee = subtotal > 0 ? 15000 : 0;
-  const total = Math.max(0, subtotal + deliveryFee - discount);
+  const discountBase = subtotal + deliveryFee;
+  const total = Math.max(0, discountBase - discount);
 
   useEffect(() => {
     if (items.length === 0) {
       navigate('/cart', { replace: true });
     }
   }, [items.length, navigate]);
+
+  useEffect(() => {
+    const nextCustomer = getInitialCustomerInfo(user);
+    setName(nextCustomer.name);
+    setPhone(nextCustomer.phone);
+    setAddress(nextCustomer.address);
+    setDistrict(nextCustomer.district);
+  }, [user]);
 
   useEffect(() => {
     publicService.getPromotions()
@@ -93,10 +122,13 @@ const CheckoutPage = () => {
       setDiscount(0);
       return;
     }
+    if (promotions.length === 0) return;
 
-    const result = findUsablePromotion(promotions, code, subtotal);
+    const result = findUsablePromotion(promotions, code, discountBase);
     if (result.error) {
+      setPromoCode('');
       setDiscount(0);
+      localStorage.removeItem('appliedPromo');
       localStorage.removeItem('discountAmount');
       return;
     }
@@ -105,7 +137,7 @@ const CheckoutPage = () => {
     setDiscount(result.discount);
     localStorage.setItem('appliedPromo', result.promotion.name);
     localStorage.setItem('discountAmount', String(result.discount));
-  }, [promoCode, promotions, subtotal]);
+  }, [promoCode, promotions, discountBase]);
 
   const orderItems = useMemo(() => (
     items
@@ -120,27 +152,6 @@ const CheckoutPage = () => {
   const showToast = (message, type = 'success') => {
     setToast({ show: true, message, type });
     window.setTimeout(() => setToast({ show: false, message: '', type: 'success' }), 3000);
-  };
-
-  const handleApplyPromo = () => {
-    const code = normalizePromoCode(promoCode);
-    if (!code) {
-      showToast('Vui lòng nhập mã khuyến mãi.', 'error');
-      return;
-    }
-
-    const result = findUsablePromotion(promotions, code, subtotal);
-    if (result.error) {
-      setDiscount(0);
-      showToast(result.error, 'error');
-      return;
-    }
-
-    setPromoCode(result.promotion.name);
-    setDiscount(result.discount);
-    localStorage.setItem('appliedPromo', result.promotion.name);
-    localStorage.setItem('discountAmount', String(result.discount));
-    showToast(`Áp dụng mã "${result.promotion.name}" thành công.`);
   };
 
   const validateForm = () => {
@@ -212,12 +223,28 @@ const CheckoutPage = () => {
   const getItemName = (item) => (item.type === 'combo' ? item.name : item.menuItem?.name) || 'Món ăn';
   const getItemPrice = (item) => (item.type === 'combo' ? item.price : item.menuItem?.price) || 0;
 
+  const handleBackToCart = () => {
+    if (promoCode) localStorage.setItem('appliedPromo', promoCode);
+    localStorage.setItem('discountAmount', String(discount || 0));
+    navigate('/cart');
+  };
+
   return (
     <div className="min-h-screen bg-[#f9fafb] pb-16 font-sans">
       <main className="mx-auto mt-10 max-w-[1200px] px-5">
-        <h1 className="mb-8 text-[25px] font-black tracking-tight text-gray-800">
-          Thông tin đơn hàng
-        </h1>
+        <div className="mb-8 flex flex-wrap items-center justify-between gap-3">
+          <h1 className="m-0 text-[25px] font-black tracking-tight text-gray-800">
+            Thông tin đơn hàng
+          </h1>
+          <button
+            type="button"
+            onClick={handleBackToCart}
+            className="inline-flex items-center gap-2 rounded-xl border border-gray-100 bg-white px-4 py-2.5 text-sm font-black text-gray-700 shadow-sm transition-colors hover:border-red-100 hover:bg-red-50 hover:text-[#c0392b]"
+          >
+            <MoveLeft size={17} />
+            Quay lại giỏ hàng
+          </button>
+        </div>
 
         <div className="grid grid-cols-1 items-start gap-8 lg:grid-cols-12">
           <div className="flex flex-col gap-8 lg:col-span-7">
@@ -407,23 +434,13 @@ const CheckoutPage = () => {
                 })}
               </div>
 
-              <div className="mt-2 flex gap-2 border-t border-gray-50 pt-5">
-                <input
-                  type="text"
-                  placeholder="Mã khuyến mãi"
-                  value={promoCode}
-                  onChange={(event) => setPromoCode(event.target.value)}
-                  className="min-w-0 flex-1 rounded-xl border border-gray-100 bg-gray-50 px-4 py-2.5 text-xs font-semibold uppercase text-gray-700 outline-none transition-all focus:border-[#c0392b] focus:bg-white"
-                />
-                <button
-                  type="button"
-                  onClick={handleApplyPromo}
-                  disabled={loading}
-                  className="shrink-0 rounded-xl border-none bg-gray-100 px-5 py-2.5 text-xs font-extrabold text-gray-700 transition-colors hover:bg-gray-200 disabled:cursor-not-allowed disabled:opacity-60"
-                >
-                  Áp dụng
-                </button>
-              </div>
+              {promoCode && discount > 0 && (
+                <div className="mt-2 border-t border-gray-50 pt-5">
+                  <div className="rounded-xl border border-emerald-100 bg-emerald-50 px-4 py-3 text-xs font-bold text-emerald-700">
+                    Đang áp dụng mã: <span className="font-black">{promoCode}</span>
+                  </div>
+                </div>
+              )}
 
               <div className="my-1 flex flex-col gap-3 border-y border-gray-50 py-4">
                 <div className="flex items-center justify-between text-sm font-semibold text-gray-500">
@@ -472,10 +489,12 @@ const CheckoutPage = () => {
       </main>
 
       {toast.show && (
-        <div className={`fixed bottom-6 right-6 z-50 flex max-w-[min(360px,calc(100vw-32px))] items-center gap-3 rounded-xl px-5 py-3.5 text-sm font-semibold text-white shadow-2xl ${
-          toast.type === 'error' ? 'bg-rose-600' : 'bg-slate-900'
-        }`}>
-          {toast.type === 'error' ? <AlertCircle size={18} /> : <CheckCircle2 size={18} />}
+        <div className="fixed bottom-6 right-6 z-50 bg-slate-900 text-white px-5 py-3.5 rounded-xl shadow-2xl flex items-center gap-3 border border-slate-700 animate-bounce duration-300">
+          <div className={`w-5 h-5 rounded-full flex items-center justify-center text-white text-[11px] font-bold ${
+            toast.type === 'success' ? 'bg-emerald-500' : 'bg-rose-500'
+          }`}>
+            {toast.type === 'success' ? '✓' : '×'}
+          </div>
           <span>{toast.message}</span>
         </div>
       )}
