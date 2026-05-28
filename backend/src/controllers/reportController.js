@@ -53,7 +53,12 @@ const buildOrderFilter = (start, end) => ({
   ],
 });
 
-const getTopItems = async (matchFilter) => Order.aggregate([
+const getTopItems = async (matchFilter, options = {}) => {
+  const sortStage = options.sortBy === 'quantity'
+    ? { totalQuantity: -1, totalRevenue: -1 }
+    : { totalRevenue: -1, totalQuantity: -1 };
+
+  return Order.aggregate([
   { $match: matchFilter },
   { $unwind: '$items' },
   {
@@ -69,7 +74,7 @@ const getTopItems = async (matchFilter) => Order.aggregate([
       totalRevenue: { $sum: { $multiply: ['$items.price', '$items.quantity'] } },
     },
   },
-  { $sort: { totalRevenue: -1, totalQuantity: -1 } },
+  { $sort: sortStage },
   { $limit: 10 },
   {
     $lookup: {
@@ -111,7 +116,8 @@ const getTopItems = async (matchFilter) => Order.aggregate([
       totalRevenue: 1,
     },
   },
-]);
+  ]);
+};
 
 const getCategoryRevenue = async (matchFilter) => Order.aggregate([
   { $match: matchFilter },
@@ -149,6 +155,10 @@ const getReports = async (req, res) => {
     const { start: previousStart, end: previousEnd } = getPreviousRange(start, end);
     const matchFilter = buildOrderFilter(start, end);
     const previousFilter = buildOrderFilter(previousStart, previousEnd);
+    const allTimeCompletedFilter = {
+      status: 'completed',
+      paymentStatus: 'paid',
+    };
 
     const orders = await Order.find(matchFilter);
     const totalRevenue = orders.reduce((sum, order) => sum + order.total, 0);
@@ -167,9 +177,11 @@ const getReports = async (req, res) => {
       isDeleted: { $ne: true },
     });
 
-    const [topItems, previousTopItems, categoryRevenue, operatingCost, previousOperatingCost] = await Promise.all([
+    const [topItems, previousTopItems, allTimeTopItems, categoryRevenue, operatingCost, previousOperatingCost] = await Promise.all([
       getTopItems(matchFilter),
       getTopItems(previousFilter),
+      // Mon ban chay tren trang tong quan can tinh theo toan bo lich su va sap xep theo so luong ban.
+      getTopItems(allTimeCompletedFilter, { sortBy: 'quantity' }),
       getCategoryRevenue(matchFilter),
       getOperatingCost(start, end),
       getOperatingCost(previousStart, previousEnd),
@@ -211,6 +223,7 @@ const getReports = async (req, res) => {
       totalCustomers,
       operatingCost,
       topItems: enrichedTopItems,
+      allTimeTopItems,
       categoryRevenue,
       dailyRevenue,
       previous: {

@@ -391,7 +391,17 @@ const getOrders = async (req, res) => {
   try {
     await releaseExpiredPaymentReservations();
 
-    const { startDate, endDate } = req.query;
+    const { startDate, endDate, recent, limit } = req.query;
+    if (recent === 'true') {
+      const safeLimit = Math.min(Math.max(Number(limit) || 20, 1), 100);
+      const orders = await Order.find({})
+        .populate('staff', 'name')
+        .populate('items.menuItem', 'name price')
+        .sort('-createdAt')
+        .limit(safeLimit);
+      return res.json(orders);
+    }
+
     const { start, end } = buildOrderDateRange(startDate, endDate);
     const filter = { createdAt: { $gte: start, $lte: end } };
     const orders = await Order.find(filter)

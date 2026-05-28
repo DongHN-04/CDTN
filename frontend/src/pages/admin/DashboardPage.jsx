@@ -84,7 +84,7 @@ const DashboardPage = () => {
       const [reportData, weekReportData, orderData] = await Promise.all([
         reportService.getReports({ startDate: todayText, endDate: todayText }),
         reportService.getReports({ startDate: weekStartText, endDate: todayText }),
-        orderService.getOrders(),
+        orderService.getOrders({ recent: true, limit: 20 }),
       ]);
       setReport(reportData);
       setWeekReport(weekReportData);
@@ -169,7 +169,7 @@ const DashboardPage = () => {
     );
   }, [weeklyRevenue]);
 
-  const topItem = report?.topItems?.[0];
+  const topItem = report?.allTimeTopItems?.[0];
   const newCustomers = report?.totalCustomers || 0;
   const totalOrders = report?.totalOrders ?? todayOrders.length;
   const totalRevenue = report?.totalRevenue || 0;
