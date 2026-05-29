@@ -45,6 +45,21 @@ const userSchema = mongoose.Schema(
         isDefault: { type: Boolean, default: false },
       },
     ],
+    savedPromotions: [
+      {
+        promotion: { type: mongoose.Schema.Types.ObjectId, ref: 'Promotion' },
+        name: { type: String, default: '' },
+        description: { type: String, default: '' },
+        type: { type: String, enum: ['percent', 'fixed'], default: 'fixed' },
+        value: { type: Number, default: 0 },
+        minOrderValue: { type: Number, default: 0 },
+        startDate: { type: Date },
+        endDate: { type: Date },
+        claimedAt: { type: Date, default: Date.now },
+        usedAt: { type: Date },
+        order: { type: mongoose.Schema.Types.ObjectId, ref: 'Order' },
+      },
+    ],
     avatar: {
       type: String,
       default: '',

@@ -16,6 +16,10 @@ const publicService = {
   // Lấy khuyến mãi đang hoạt động
   getPromotions: () => axios.get(API_URL + 'promotions').then(res => res.data),
 
+  getMyPromotions: () => axios.get(API_URL + 'my-promotions', { headers: getAuthHeader() }).then(res => res.data),
+
+  claimPromotion: (id) => axios.post(API_URL + `promotions/${id}/claim`, {}, { headers: getAuthHeader() }).then(res => res.data),
+
   // Lấy dữ liệu trang chủ (gộp: featured, categories, combos, promotions)
   getHomepageData: () => axios.get(API_URL + 'homepage').then(res => res.data),
 

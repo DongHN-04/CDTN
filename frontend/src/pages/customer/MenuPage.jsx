@@ -40,7 +40,7 @@ const MenuPage = () => {
         ...combo,
         type: 'combo',
         category: COMBO_CATEGORY,
-        description: combo.description || 'Combo tiết kiệm',
+        description: combo.description || '',
       }));
       setMenuItems([...normalizedMenu, ...normalizedCombos]);
     });
@@ -124,14 +124,7 @@ const MenuPage = () => {
 
   // Trích lọc dữ liệu và trang trí (badges, out of stock)
   const filteredMenu = menuItems.map((item, idx) => {
-    let badge = null;
-    if (item.name === 'Burger Bò Đặc Biệt' || item.name === 'Pizza Pepperoni') {
-      badge = 'PHỔ BIẾN';
-    } else if (item.name.toLowerCase().includes('cay')) {
-      badge = 'CAY';
-    } else if (item.name === 'Khoai Tây Chiên' || item.name === 'Sinh Tố Bơ') {
-      badge = 'MỚI';
-    }
+    const badge = item.badge || null;
 
     const status = item.isAvailable === false ? 'HẾT HÀNG' : 'ĐANG BÁN';
 
@@ -343,6 +336,19 @@ const MenuPage = () => {
                         </span>
                       )}
 
+                      {/* Combo Discount Badge */}
+                      {item.type === 'combo' && !isOutOfStock && (() => {
+                        const totalItemsPrice = (item.items || []).reduce((sum, subItem) => {
+                          const price = subItem.menuItem?.price || 0;
+                          return sum + price * (subItem.quantity || 1);
+                        }, 0);
+                        return totalItemsPrice > item.price ? (
+                          <span className="absolute left-3 top-3 rounded-full bg-[#c0392b] px-3 py-1 text-[11px] font-black text-white z-10">
+                            Combo -{Math.max(10, Math.round(((totalItemsPrice - item.price) / totalItemsPrice) * 100))}%
+                          </span>
+                        ) : null;
+                      })()}
+
                       {/* Phủ Hết Hàng */}
                       {isOutOfStock && (
                         <div className="absolute inset-0 flex items-center justify-center bg-black/20 backdrop-blur-[0.5px]">
@@ -360,10 +366,41 @@ const MenuPage = () => {
                           <h3 className="text-[16px] font-extrabold text-gray-800 leading-snug line-clamp-2 pr-1">
                             {item.name}
                           </h3>
-                          <span className="text-[#c0392b] font-black text-[17px] shrink-0">
-                            {formatPrice(item.price)}
+                          <span className="flex flex-col items-end shrink-0">
+                            {item.type === 'combo' && (() => {
+                              const totalItemsPrice = (item.items || []).reduce((sum, subItem) => {
+                                const price = subItem.menuItem?.price || 0;
+                                return sum + price * (subItem.quantity || 1);
+                              }, 0);
+                              return totalItemsPrice > item.price ? (
+                                <span className="text-xs font-bold text-gray-400 line-through">
+                                  {formatPrice(totalItemsPrice)}
+                                </span>
+                              ) : null;
+                            })()}
+                            <span className="text-[#c0392b] font-black text-[17px]">
+                              {formatPrice(item.price)}
+                            </span>
                           </span>
                         </div>
+                        
+                        {item.type === 'combo' && (
+                          <div className="mb-3 rounded-2xl bg-[#f6f1ef] p-3">
+                            <div className="mb-1 text-[10px] font-black uppercase tracking-wider text-red-950">Thành phần:</div>
+                            <ul className="m-0 flex list-none flex-col gap-1.5 p-0">
+                              {(item.items || []).slice(0, 4).map(subItem => (
+                                <li key={subItem._id || `${subItem.menuItem?._id || subItem.menuItem}-${subItem.quantity}`} className="flex items-start gap-1.5 text-xs font-semibold text-red-950">
+                                  <span className="text-[#c0392b]">⊗</span>
+                                  <span>{subItem.quantity}x {subItem.menuItem?.name || subItem.name || 'Món ăn'}</span>
+                                </li>
+                              ))}
+                              {item.items?.length > 4 && (
+                                <li className="text-[10px] font-bold text-gray-500">+{item.items.length - 4} món khác</li>
+                              )}
+                            </ul>
+                          </div>
+                        )}
+
                         <p className="text-gray-400 text-xs leading-relaxed line-clamp-2 h-8">
                           {item.description}
                         </p>

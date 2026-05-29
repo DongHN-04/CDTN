@@ -1,5 +1,5 @@
-import React, { useEffect, useMemo, useState } from 'react';
-import { CalendarDays, Home, MapPin, PackageCheck, Pencil, Plus, Save, Trash2, X } from 'lucide-react';
+import React, { useEffect, useState } from 'react';
+import { CalendarDays, Home, MapPin, PackageCheck, Pencil, Plus, Save, TicketPercent, Trash2, X } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
 import publicService from '../../services/publicService';
 import userService from '../../services/userService';
@@ -8,6 +8,7 @@ import {
   normalizeCustomerAddresses,
   parseSavedAddress,
 } from '../../utils/customerAddresses';
+import { normalizeSavedPromotions } from '../../utils/savedPromotions';
 
 const districts = [
   'Quận 1',
@@ -64,6 +65,9 @@ const CustomerProfilePage = () => {
   const [editingProfile, setEditingProfile] = useState(false);
   const [profileForm, setProfileForm] = useState({ name: '', phone: '' });
   const [addresses, setAddresses] = useState([]);
+  const [savedPromotions, setSavedPromotions] = useState([]);
+  const [promoPage, setPromoPage] = useState(1);
+  const PROMO_PAGE_SIZE = 4;
   const [showAddressForm, setShowAddressForm] = useState(false);
   const [addressForm, setAddressForm] = useState({ label: 'Nhà riêng', address: '', district: '', city: 'Hồ Chí Minh' });
   const [message, setMessage] = useState({ type: '', text: '' });
@@ -111,9 +115,19 @@ const CustomerProfilePage = () => {
       }
     };
 
+    const fetchSavedPromotions = async () => {
+      try {
+        const data = await publicService.getMyPromotions();
+        setSavedPromotions(normalizeSavedPromotions(data));
+      } catch (error) {
+        setSavedPromotions([]);
+      }
+    };
+
     fetchProfile();
     fetchOrders();
-  }, []);
+    fetchSavedPromotions();
+  }, [user?.savedPromotions]);
 
   const displayName = profile?.name || user?.name || 'Khách hàng Sơn Đông';
   const email = profile?.email || user?.email || 'Chưa cập nhật email';
@@ -121,11 +135,16 @@ const CustomerProfilePage = () => {
   const orderTotalPages = Math.max(1, Math.ceil(orders.length / PAGE_SIZE));
   const visibleOrders = orders.slice((orderPage - 1) * PAGE_SIZE, orderPage * PAGE_SIZE);
 
-  const membershipPoints = useMemo(() => {
-    const seed = String(profile?._id || '').slice(-4);
-    const numeric = parseInt(seed, 16);
-    return Number.isFinite(numeric) ? 1000 + (numeric % 3000) : 1000;
-  }, [profile?._id]);
+  const promoTotalPages = Math.max(1, Math.ceil(savedPromotions.length / PROMO_PAGE_SIZE));
+  const paginatedPromotions = savedPromotions.slice((promoPage - 1) * PROMO_PAGE_SIZE, promoPage * PROMO_PAGE_SIZE);
+
+  useEffect(() => {
+    if (promoPage > promoTotalPages) {
+      setPromoPage(promoTotalPages);
+    }
+  }, [savedPromotions.length, promoTotalPages, promoPage]);
+
+
 
   const showMessage = (type, text) => {
     setMessage({ type, text });
@@ -218,7 +237,7 @@ const CustomerProfilePage = () => {
     try {
       const nextAddresses = persistAddresses(addresses.map(item => ({ ...item, isDefault: item.id === id })));
       await saveAddressesToProfile(nextAddresses);
-    showMessage('success', 'Đã đặt địa chỉ mặc định.');
+      showMessage('success', 'Đã đặt địa chỉ mặc định.');
     } catch (error) {
       showMessage('error', error.response?.data?.message || 'Cập nhật địa chỉ thất bại.');
     } finally {
@@ -231,7 +250,7 @@ const CustomerProfilePage = () => {
     try {
       const nextAddresses = persistAddresses(addresses.filter(item => item.id !== id));
       await saveAddressesToProfile(nextAddresses);
-    showMessage('success', 'Đã xóa địa chỉ.');
+      showMessage('success', 'Đã xóa địa chỉ.');
     } catch (error) {
       showMessage('error', error.response?.data?.message || 'Xóa địa chỉ thất bại.');
     } finally {
@@ -248,9 +267,8 @@ const CustomerProfilePage = () => {
         </div>
 
         {message.text && (
-          <div className={`mb-5 rounded-lg px-4 py-3 text-sm font-bold ${
-            message.type === 'error' ? 'bg-red-50 text-red-700' : 'bg-emerald-50 text-emerald-700'
-          }`}>
+          <div className={`mb-5 rounded-lg px-4 py-3 text-sm font-bold ${message.type === 'error' ? 'bg-red-50 text-red-700' : 'bg-emerald-50 text-emerald-700'
+            }`}>
             {message.text}
           </div>
         )}
@@ -264,16 +282,6 @@ const CustomerProfilePage = () => {
               <h2 className="m-0 text-xl font-black">{displayName}</h2>
               <p className="mt-1 text-sm font-medium text-slate-500">{email}</p>
 
-              <div className="mt-6 grid grid-cols-2 overflow-hidden rounded-lg border border-red-50 bg-[#fffaf8]">
-                <div className="border-r border-red-50 p-3">
-                  <p className="m-0 text-[11px] font-black uppercase text-slate-400">Hạng thành viên</p>
-                  <p className="mt-1 text-sm font-black text-[#c0392b]">Vàng</p>
-                </div>
-                <div className="p-3">
-                  <p className="m-0 text-[11px] font-black uppercase text-slate-400">Điểm tích lũy</p>
-                  <p className="mt-1 text-sm font-black">{membershipPoints.toLocaleString('vi-VN')} pt</p>
-                </div>
-              </div>
             </section>
 
             <section className="rounded-lg border border-red-50 bg-white p-5 shadow-sm">
@@ -400,6 +408,7 @@ const CustomerProfilePage = () => {
                 ))}
               </div>
             </section>
+
           </aside>
 
           <main className="space-y-6">
@@ -445,21 +454,105 @@ const CustomerProfilePage = () => {
               {orders.length > PAGE_SIZE && (
                 <div className="mt-5 flex items-center justify-end gap-2">
                   <button
-                    onClick={() => setOrderPage(page => Math.max(1, page - 1))}
+                    type="button"
                     disabled={orderPage === 1}
-                    className="h-9 rounded-lg border border-red-50 px-3 text-xs font-black text-slate-600 disabled:opacity-40"
+                    onClick={() => setOrderPage(page => Math.max(1, page - 1))}
+                    className="flex h-8 w-8 items-center justify-center rounded-full border border-red-50 text-slate-600 disabled:cursor-not-allowed disabled:opacity-40"
                   >
-                    Trước
+                    ‹
                   </button>
-                  <span className="text-xs font-black text-slate-500">
-                    {orderPage}/{orderTotalPages}
-                  </span>
+                  {Array.from({ length: orderTotalPages }, (_, index) => index + 1).map(page => (
+                    <button
+                      key={page}
+                      type="button"
+                      onClick={() => setOrderPage(page)}
+                      className={`flex h-8 w-8 items-center justify-center rounded-full text-xs ${
+                        orderPage === page ? 'bg-[#c0392b] font-black text-white' : 'border border-red-50 text-slate-600'
+                      }`}
+                    >
+                      {page}
+                    </button>
+                  ))}
                   <button
-                    onClick={() => setOrderPage(page => Math.min(orderTotalPages, page + 1))}
+                    type="button"
                     disabled={orderPage === orderTotalPages}
-                    className="h-9 rounded-lg border border-red-50 px-3 text-xs font-black text-slate-600 disabled:opacity-40"
+                    onClick={() => setOrderPage(page => Math.min(orderTotalPages, page + 1))}
+                    className="flex h-8 w-8 items-center justify-center rounded-full border border-red-50 text-slate-600 disabled:cursor-not-allowed disabled:opacity-40"
                   >
-                    Sau
+                    ›
+                  </button>
+                </div>
+              )}
+            </section>
+
+            <section className="rounded-lg border border-red-50 bg-white p-5 shadow-sm">
+              <div className="mb-4 flex items-center justify-between">
+                <h2 className="m-0 text-lg font-black">Mã giảm giá đã lưu</h2>
+                <TicketPercent size={18} className="text-[#c0392b]" />
+              </div>
+              <div className="grid gap-4 sm:grid-cols-2">
+                {savedPromotions.length === 0 ? (
+                  <div className="sm:col-span-2 rounded-lg border border-dashed border-red-100 p-4 text-sm font-semibold text-slate-500">
+                    Chưa có mã giảm giá nào. Hãy vào trang khuyến mãi để lấy mã.
+                  </div>
+                ) : paginatedPromotions.map(promo => (
+                  <div key={promo.promotion || promo._id || promo.name} className="rounded-lg border border-red-50 bg-red-50/30 p-4 flex flex-col justify-between">
+                    <div>
+                      <p className="m-0 text-base font-black text-[#c0392b]">{promo.name}</p>
+                      <p className="m-0 mt-1 text-xs font-medium text-slate-500">{promo.description || ''}</p>
+                      <div className="mt-2 flex flex-wrap items-center gap-2">
+                        <span className="rounded bg-red-50 px-2 py-0.5 text-xs font-black text-red-700">
+                          Giảm {promo.type === 'percent'
+                            ? `${promo.value}%`
+                            : `${Number(promo.value).toLocaleString('vi-VN')}đ`}
+                        </span>
+                        {promo.minOrderValue > 0 && (
+                          <span className="rounded bg-red-50 px-2 py-0.5 text-[10px] font-black text-[#c70d18]">
+                            Đơn từ {Number(promo.minOrderValue).toLocaleString('vi-VN')}đ
+                          </span>
+                        )}
+                      </div>
+                    </div>
+                    <div className="mt-3 pt-3 border-t border-red-100/50">
+                      {promo.endDate && (
+                        <div className="text-[11px] font-bold text-slate-400">
+                          Hạn dùng: {new Intl.DateTimeFormat('vi-VN').format(new Date(promo.endDate))}
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                ))}
+              </div>
+
+              {savedPromotions.length > PROMO_PAGE_SIZE && (
+                <div className="mt-5 flex items-center justify-end gap-2">
+                  <button
+                    type="button"
+                    disabled={promoPage === 1}
+                    onClick={() => setPromoPage(page => Math.max(1, page - 1))}
+                    className="flex h-8 w-8 items-center justify-center rounded-full border border-red-50 text-slate-600 disabled:cursor-not-allowed disabled:opacity-40"
+                  >
+                    ‹
+                  </button>
+                  {Array.from({ length: promoTotalPages }, (_, index) => index + 1).map(page => (
+                    <button
+                      key={page}
+                      type="button"
+                      onClick={() => setPromoPage(page)}
+                      className={`flex h-8 w-8 items-center justify-center rounded-full text-xs ${
+                        promoPage === page ? 'bg-[#c0392b] font-black text-white' : 'border border-red-50 text-slate-600'
+                      }`}
+                    >
+                      {page}
+                    </button>
+                  ))}
+                  <button
+                    type="button"
+                    disabled={promoPage === promoTotalPages}
+                    onClick={() => setPromoPage(page => Math.min(promoTotalPages, page + 1))}
+                    className="flex h-8 w-8 items-center justify-center rounded-full border border-red-50 text-slate-600 disabled:cursor-not-allowed disabled:opacity-40"
+                  >
+                    ›
                   </button>
                 </div>
               )}

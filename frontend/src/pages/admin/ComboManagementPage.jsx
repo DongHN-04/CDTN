@@ -16,11 +16,7 @@ const emptyForm = {
   items: [],
 };
 
-const fallbackImages = [
-  '/images/home/hero-collage.png',
-  '/images/home/hero-burger.png',
-  '/images/home/product-burger.png',
-];
+// Fallback images removed
 
 const pageSize = 6;
 const NEW_COMBO_DAYS = 2;
@@ -231,14 +227,9 @@ const ComboManagementPage = () => {
     }
   };
 
-  const getComboImage = (combo, index) => (
-    getImageUrl(combo.image, fallbackImages[index % fallbackImages.length])
+  const getComboImage = (combo) => (
+    getImageUrl(combo.image, '/images/home/hero-collage.png')
   );
-
-  const getOldPrice = (combo, index) => {
-    const multiplier = index === 0 ? 1.18 : index === 1 ? 1.22 : 1.15;
-    return Math.round((combo.price || 0) * multiplier / 1000) * 1000;
-  };
 
   return (
     <div className="max-w-6xl mx-auto pb-10">
@@ -284,8 +275,11 @@ const ComboManagementPage = () => {
                   combo={combo}
                   index={absoluteIndex}
                   isBestSeller={combo._id === bestSellingComboId}
-                  image={getComboImage(combo, absoluteIndex)}
-                  oldPrice={getOldPrice(combo, absoluteIndex)}
+                  image={getComboImage(combo)}
+                  oldPrice={(combo.items || []).reduce((sum, item) => {
+                    const price = item.menuItem?.price || 0;
+                    return sum + price * (item.quantity || 1);
+                  }, 0)}
                   onEdit={() => openEditForm(combo)}
                   onDelete={() => handleDelete(combo)}
                 />
@@ -476,10 +470,6 @@ const ComboCard = ({ combo, index, isBestSeller, image, oldPrice, onEdit, onDele
 
       <div className="p-5">
         <h3 className="mb-1 line-clamp-2 min-h-[48px] text-xl font-black leading-tight text-gray-950">{combo.name}</h3>
-        <p className="mb-4 line-clamp-2 min-h-[40px] text-sm font-medium leading-5 text-gray-500">
-          {combo.description || 'Gói combo tiết kiệm cho khách hàng.'}
-        </p>
-
         <div className="mb-5 rounded-xl bg-[#f6f1ef] p-4">
           <div className="mb-2 text-[11px] font-black uppercase tracking-wider text-red-950">Thành phần:</div>
           <ul className="m-0 flex list-none flex-col gap-1.5 p-0">
@@ -494,6 +484,10 @@ const ComboCard = ({ combo, index, isBestSeller, image, oldPrice, onEdit, onDele
             )}
           </ul>
         </div>
+
+        <p className="mb-4 line-clamp-2 min-h-[40px] text-sm font-medium leading-5 text-gray-500">
+          {combo.description || ''}
+        </p>
 
         <div className="flex items-end justify-between gap-3 border-t border-gray-100 pt-4">
           <div>

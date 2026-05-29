@@ -59,15 +59,7 @@ const StarRating = ({ rating }) => {
 };
 
 /* ───────── Static Data ───────── */
-// eslint-disable-next-line no-unused-vars
-const categories = [
-  { name: 'Burger', icon: BurgerIcon, color: '#ef4444' },
-  { name: 'Gà Rán', icon: ChickenIcon, color: '#f97316' },
-  { name: 'Pizza', icon: PizzaIcon, color: '#ec4899' },
-  { name: 'Combo', icon: ComboIcon, color: '#8b5cf6' },
-  { name: 'Đồ Uống', icon: DrinkIcon, color: '#06b6d4' },
-  { name: 'Tráng Miệng', icon: DessertIcon, color: '#10b981' },
-];
+// Static categories list removed
 
 // Ảnh mặc định theo category
 const categoryVisuals = {
@@ -93,13 +85,7 @@ const defaultImages = {
   'Khai Vị': '/images/home/product-chicken.png',
 };
 
-// Badge tự động theo index / category
-const autoBadges = [
-  { text: 'Hot', color: '#ef4444' },
-  null,
-  { text: '-20%', color: '#22c55e' },
-  { text: 'Cay', color: '#f97316' },
-];
+// Auto badges removed
 
 const formatPrice = (val) => val.toLocaleString('vi-VN') + ' VNĐ';
 
@@ -156,9 +142,9 @@ const HomePage = () => {
     image: item.image 
       ? getImageUrl(item.image, defaultImages[item.category] || '/images/home/product-burger.png') 
       : defaultImages[item.category] || '/images/home/product-burger.png',
-    badge: autoBadges[idx] || null,
-    rating: [4.8, 4.9, 4.7, 4.6][idx] || 4.5,
-    oldPrice: idx === 2 ? Math.round(item.price * 1.25) : null,
+    badge: null,
+    rating: item.rating || 5,
+    oldPrice: null,
   }));
 
   const handleAddToCart = (item) => {

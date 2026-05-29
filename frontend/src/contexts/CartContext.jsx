@@ -61,6 +61,7 @@ const cartReducer = (state, action) => {
             price: combo.price,
             image: combo.image || '',
             items: combo.items,
+            description: combo.description || '',
             quantity: action.payload.quantity || 1,
           },
         ],
@@ -117,6 +118,7 @@ const cartReducer = (state, action) => {
                   price: freshCombo.price,
                   image: freshCombo.image || '',
                   items: freshCombo.items,
+                  description: freshCombo.description || '',
                   isAvailable: freshCombo.isAvailable,
                 }
               : { ...item, isAvailable: false };

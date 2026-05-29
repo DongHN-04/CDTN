@@ -64,7 +64,7 @@ const getInitialCustomerInfo = (user) => {
 
 const CheckoutPage = () => {
   const { items, clearCart, getCartTotal, refreshCartProducts } = useCart();
-  const { user } = useAuth();
+  const { user, updateCurrentUser } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
 
@@ -194,6 +194,12 @@ const CheckoutPage = () => {
         promoCode: normalizePromoCode(promoCode),
         items: orderItems,
       });
+
+      if (user?.role === 'customer' && promoCode) {
+        publicService.getMyPromotions()
+          .then(data => updateCurrentUser({ savedPromotions: data }))
+          .catch(() => {});
+      }
 
       if (paymentMethod === 'vnpay') {
         const { paymentUrl } = await paymentService.createPayment({ orderId: order._id });

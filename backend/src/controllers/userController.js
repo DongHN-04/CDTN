@@ -122,6 +122,7 @@ const updateMe = async (req, res) => {
       phone: updatedUser.phone,
       address: updatedUser.address,
       addresses: updatedUser.addresses || [],
+      savedPromotions: updatedUser.savedPromotions || [],
       avatar: updatedUser.avatar,
       salary: updatedUser.salary,
       status: updatedUser.status,

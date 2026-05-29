@@ -19,10 +19,7 @@ const initialForm = {
   isActive: true,
 };
 
-const defaultBanner = {
-  image: '/images/home/hero-burger.png',
-  title: 'Ưu đãi cuối tuần',
-};
+// Default banner removed
 
 const formatDateInput = (value) => {
   if (!value) return '';
@@ -68,7 +65,7 @@ const PromotionManagementPage = () => {
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
   const [, setError] = useState('');
-  const [banners, setBanners] = useState([defaultBanner]);
+  const [banners, setBanners] = useState([]);
   const [activeBannerIndex, setActiveBannerIndex] = useState(0);
   const [uploadingBanner, setUploadingBanner] = useState(false);
   const [deleteModal, setDeleteModal] = useState({ isOpen: false, type: '', target: null, loading: false });
@@ -98,7 +95,7 @@ const PromotionManagementPage = () => {
         const activeIdx = data.findIndex(b => b.isActive);
         setActiveBannerIndex(activeIdx !== -1 ? activeIdx : 0);
       } else {
-        setBanners([defaultBanner]);
+        setBanners([]);
         setActiveBannerIndex(0);
       }
     } catch (err) {
@@ -234,7 +231,7 @@ const PromotionManagementPage = () => {
     return promotions.find(promotion => getPromotionStatus(promotion).label === 'Đang chạy') || promotions[0];
   }, [promotions]);
 
-  const activeBanner = banners[activeBannerIndex] || defaultBanner;
+  const activeBanner = banners[activeBannerIndex] || { image: '', title: '' };
 
   const selectBanner = async (index) => {
     const targetBanner = banners[index];

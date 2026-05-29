@@ -5,7 +5,7 @@ import { useAuth } from '../../contexts/AuthContext';
 import publicService from '../../services/publicService';
 import { getImageUrl } from '../../utils/imageUrl';
 import { findUsablePromotion, normalizePromoCode } from '../../utils/promotionUtils';
-import { getSavedPromotions } from '../../utils/savedPromotions';
+import { normalizeSavedPromotions } from '../../utils/savedPromotions';
 
 // Định nghĩa defaultImages
 const defaultImages = {
@@ -48,7 +48,13 @@ const CartPage = () => {
   }, []);
 
   useEffect(() => {
-    setSavedPromotions(getSavedPromotions(user));
+    if (user?.role !== 'customer') {
+      setSavedPromotions([]);
+      return;
+    }
+    publicService.getMyPromotions()
+      .then(data => setSavedPromotions(normalizeSavedPromotions(data)))
+      .catch(() => setSavedPromotions([]));
   }, [user]);
 
   useEffect(() => {
@@ -60,6 +66,25 @@ const CartPage = () => {
   useEffect(() => {
     if (!appliedPromo) return;
 
+    if (user?.role !== 'customer') {
+      setPromoInput('');
+      setAppliedPromo('');
+      setDiscountAmount(0);
+      localStorage.removeItem('appliedPromo');
+      localStorage.removeItem('discountAmount');
+      return;
+    }
+
+    const savedCodes = new Set(savedPromotions.map(promo => normalizePromoCode(promo.name)));
+    if (!savedCodes.has(normalizePromoCode(appliedPromo))) {
+      setPromoInput('');
+      setAppliedPromo('');
+      setDiscountAmount(0);
+      localStorage.removeItem('appliedPromo');
+      localStorage.removeItem('discountAmount');
+      return;
+    }
+
     const currentSubtotal = getCartTotal();
     const currentDiscountBase = currentSubtotal + (currentSubtotal > 0 ? 15000 : 0);
     const { discount, error } = findUsablePromotion(promotions, appliedPromo, currentDiscountBase);
@@ -69,13 +94,16 @@ const CartPage = () => {
       setDiscountAmount(0);
       localStorage.removeItem('appliedPromo');
       localStorage.removeItem('discountAmount');
+      if (error) {
+        showToast(error, 'error');
+      }
       return;
     }
 
     setPromoInput(appliedPromo);
     setDiscountAmount(discount);
     localStorage.setItem('discountAmount', String(discount));
-  }, [items, promotions, appliedPromo, getCartTotal]);
+  }, [items, promotions, savedPromotions, appliedPromo, getCartTotal, user]);
 
   const handleApplyPromo = (selectedCode = promoInput) => {
     const code = normalizePromoCode(selectedCode);
@@ -191,16 +219,6 @@ const CartPage = () => {
               const itemId = getItemId(item);
               const name = getItemName(item);
               const image = getResolvedImage(item);
-              
-              // Tạo nhãn mô tả phụ giả lập theo ảnh mẫu
-              const subDescription = item.type === 'combo' 
-                ? 'Combo đầy đủ nước và khoai tây chiên' 
-                : item.menuItem?.category === 'Burger' 
-                  ? 'Thêm dưa chua, không hành' 
-                  : 'Ăn kèm sốt tương cà đặc trưng';
-
-              // Tính giá cũ giả lập (strike-through) cao hơn 10%
-              const fakeOldPrice = Math.round(price * 1.1);
 
               return (
                 <div 
@@ -221,9 +239,33 @@ const CartPage = () => {
                     <h3 className="text-[17px] font-extrabold text-gray-800 leading-snug mb-1">
                       {name}
                     </h3>
-                    <p className="text-gray-400 text-xs mb-4 sm:mb-3">
-                      {subDescription}
-                    </p>
+                    
+                    {item.type === 'combo' ? (
+                      <div className="flex flex-col gap-1 text-left mb-4 sm:mb-3">
+                        {item.items && item.items.length > 0 && (
+                          <div className="flex flex-wrap gap-x-2 gap-y-1 text-xs font-semibold text-red-950 bg-red-50/50 p-1.5 rounded-lg border border-red-100/50">
+                            <span className="text-[#c0392b] font-bold">Thành phần:</span>
+                            {item.items.map((subItem, idx) => (
+                              <span key={subItem._id || idx}>
+                                {subItem.quantity}x {subItem.menuItem?.name || subItem.name || 'Món ăn'}
+                                {idx < item.items.length - 1 ? ',' : ''}
+                              </span>
+                            ))}
+                          </div>
+                        )}
+                        {item.description && (
+                          <p className="text-gray-400 text-xs m-0 leading-relaxed">
+                            {item.description}
+                          </p>
+                        )}
+                      </div>
+                    ) : (
+                      item.menuItem?.description && (
+                        <p className="text-gray-400 text-xs mb-4 sm:mb-3">
+                          {item.menuItem.description}
+                        </p>
+                      )
+                    )}
 
                     {/* Quantity Selector */}
                     <div className="inline-flex items-center gap-4 bg-gray-50 border border-gray-100 rounded-xl px-3.5 py-1.5 shrink-0">
@@ -261,9 +303,21 @@ const CartPage = () => {
 
                     {/* Price displays */}
                     <div className="text-center sm:text-right mt-2 sm:mt-auto">
-                      <span className="block text-gray-300 line-through text-[13px] font-semibold mb-0.5">
-                        {formatPrice(fakeOldPrice)}
-                      </span>
+                      {item.type === 'combo' && (() => {
+                        const oldPrice = (item.items || []).reduce((sum, sub) => {
+                          const subPrice = sub.menuItem?.price || 0;
+                          return sum + subPrice * (sub.quantity || 1);
+                        }, 0);
+                        const totalOldPrice = oldPrice * item.quantity;
+                        if (totalOldPrice > price * item.quantity) {
+                          return (
+                            <span className="block text-gray-300 line-through text-[13px] font-semibold mb-0.5">
+                              {formatPrice(totalOldPrice)}
+                            </span>
+                          );
+                        }
+                        return null;
+                      })()}
                       <span className="block text-[#c0392b] text-[18px] font-black">
                         {formatPrice(price * item.quantity)}
                       </span>

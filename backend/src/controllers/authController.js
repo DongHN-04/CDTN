@@ -11,6 +11,7 @@ const buildAuthResponse = (user) => ({
   phone: user.phone,
   address: user.address,
   addresses: user.addresses || [],
+  savedPromotions: user.savedPromotions || [],
   avatar: user.avatar,
   token: generateToken(user._id, user.role),
 });

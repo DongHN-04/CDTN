@@ -10,16 +10,7 @@ import { useToast } from '../../contexts/ToastContext';
 const categories = [ALL_MENU_CATEGORY, ...MENU_CATEGORIES];
 const pageSize = 5;
 
-const fallbackImages = {
-  Burger: '/images/home/product-burger.png',
-  Pizza: '/images/home/product-pizza.png',
-  'Gà rán': '/images/home/product-chicken.png',
-  'Gà Rán': '/images/home/product-chicken.png',
-  'Đồ uống': '/images/home/product-sandwich.png',
-  'Đồ Uống': '/images/home/product-sandwich.png',
-  'Tráng miệng': '/images/home/product-sandwich.png',
-  'Tráng Miệng': '/images/home/product-sandwich.png',
-};
+// Fallback images removed
 
 const normalizeText = (value = '') => value.toString().trim().toLowerCase();
 const formatPrice = (value) => Number(value || 0).toLocaleString('vi-VN');
@@ -307,7 +298,7 @@ const MenuManagementPage = () => {
 
 const MenuRow = ({ item, onEdit, onDelete }) => {
   const status = getStatus(item);
-  const image = getImageUrl(item.image, fallbackImages[item.category] || '/images/home/product-burger.png');
+  const image = getImageUrl(item.image, '/images/home/product-burger.png');
 
   return (
     <tr className="border-t border-gray-50 text-sm text-gray-900 hover:bg-gray-50/70">
