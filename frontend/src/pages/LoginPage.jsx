@@ -2,11 +2,12 @@ import React, { useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import { useToast } from '../contexts/ToastContext';
+import { Mail, Lock, Eye, EyeOff, ArrowRight, Utensils } from 'lucide-react';
 
 const LoginPage = () => {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
-  const [showPassword, setShowPassword] = useState(false); // State cho nút ẩn/hiện mật khẩu
+  const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
   const { login } = useAuth();
   const { showToast } = useToast();
@@ -21,7 +22,7 @@ const LoginPage = () => {
       if (userData.role === 'admin' || userData.role === 'staff') {
         navigate('/admin/dashboard');
       } else {
-        navigate('/'); 
+        navigate('/');
       }
     } catch (err) {
       showToast(err.response?.data?.message || 'Đăng nhập thất bại. Vui lòng kiểm tra lại!', 'error');
@@ -31,265 +32,114 @@ const LoginPage = () => {
   };
 
   return (
-    <div style={pageWrapperStyle}>
-      
-      {/* Background Watermark (Logo mờ phía sau) */}
-      <div style={watermarkStyle}>
-        <svg viewBox="0 0 24 24" fill="none" stroke="#f0e6e6" strokeWidth="1" strokeLinecap="round" strokeLinejoin="round" style={{ width: '600px', height: '600px' }}>
-          <path d="M3 2v7c0 1.1.9 2 2 2h4a2 2 0 0 0 2-2V2" /><path d="M7 2v20" /><path d="M21 15V2v0a5 5 0 0 0-5 5v6c0 1.1.9 2 2 2h3Zm0 0v7" />
-        </svg>
-      </div>
+    <div className="flex items-center justify-center min-h-screen bg-gradient-to-br from-[#fdfbf7] to-[#f5ece5] p-5 font-sans">
+      <div className="flex flex-col md:flex-row w-[900px] max-w-full bg-white rounded-[24px] shadow-[0_25px_50px_-12px_rgba(139,92,246,0.04),0_16px_24px_-8px_rgba(0,0,0,0.04)] overflow-hidden min-h-[520px] items-stretch">
 
-      {/* Header Logo Section */}
-      <div style={headerSectionStyle}>
-        <div style={logoIconBoxStyle}>
-          <img 
-              src="/images/ICON/restaurant.png" 
-              alt="Logo" 
-              style={{ width: '32px', height: '32px', objectFit: 'contain' }} 
-            />
+        {/* Cột trái: Panel Quảng bá / Slogan thương hiệu */}
+        <div className="hidden md:flex w-[42%] bg-gradient-to-br from-[#c0392b] to-[#a93226] p-10 text-white flex-col justify-between relative box-border">
+          <div className="flex items-center gap-2.5">
+            <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-white text-[#c0392b] shadow-sm">
+              <Utensils size={22} />
+            </div>
+            <span className="text-[18px] font-black tracking-wide text-white">Sơn Đông FastFood</span>
+          </div>
+
+          <div className="my-15">
+            <h2 className="text-[28px] font-extrabold leading-tight mb-[15px] tracking-tight">
+              Hương vị tuyệt hảo<br />
+              <span className="text-[#f39c12]">Đặt hàng tiện lợi</span>
+            </h2>
+            <p className="text-[14px] leading-relaxed text-white/85 m-0">
+              Hệ thống đặt món nhanh chóng và quản lý bán hàng tối ưu. Trải nghiệm ẩm thực tuyệt vời của chuỗi cửa hàng Sơn Đông FastFood.
+            </p>
+          </div>
+
+          <div className="text-[11px] text-white/60 tracking-wider">
+            © 2026 Sơn Đông FastFood • V2.4.0
+          </div>
         </div>
-        <h1 style={titleStyle}>Sơn Đông Fast Food</h1>
-        <p style={subtitleStyle}>HỆ THỐNG QUẢN LÝ VẬN HÀNH</p>
-      </div>
 
-      {/* Login Form Card */}
-      <div style={formCardStyle}>
-        <h2 style={{ fontSize: '22px', marginBottom: '30px', color: '#111827' }}>Đăng nhập hệ thống</h2>
-        
-        <form onSubmit={handleSubmit}>
-          
-          {/* Input: Tên đăng nhập */}
-          <div style={formGroupStyle}>
-            <label style={labelStyle}>TÊN ĐĂNG NHẬP</label>
-            <div style={inputWrapperStyle}>
-              <span style={leftIconStyle}>
-                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#9ca3af" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
-              </span>
-              <input
-                type="email"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                required
-                style={inputStyle}
-                placeholder="admin@example.com"
-              />
-            </div>
+        {/* Cột phải: Form Đăng nhập */}
+        <div className="w-full md:w-[58%] p-8 sm:p-12 flex flex-col justify-center box-border">
+          <div className="mb-7">
+            <h2 className="text-2xl font-extrabold text-slate-800 mb-1.5 tracking-tight">Chào mừng bạn quay lại!</h2>
+            <p className="text-[13px] text-slate-500 m-0 font-medium">Đăng nhập để đặt món hoặc quản lý hệ thống</p>
           </div>
 
-          {/* Input: Mật khẩu */}
-          <div style={formGroupStyle}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-              <label style={labelStyle}>MẬT KHẨU</label>
-              <Link to="/forgot-password" style={forgotPasswordStyle}>Quên mật khẩu?</Link>
+          <form onSubmit={handleSubmit} className="flex flex-col gap-5">
+            {/* Input Email */}
+            <div className="flex flex-col gap-2 w-full">
+              <label className="text-[11px] font-extrabold text-slate-500 tracking-wider uppercase">EMAIL TÀI KHOẢN</label>
+              <div className="relative flex items-center w-full">
+                <span className="absolute left-3.5 flex items-center pointer-events-none">
+                  <Mail size={18} className="text-gray-400" />
+                </span>
+                <input
+                  type="email"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  required
+                  className="w-full pl-11 pr-3.5 py-3 text-[14px] text-slate-800 bg-slate-50 border-[1.5px] border-slate-100 rounded-xl outline-none focus:border-red-200 focus:bg-white focus:ring-2 focus:ring-red-100/50 transition-all duration-200 box-border"
+                  placeholder="example@gmail.com"
+                />
+              </div>
             </div>
-            <div style={inputWrapperStyle}>
-              <span style={leftIconStyle}>
-                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#9ca3af" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
-              </span>
-              <input
-                type={showPassword ? "text" : "password"}
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                required
-                style={inputStyle}
-                placeholder="••••••••"
-              />
-              <span style={rightIconStyle} onClick={() => setShowPassword(!showPassword)}>
-                {showPassword ? (
-                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#6b7280" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24M1 1l22 22"/></svg>
-                ) : (
-                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#6b7280" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
-                )}
-              </span>
+
+            {/* Input Password */}
+            <div className="flex flex-col gap-2 w-full">
+              <div className="flex justify-between items-center w-full">
+                <label className="text-[11px] font-extrabold text-slate-500 tracking-wider uppercase">MẬT KHẨU</label>
+                <Link to="/forgot-password" className="text-[11px] font-bold text-[#c0392b] hover:text-[#a93226] transition-colors no-underline">Quên mật khẩu?</Link>
+              </div>
+              <div className="relative flex items-center w-full">
+                <span className="absolute left-3.5 flex items-center pointer-events-none">
+                  <Lock size={18} className="text-gray-400" />
+                </span>
+                <input
+                  type={showPassword ? "text" : "password"}
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  required
+                  className="w-full pl-11 pr-12 py-3 text-[14px] text-slate-800 bg-slate-50 border-[1.5px] border-slate-100 rounded-xl outline-none focus:border-red-200 focus:bg-white focus:ring-2 focus:ring-red-100/50 transition-all duration-200 box-border"
+                  placeholder="••••••••"
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowPassword(!showPassword)}
+                  className="absolute right-3 bg-transparent border-none cursor-pointer flex items-center p-1.5 hover:bg-slate-100 rounded-lg transition-colors"
+                  title={showPassword ? "Ẩn mật khẩu" : "Hiện mật khẩu"}
+                >
+                  {showPassword ? <EyeOff size={18} className="text-gray-500" /> : <Eye size={18} className="text-gray-500" />}
+                </button>
+              </div>
             </div>
+
+            {/* Ghi nhớ đăng nhập */}
+            <div className="flex items-center gap-2 mt-0.5">
+              <input type="checkbox" id="remember" className="w-[15px] h-[15px] accent-[#c0392b] cursor-pointer" />
+              <label htmlFor="remember" className="text-[13px] text-slate-500 cursor-pointer font-medium select-none">Ghi nhớ phiên đăng nhập</label>
+            </div>
+
+            {/* Nút Submit */}
+            <button
+              type="submit"
+              disabled={loading}
+              className="w-full py-3.5 bg-[#c0392b] text-white rounded-xl text-[14px] font-extrabold cursor-pointer flex items-center justify-center shadow-[0_4px_12px_rgba(192,57,43,0.15)] hover:bg-[#a93226] hover:shadow-[0_6px_20px_rgba(192,57,43,0.25)] focus:ring-4 focus:ring-red-100 active:scale-[0.98] transition-all duration-200 mt-2.5 disabled:opacity-70 disabled:cursor-not-allowed"
+            >
+              {loading ? 'Đang xử lý...' : 'Đăng nhập'}
+              <ArrowRight size={18} className="ml-2" />
+            </button>
+          </form>
+
+          <div className="mt-6 text-[13px] text-slate-500 text-center font-medium">
+            Chưa có tài khoản?{' '}
+            <Link to="/register" className="text-[#c0392b] font-bold hover:text-[#a93226] transition-colors no-underline">Đăng ký ngay</Link>
           </div>
-
-          {/* Ghi nhớ đăng nhập */}
-          <div style={rememberStyle}>
-            <input type="checkbox" id="remember" style={{ cursor: 'pointer', width: '16px', height: '16px', accentColor: '#c0392b' }} />
-            <label htmlFor="remember" style={{ cursor: 'pointer', color: '#6b7280', fontSize: '14px' }}>Ghi nhớ phiên đăng nhập</label>
-          </div>
-
-          {/* Nút Submit */}
-          <button
-            type="submit"
-            disabled={loading}
-            style={loading ? { ...buttonStyle, opacity: 0.7 } : buttonStyle}
-          >
-            {loading ? 'Đang xử lý...' : 'Đăng nhập'}
-          </button>
-        </form>
-
-        {/* Footer */}
-        <div style={footerStyle}>
-          <p style={{ margin: 0, color: '#6b7280', fontSize: '14px' }}>
-            Bạn chưa có tài khoản ? <Link to="/register" style={registerLinkStyle}>Yêu cầu đăng ký</Link>
-          </p>
         </div>
+
       </div>
     </div>
   );
-};
-
-// ================= CSS STYLES (Inline) =================
-
-const pageWrapperStyle = {
-  display: 'flex',
-  flexDirection: 'column',
-  alignItems: 'center',
-  justifyContent: 'center',
-  minHeight: '100vh',
-  backgroundColor: '#f8f9fa',
-  fontFamily: 'system-ui, -apple-system, sans-serif',
-  position: 'relative',
-  overflow: 'hidden'
-};
-
-const watermarkStyle = {
-  position: 'absolute',
-  top: '-10%',
-  right: '-10%',
-  zIndex: 0,
-  opacity: 0.5,
-  pointerEvents: 'none'
-};
-
-const headerSectionStyle = {
-  display: 'flex',
-  flexDirection: 'column',
-  alignItems: 'center',
-  marginBottom: '30px',
-  zIndex: 1
-};
-
-const logoIconBoxStyle = {
-  width: '60px',
-  height: '60px',
-  backgroundColor: '#c0392b',
-  borderRadius: '12px',
-  display: 'flex',
-  alignItems: 'center',
-  justifyContent: 'center',
-  marginBottom: '15px',
-  boxShadow: '0 4px 6px -1px rgba(192, 57, 43, 0.3)'
-};
-
-const titleStyle = {
-  margin: '0 0 5px 0',
-  color: '#c0392b',
-  fontSize: '28px',
-  fontWeight: '900',
-  letterSpacing: '-0.5px'
-};
-
-const subtitleStyle = {
-  margin: 0,
-  color: '#6b7280',
-  fontSize: '13px',
-  fontWeight: '600',
-  letterSpacing: '1.5px'
-};
-
-const formCardStyle = {
-  width: '100%',
-  maxWidth: '420px',
-  padding: '40px',
-  background: 'white',
-  borderRadius: '12px',
-  boxShadow: '0 10px 25px -5px rgba(0, 0, 0, 0.05)',
-  zIndex: 1
-};
-
-const formGroupStyle = {
-  marginBottom: '25px',
-};
-
-const labelStyle = {
-  fontSize: '12px',
-  fontWeight: '700',
-  color: '#4b5563',
-  letterSpacing: '0.5px',
-  display: 'block',
-  marginBottom: '8px'
-};
-
-const forgotPasswordStyle = {
-  fontSize: '12px',
-  fontWeight: '700',
-  color: '#c0392b',
-  textDecoration: 'none',
-  marginBottom: '8px'
-};
-
-const inputWrapperStyle = {
-  position: 'relative',
-  display: 'flex',
-  alignItems: 'center'
-};
-
-const leftIconStyle = {
-  position: 'absolute',
-  left: '0',
-  display: 'flex',
-  alignItems: 'center',
-  color: '#9ca3af'
-};
-
-const rightIconStyle = {
-  position: 'absolute',
-  right: '0',
-  display: 'flex',
-  alignItems: 'center',
-  cursor: 'pointer',
-  padding: '5px'
-};
-
-const inputStyle = {
-  width: '100%',
-  padding: '10px 30px 10px 30px', // Chừa khoảng trống cho icon trái/phải
-  border: 'none',
-  borderBottom: '2px solid #e5e7eb',
-  fontSize: '15px',
-  outline: 'none',
-  backgroundColor: 'transparent',
-  transition: 'border-color 0.3s',
-  color: '#111827'
-};
-
-const rememberStyle = {
-  display: 'flex',
-  alignItems: 'center',
-  gap: '10px',
-  marginBottom: '30px',
-  marginTop: '-5px'
-};
-
-const buttonStyle = {
-  width: '100%',
-  padding: '14px',
-  background: '#c0392b',
-  color: 'white',
-  border: 'none',
-  borderRadius: '8px',
-  fontSize: '16px',
-  cursor: 'pointer',
-  fontWeight: 'bold',
-  transition: 'background 0.3s',
-  boxShadow: '0 4px 6px -1px rgba(192, 57, 43, 0.2)'
-};
-
-const footerStyle = {
-  marginTop: '30px',
-  paddingTop: '20px',
-  borderTop: '1px solid #f3f4f6',
-  textAlign: 'center'
-};
-
-const registerLinkStyle = {
-  color: '#0369a1', // Màu xanh lục đậm giống thiết kế
-  fontWeight: '700',
-  textDecoration: 'none'
 };
 
 export default LoginPage;

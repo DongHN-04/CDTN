@@ -11,16 +11,36 @@ import {
 import { normalizeSavedPromotions } from '../../utils/savedPromotions';
 
 const districts = [
-  'Quận 1',
-  'Quận 3',
-  'Quận 5',
-  'Quận 7',
-  'Quận 10',
-  'Tân Bình',
-  'Bình Thạnh',
-  'Bình Tân',
-  'Gò Vấp',
-  'Thủ Đức',
+  'Ba Đình',
+  'Hoàn Kiếm',
+  'Tây Hồ',
+  'Long Biên',
+  'Cầu Giấy',
+  'Đống Đa',
+  'Hai Bà Trưng',
+  'Hoàng Mai',
+  'Thanh Xuân',
+  'Nam Từ Liêm',
+  'Bắc Từ Liêm',
+  'Hà Đông',
+  'Sơn Tây',
+  'Ba Vì',
+  'Chương Mỹ',
+  'Đan Phượng',
+  'Đông Anh',
+  'Gia Lâm',
+  'Hoài Đức',
+  'Mê Linh',
+  'Mỹ Đức',
+  'Phú Xuyên',
+  'Phúc Thọ',
+  'Quốc Oai',
+  'Sóc Sơn',
+  'Thạch Thất',
+  'Thanh Oai',
+  'Thanh Trì',
+  'Thường Tín',
+  'Ứng Hòa',
 ];
 
 const PAGE_SIZE = 5;
@@ -69,7 +89,7 @@ const CustomerProfilePage = () => {
   const [promoPage, setPromoPage] = useState(1);
   const PROMO_PAGE_SIZE = 4;
   const [showAddressForm, setShowAddressForm] = useState(false);
-  const [addressForm, setAddressForm] = useState({ label: 'Nhà riêng', address: '', district: '', city: 'Hồ Chí Minh' });
+  const [addressForm, setAddressForm] = useState({ label: 'Nhà riêng', address: '', district: '', city: 'Hà Nội' });
   const [toast, setToast] = useState({ show: false, message: '', type: 'success' });
   const [saving, setSaving] = useState(false);
 
@@ -461,9 +481,8 @@ const CustomerProfilePage = () => {
                       key={page}
                       type="button"
                       onClick={() => setOrderPage(page)}
-                      className={`flex h-8 w-8 items-center justify-center rounded-full text-xs ${
-                        orderPage === page ? 'bg-[#c0392b] font-black text-white' : 'border border-red-50 text-slate-600'
-                      }`}
+                      className={`flex h-8 w-8 items-center justify-center rounded-full text-xs ${orderPage === page ? 'bg-[#c0392b] font-black text-white' : 'border border-red-50 text-slate-600'
+                        }`}
                     >
                       {page}
                     </button>
@@ -534,9 +553,8 @@ const CustomerProfilePage = () => {
                       key={page}
                       type="button"
                       onClick={() => setPromoPage(page)}
-                      className={`flex h-8 w-8 items-center justify-center rounded-full text-xs ${
-                        promoPage === page ? 'bg-[#c0392b] font-black text-white' : 'border border-red-50 text-slate-600'
-                      }`}
+                      className={`flex h-8 w-8 items-center justify-center rounded-full text-xs ${promoPage === page ? 'bg-[#c0392b] font-black text-white' : 'border border-red-50 text-slate-600'
+                        }`}
                     >
                       {page}
                     </button>
@@ -559,9 +577,8 @@ const CustomerProfilePage = () => {
       {/* ===== TOAST NOTIFICATION ===== */}
       {toast.show && (
         <div className="fixed bottom-6 right-6 z-50 bg-slate-900 text-white px-5 py-3.5 rounded-xl shadow-2xl flex items-center gap-3 border border-slate-700 animate-bounce duration-300">
-          <div className={`w-5 h-5 rounded-full flex items-center justify-center text-white text-[11px] font-bold ${
-            toast.type === 'success' ? 'bg-emerald-500' : 'bg-rose-500'
-          }`}>
+          <div className={`w-5 h-5 rounded-full flex items-center justify-center text-white text-[11px] font-bold ${toast.type === 'success' ? 'bg-emerald-500' : 'bg-rose-500'
+            }`}>
             {toast.type === 'success' ? '✓' : '✕'}
           </div>
           <span className="text-sm font-semibold">{toast.message}</span>

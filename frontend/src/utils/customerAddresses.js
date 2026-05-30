@@ -4,11 +4,11 @@ export const parseSavedAddress = (fullAddress = '', districts = []) => {
     ? fullAddress.replace(new RegExp(`,?\\s*${matchedDistrict}`, 'i'), '')
     : fullAddress;
   const address = addressWithoutDistrict
-    .replace(/,?\s*Hồ Chí Minh/i, '')
+    .replace(/,?\s*(Hà Nội)/i, '')
     .trim()
     .replace(/,\s*$/, '');
 
-  return { address, district: matchedDistrict, city: 'Hồ Chí Minh' };
+  return { address, district: matchedDistrict, city: 'Hà Nội' };
 };
 
 export const normalizeCustomerAddresses = (addresses = []) => (
@@ -18,12 +18,12 @@ export const normalizeCustomerAddresses = (addresses = []) => (
   label: item.label || 'Địa chỉ nhận hàng',
   address: item.address || '',
   district: item.district || '',
-  city: item.city || 'Hồ Chí Minh',
-  fullAddress: item.fullAddress || [item.address, item.district, item.city || 'Hồ Chí Minh'].filter(Boolean).join(', '),
+  city: item.city || 'Hà Nội',
+  fullAddress: item.fullAddress || [item.address, item.district, item.city || 'Hà Nội'].filter(Boolean).join(', '),
   isDefault: Boolean(item.isDefault),
 }));
 
-export const buildAddressOption = ({ label, address, district, city = 'Hồ Chí Minh', isDefault = false }) => ({
+export const buildAddressOption = ({ label, address, district, city = 'Hà Nội', isDefault = false }) => ({
   id: `${Date.now()}-${Math.random().toString(36).slice(2)}`,
   label: label?.trim() || 'Địa chỉ nhận hàng',
   address: address?.trim() || '',

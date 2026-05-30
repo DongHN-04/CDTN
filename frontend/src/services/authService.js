@@ -5,9 +5,6 @@ const API_URL = `${process.env.REACT_APP_API_URL || 'http://localhost:5000/api'}
 // Đăng ký
 const register = async (userData) => {
   const response = await axios.post(API_URL + 'register', userData);
-  if (response.data) {
-    localStorage.setItem('user', JSON.stringify(response.data));
-  }
   return response.data;
 };
 
@@ -28,7 +25,6 @@ const logout = () => {
 // Lấy thông tin user hiện tại từ localStorage
 const getCurrentUser = () => {
   try {
-    // LocalStorage có thể bị người dùng/sandbox ghi sai JSON, nên cần fallback an toàn.
     return JSON.parse(localStorage.getItem('user'));
   } catch {
     localStorage.removeItem('user');
@@ -36,11 +32,25 @@ const getCurrentUser = () => {
   }
 };
 
+// Quên mật khẩu
+const forgotPassword = async (email) => {
+  const response = await axios.post(API_URL + 'forgot-password', { email });
+  return response.data;
+};
+
+// Đặt lại mật khẩu
+const resetPassword = async (token, password) => {
+  const response = await axios.post(API_URL + 'reset-password/' + token, { password });
+  return response.data;
+};
+
 const authService = {
   register,
   login,
   logout,
   getCurrentUser,
+  forgotPassword,
+  resetPassword,
 };
 
 export default authService;

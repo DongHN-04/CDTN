@@ -1,15 +1,13 @@
 const express = require('express');
 const router = express.Router();
-const { registerUser, loginUser } = require('../controllers/authController');
+const { registerUser, loginUser, forgotPassword, resetPassword } = require('../controllers/authController');
 const rateLimit = require('../middleware/rateLimitMiddleware');
 const { validateAuthRegister, validateAuthLogin } = require('../middleware/validationMiddleware');
-
-const isProduction = process.env.NODE_ENV === 'production';
 
 const authLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,
   max: 20,
-  message: 'Bạn thử đăng nhập/đăng ký quá nhiều lần, vui lòng thử lại sau',
+  message: 'Bạn thử thao tác quá nhiều lần, vui lòng thử lại sau',
 });
 
 router.post('/register', authLimiter, validateAuthRegister, registerUser);
@@ -27,5 +25,8 @@ router
       },
     });
   });
+
+router.post('/forgot-password', authLimiter, forgotPassword);
+router.post('/reset-password/:token', authLimiter, resetPassword);
 
 module.exports = router;

@@ -45,11 +45,10 @@ const CustomerLayout = () => {
               <Link
                 key={link.path}
                 to={link.path}
-                className={`rounded-lg px-4 py-2 text-[14px] font-semibold no-underline transition-all duration-200 ${
-                  isActive(link.path)
+                className={`rounded-lg px-4 py-2 text-[14px] font-semibold no-underline transition-all duration-200 ${isActive(link.path)
                     ? 'bg-red-50 text-[#c0392b]'
                     : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900'
-                }`}
+                  }`}
               >
                 {link.label}
               </Link>
@@ -82,11 +81,10 @@ const CustomerLayout = () => {
                 )}
                 <Link
                   to="/profile"
-                  className={`flex items-center gap-2 rounded-xl border px-2.5 py-2 no-underline transition-all ${
-                    isActive('/profile')
+                  className={`flex items-center gap-2 rounded-xl border px-2.5 py-2 no-underline transition-all ${isActive('/profile')
                       ? 'border-red-200 bg-red-50 text-[#c0392b]'
                       : 'border-gray-200 bg-gray-50 text-gray-700 hover:border-red-200 hover:bg-red-50 hover:text-[#c0392b]'
-                  }`}
+                    }`}
                   title="Hồ sơ của bạn"
                 >
                   <span className="grid h-7 w-7 place-items-center rounded-full bg-white text-[#c0392b] shadow-sm">

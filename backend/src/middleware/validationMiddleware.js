@@ -617,7 +617,7 @@ const validateProfileUpdate = validateBody((body, errors) => {
     payload.addresses = addresses.slice(0, 10).map((item = {}, index) => {
       const address = trimString(item.address || '');
       const district = trimString(item.district || '');
-      const city = trimString(item.city || 'Hồ Chí Minh');
+      const city = trimString(item.city || 'Hà Nội');
       const fullAddress = trimString(item.fullAddress || [address, district, city].filter(Boolean).join(', '));
       validateTextLength(errors, `addresses.${index}.label`, trimString(item.label || 'Địa chỉ nhận hàng'));
       validateTextLength(errors, `addresses.${index}.address`, address, LIMITS.description);

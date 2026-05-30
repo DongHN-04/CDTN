@@ -26,7 +26,6 @@ export const AuthProvider = ({ children }) => {
   // Hàm đăng ký
   const register = async (userData) => {
     const data = await authService.register(userData);
-    setUser(data);
     return data;
   };
 

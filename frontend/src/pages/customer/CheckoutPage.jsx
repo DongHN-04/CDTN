@@ -29,16 +29,36 @@ const defaultImages = {
 };
 
 const districts = [
-  'Quận 1',
-  'Quận 3',
-  'Quận 5',
-  'Quận 7',
-  'Quận 10',
-  'Tân Bình',
-  'Bình Thạnh',
-  'Bình Tân',
-  'Gò Vấp',
-  'Thủ Đức',
+  'Ba Đình',
+  'Hoàn Kiếm',
+  'Tây Hồ',
+  'Long Biên',
+  'Cầu Giấy',
+  'Đống Đa',
+  'Hai Bà Trưng',
+  'Hoàng Mai',
+  'Thanh Xuân',
+  'Nam Từ Liêm',
+  'Bắc Từ Liêm',
+  'Hà Đông',
+  'Sơn Tây',
+  'Ba Vì',
+  'Chương Mỹ',
+  'Đan Phượng',
+  'Đông Anh',
+  'Gia Lâm',
+  'Hoài Đức',
+  'Mê Linh',
+  'Mỹ Đức',
+  'Phú Xuyên',
+  'Phúc Thọ',
+  'Quốc Oai',
+  'Sóc Sơn',
+  'Thạch Thất',
+  'Thanh Oai',
+  'Thanh Trì',
+  'Thường Tín',
+  'Ứng Hòa',
 ];
 
 const formatPrice = (value) => `${Number(value || 0).toLocaleString('vi-VN')}đ`;
@@ -76,7 +96,7 @@ const CheckoutPage = () => {
   const [phone, setPhone] = useState(initialCustomer.phone);
   const [address, setAddress] = useState(initialCustomer.address);
   const [district, setDistrict] = useState(initialCustomer.district);
-  const [city] = useState('Hồ Chí Minh');
+  const [city] = useState('Hà Nội');
   const [notes, setNotes] = useState('');
   const [paymentMethod, setPaymentMethod] = useState('cash');
   const [promoCode, setPromoCode] = useState(initialPromo);
@@ -113,7 +133,7 @@ const CheckoutPage = () => {
   useEffect(() => {
     Promise.all([publicService.getMenu(), publicService.getCombos()])
       .then(([menuItems, combos]) => refreshCartProducts({ menuItems, combos }))
-      .catch(() => {});
+      .catch(() => { });
   }, [refreshCartProducts]);
 
   useEffect(() => {
@@ -198,7 +218,7 @@ const CheckoutPage = () => {
       if (user?.role === 'customer' && promoCode) {
         publicService.getMyPromotions()
           .then(data => updateCurrentUser({ savedPromotions: data }))
-          .catch(() => {});
+          .catch(() => { });
       }
 
       if (paymentMethod === 'vnpay') {
@@ -351,9 +371,8 @@ const CheckoutPage = () => {
               </h2>
 
               <div className="flex flex-col gap-3.5">
-                <label className={`flex cursor-pointer items-center gap-4 rounded-2xl border p-4 transition-all ${
-                  paymentMethod === 'cash' ? 'border-[#c0392b] bg-red-50/30' : 'border-gray-100 bg-white hover:border-gray-200'
-                }`}>
+                <label className={`flex cursor-pointer items-center gap-4 rounded-2xl border p-4 transition-all ${paymentMethod === 'cash' ? 'border-[#c0392b] bg-red-50/30' : 'border-gray-100 bg-white hover:border-gray-200'
+                  }`}>
                   <input
                     type="radio"
                     name="payment"
@@ -375,9 +394,8 @@ const CheckoutPage = () => {
                   </div>
                 </label>
 
-                <label className={`flex cursor-pointer items-center gap-4 rounded-2xl border p-4 transition-all ${
-                  paymentMethod === 'vnpay' ? 'border-[#c0392b] bg-red-50/30' : 'border-gray-100 bg-white hover:border-gray-200'
-                }`}>
+                <label className={`flex cursor-pointer items-center gap-4 rounded-2xl border p-4 transition-all ${paymentMethod === 'vnpay' ? 'border-[#c0392b] bg-red-50/30' : 'border-gray-100 bg-white hover:border-gray-200'
+                  }`}>
                   <input
                     type="radio"
                     name="payment"
@@ -493,9 +511,8 @@ const CheckoutPage = () => {
 
       {toast.show && (
         <div className="fixed bottom-6 right-6 z-50 bg-slate-900 text-white px-5 py-3.5 rounded-xl shadow-2xl flex items-center gap-3 border border-slate-700 animate-bounce duration-300">
-          <div className={`w-5 h-5 rounded-full flex items-center justify-center text-white text-[11px] font-bold ${
-            toast.type === 'success' ? 'bg-emerald-500' : 'bg-rose-500'
-          }`}>
+          <div className={`w-5 h-5 rounded-full flex items-center justify-center text-white text-[11px] font-bold ${toast.type === 'success' ? 'bg-emerald-500' : 'bg-rose-500'
+            }`}>
             {toast.type === 'success' ? '✓' : '×'}
           </div>
           <span>{toast.message}</span>

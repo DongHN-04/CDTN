@@ -40,7 +40,7 @@ const userSchema = mongoose.Schema(
         label: { type: String, default: 'Địa chỉ nhận hàng' },
         address: { type: String, default: '' },
         district: { type: String, default: '' },
-        city: { type: String, default: 'Hồ Chí Minh' },
+        city: { type: String, default: 'Hà Nội' },
         fullAddress: { type: String, default: '' },
         isDefault: { type: Boolean, default: false },
       },
@@ -76,6 +76,12 @@ const userSchema = mongoose.Schema(
     isDeleted: {
       type: Boolean,
       default: false,
+    },
+    resetPasswordToken: {
+      type: String,
+    },
+    resetPasswordExpires: {
+      type: Date,
     },
   },
   {
