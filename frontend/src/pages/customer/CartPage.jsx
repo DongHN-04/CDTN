@@ -188,6 +188,8 @@ const CartPage = () => {
     return promotions.filter(promo => savedCodes.has(normalizePromoCode(promo.name)));
   }, [promotions, savedPromotions]);
 
+  const activePromoInfo = promotions.find(p => p.name === appliedPromo);
+
   return (
     <div className="max-w-[1200px] mx-auto px-5 py-12 font-sans">
       {/* Title */}
@@ -352,13 +354,18 @@ const CartPage = () => {
                   <option value="">Chọn mã giảm giá</option>
                   {savedUsablePromotions.map(promo => (
                     <option key={promo._id || promo.name} value={promo.name}>
-                      {promo.name} - đơn từ {Number(promo.minOrderValue || 0).toLocaleString('vi-VN')}đ
+                      {promo.name} - Giảm {promo.type === 'percent' ? `${promo.value}%` : `${Number(promo.value || 0).toLocaleString('vi-VN')}đ`} (Đơn từ {Number(promo.minOrderValue || 0).toLocaleString('vi-VN')}đ)
                     </option>
                   ))}
               </select>
               {appliedPromo && (
                 <span className="text-emerald-600 text-xs font-bold mt-1 block">
                   ✓ Đang áp dụng mã: <strong className="font-extrabold">{appliedPromo}</strong>
+                  {activePromoInfo && (
+                    <span className="text-gray-500 font-semibold ml-1">
+                      (Giảm {activePromoInfo.type === 'percent' ? `${activePromoInfo.value}%` : `${Number(activePromoInfo.value || 0).toLocaleString('vi-VN')}đ`} cho đơn từ {Number(activePromoInfo.minOrderValue || 0).toLocaleString('vi-VN')}đ)
+                    </span>
+                  )}
                 </span>
               )}
             </div>

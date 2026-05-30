@@ -2,6 +2,7 @@ import React, { useEffect } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { AlertTriangle, CheckCircle2, Home, XCircle } from 'lucide-react';
 import { useCart } from '../../contexts/CartContext';
+import { useAuth } from '../../contexts/AuthContext';
 
 const errorMessages = {
   24: 'Bạn đã huỷ giao dịch.',
@@ -13,6 +14,7 @@ const errorMessages = {
 const PaymentResultPage = () => {
   const location = useLocation();
   const { clearCart } = useCart();
+  const { user, loading } = useAuth();
   const params = new URLSearchParams(location.search);
   const status = params.get('status');
   const txnRef = params.get('txnRef');
@@ -43,11 +45,20 @@ const PaymentResultPage = () => {
   const colorClass = isSuccess || isPending ? 'text-emerald-600' : isInvalid ? 'text-amber-500' : 'text-rose-600';
 
   useEffect(() => {
+    if (loading) return; // Chờ cho đến khi AuthContext tải xong thông tin User
     if (!isSuccess && !isPending) return;
+    
+    // Xóa sạch giỏ hàng trong state
     clearCart();
+
+    // Xóa trực tiếp trong localStorage để tránh bất đồng bộ/race condition khi tải lại trang
+    localStorage.removeItem('cart:guest');
+    if (user?._id) {
+      localStorage.removeItem(`cart:${user._id}`);
+    }
     localStorage.removeItem('appliedPromo');
     localStorage.removeItem('discountAmount');
-  }, [clearCart, isPending, isSuccess]);
+  }, [clearCart, isPending, isSuccess, loading, user]);
 
   return (
     <main className="flex min-h-screen items-center justify-center bg-[#f9fafb] px-5 py-12 font-sans">

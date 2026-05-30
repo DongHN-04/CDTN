@@ -61,6 +61,7 @@ const getUsableSavedPromotions = (user) => {
     .map(serializeSavedPromotion);
 };
 
+
 // @desc    Lấy thực đơn công khai
 // @route   GET /api/public/menu
 // @access  Public
@@ -68,7 +69,32 @@ const getMenu = async (req, res) => {
   try {
     const menuItems = await MenuItem.find({ isActive: { $ne: false }, isDeleted: { $ne: true } })
       .populate('ingredients.ingredient', 'stock isActive isDeleted');
-    // Populate ton kho toi thieu de frontend biet mon nao co the dat.
+
+    // Tính toán lượt bán động từ đơn hàng đã thanh toán
+    const SOLD_ORDER_STATUSES = ['confirmed', 'delivering', 'completed'];
+    const soldCounts = new Map();
+    const orders = await Order.find({
+      status: { $in: SOLD_ORDER_STATUSES },
+      paymentStatus: 'paid',
+    }).populate('items.comboId', 'items');
+
+    orders.forEach(order => {
+      (order.items || []).forEach(orderItem => {
+        if (orderItem.menuItem) {
+          const key = orderItem.menuItem.toString();
+          soldCounts.set(key, (soldCounts.get(key) || 0) + Number(orderItem.quantity || 0));
+          return;
+        }
+
+        (orderItem.comboId?.items || []).forEach(comboItem => {
+          if (!comboItem.menuItem) return;
+          const key = comboItem.menuItem.toString();
+          const quantity = Number(comboItem.quantity || 0) * Number(orderItem.quantity || 0);
+          soldCounts.set(key, (soldCounts.get(key) || 0) + quantity);
+        });
+      });
+    });
+
     const publicMenu = menuItems.map(item => ({
       _id: item._id,
       name: item.name,
@@ -79,6 +105,7 @@ const getMenu = async (req, res) => {
       isActive: item.isActive,
       // Frontend dung co nay de khoa nut dat mon thay vi hard-code theo ten mon.
       isAvailable: isMenuItemAvailable(item),
+      soldCount: soldCounts.get(item._id.toString()) || 0,
     }));
     res.json(publicMenu);
   } catch (error) {

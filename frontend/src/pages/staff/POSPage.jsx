@@ -21,6 +21,15 @@ import { getImageUrl } from '../../utils/imageUrl';
 import { ALL_MENU_CATEGORY, COMBO_CATEGORY, MENU_CATEGORIES, normalizeCategory } from '../../constants/menuCategories';
 import { useToast } from '../../contexts/ToastContext';
 
+const defaultImages = {
+  'Burger': '/images/home/product-burger.png',
+  'Gà rán': '/images/home/product-chicken.png',
+  'Pizza': '/images/home/product-pizza.png',
+  'Đồ uống': '/images/home/product-sandwich.png',
+  'Tráng miệng': '/images/home/product-sandwich.png',
+  'Combo': '/images/home/product-burger.png',
+};
+
 const categories = [ALL_MENU_CATEGORY, ...MENU_CATEGORIES, COMBO_CATEGORY];
 
 const formatCurrency = value =>
@@ -231,8 +240,14 @@ const POSPage = () => {
                 {filteredProducts.map(product => {
                   const isCombo = product.productType === 'combo';
                   const isOutOfStock = product.isAvailable === false;
-                  const image = isCombo ? product.image : getImageUrl(product.image);
-                  const soldLabel = isCombo ? 'Combo tiết kiệm' : product.description || product.category;
+                  
+                  // Category-specific fallback image
+                  const fallback = defaultImages[product.category] || '/images/home/product-burger.png';
+                  const image = isCombo
+                    ? (product.image ? getImageUrl(product.image, fallback) : fallback)
+                    : getImageUrl(product.image, fallback);
+
+
 
                   return (
                     <article
@@ -245,18 +260,14 @@ const POSPage = () => {
                         className="block w-full text-left disabled:cursor-not-allowed"
                       >
                         <div className="relative aspect-[4/3] overflow-hidden bg-stone-100">
-                          {image ? (
-                            <img
-                              src={image}
-                              alt={product.name}
-                              className={`h-full w-full object-cover transition duration-300 ${isOutOfStock ? 'grayscale opacity-60' : 'group-hover:scale-105'}`}
-                              onError={event => {
-                                event.currentTarget.style.display = 'none';
-                              }}
-                            />
-                          ) : (
-                            <div className="grid h-full place-items-center text-xs font-bold text-stone-400">No image</div>
-                          )}
+                          <img
+                            src={image}
+                            alt={product.name}
+                            className={`h-full w-full object-cover transition duration-300 ${isOutOfStock ? 'grayscale opacity-60' : 'group-hover:scale-105'}`}
+                            onError={event => {
+                              event.currentTarget.src = fallback;
+                            }}
+                          />
                           {isCombo && (
                             <span className="absolute right-2 top-2 rounded bg-stone-900 px-2 py-1 text-[10px] font-black text-white">
                               COMBO
@@ -270,7 +281,26 @@ const POSPage = () => {
                         </div>
                         <div className="p-3">
                           <h3 className="line-clamp-1 text-sm font-bold text-slate-900">{product.name}</h3>
-                          <p className="mt-1 line-clamp-1 text-xs text-stone-500">{soldLabel}</p>
+
+                          
+                          {/* Hiển thị thành phần của combo */}
+                          {isCombo && (
+                            <div className="mt-2 rounded-xl bg-orange-50/50 p-2 text-left border border-orange-100/50">
+                              <div className="mb-1 text-[9px] font-black uppercase tracking-wider text-orange-950">Thành phần:</div>
+                              <ul className="m-0 flex list-none flex-col gap-1 p-0">
+                                {(product.items || []).slice(0, 3).map(subItem => (
+                                  <li key={subItem._id || `${subItem.menuItem?._id || subItem.menuItem}-${subItem.quantity}`} className="flex items-start gap-1 text-[10px] font-semibold text-orange-950">
+                                    <span className="text-[#c70d18]">⊗</span>
+                                    <span className="truncate">{subItem.quantity}x {subItem.menuItem?.name || subItem.name || 'Món ăn'}</span>
+                                  </li>
+                                ))}
+                                {product.items?.length > 3 && (
+                                  <li className="text-[9px] font-bold text-stone-500">+{product.items.length - 3} món khác</li>
+                                )}
+                              </ul>
+                            </div>
+                          )}
+
                           <div className="mt-4 flex items-center justify-between">
                             <span className="text-base font-black text-[#c70d18]">{formatCurrency(product.price)}</span>
                             <span className={`grid h-8 w-8 place-items-center rounded-lg shadow-sm ${isOutOfStock ? 'bg-stone-200 text-stone-400' : 'bg-[#c70d18] text-white'}`}>
@@ -317,15 +347,25 @@ const POSPage = () => {
                   const id = getCartLineId(item);
                   const name = item.type === 'combo' ? item.name : item.menuItem.name;
                   const price = item.type === 'combo' ? item.price : item.menuItem.price;
-                  const image = item.type === 'combo' ? item.image : getImageUrl(item.menuItem.image);
+                  
+                  const itemCategory = item.type === 'combo' ? 'Combo' : item.menuItem?.category;
+                  const itemFallback = defaultImages[itemCategory] || '/images/home/product-burger.png';
+                  const image = item.type === 'combo'
+                    ? (item.image ? getImageUrl(item.image, itemFallback) : itemFallback)
+                    : getImageUrl(item.menuItem?.image, itemFallback);
 
                   return (
                     <div key={`${item.type}-${id}`} className="grid grid-cols-[52px_1fr_auto] items-center gap-3 rounded-lg border border-red-50 bg-white p-2">
                       <div className="h-12 w-12 overflow-hidden rounded-lg bg-stone-100">
-                        {image ? <img src={image} alt={name} className="h-full w-full object-cover" /> : null}
+                        <img src={image} alt={name} className="h-full w-full object-cover" onError={e => { e.currentTarget.src = itemFallback; }} />
                       </div>
                       <div className="min-w-0">
                         <p className="m-0 truncate text-sm font-bold">{name}</p>
+                        {item.type === 'combo' && (
+                          <p className="m-0 text-[10px] text-orange-950/80 font-medium truncate" title={(item.items || []).map(subItem => `${subItem.quantity}x ${subItem.menuItem?.name || subItem.name || 'Món'}`).join(', ')}>
+                            Thành phần: {(item.items || []).map(subItem => `${subItem.quantity}x ${subItem.menuItem?.name || subItem.name || 'Món'}`).join(', ')}
+                          </p>
+                        )}
                         <p className="m-0 text-[11px] text-stone-500">{formatCurrency(price)}</p>
                         <div className="mt-2 inline-flex h-7 items-center rounded-full bg-red-50">
                           <button

@@ -1,62 +1,49 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { Link } from 'react-router-dom';
 import publicService from '../../services/publicService';
 import { useCart } from '../../contexts/CartContext';
+import { useAuth } from '../../contexts/AuthContext';
 import { getImageUrl } from '../../utils/imageUrl';
 import { COMBO_CATEGORY, MENU_CATEGORIES, normalizeCategory } from '../../constants/menuCategories';
 
 /* ───────── SVG Icon Components ───────── */
 const BurgerIcon = () => (
   <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
-    <path d="M3 11h18M3 11c0-4 4-7 9-7s9 3 9 7M3 11v1a1 1 0 001 1h16a1 1 0 001-1v-1"/>
-    <path d="M3 15h18a1 1 0 011 1v1c0 2-3 4-10 4S2 19 2 17v-1a1 1 0 011-1z"/>
-    <line x1="4" y1="13" x2="20" y2="13"/>
+    <path d="M3 11h18M3 11c0-4 4-7 9-7s9 3 9 7M3 11v1a1 1 0 001 1h16a1 1 0 001-1v-1" />
+    <path d="M3 15h18a1 1 0 011 1v1c0 2-3 4-10 4S2 19 2 17v-1a1 1 0 011-1z" />
+    <line x1="4" y1="13" x2="20" y2="13" />
   </svg>
 );
 const ChickenIcon = () => (
   <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
-    <path d="M15 11.5c0-2.5-1.5-4.5-4-5.5 1-3 4-4 6-3s3 4 2 7c-.5 1.5-2 2.5-4 1.5z"/>
-    <path d="M11 6C8 4 5 5 4 8s1 6 4 7l1 4h6l1-4c2-1 3-3 3-5"/>
-    <line x1="9" y1="19" x2="9" y2="22"/><line x1="15" y1="19" x2="15" y2="22"/>
+    <path d="M15 11.5c0-2.5-1.5-4.5-4-5.5 1-3 4-4 6-3s3 4 2 7c-.5 1.5-2 2.5-4 1.5z" />
+    <path d="M11 6C8 4 5 5 4 8s1 6 4 7l1 4h6l1-4c2-1 3-3 3-5" />
+    <line x1="9" y1="19" x2="9" y2="22" /><line x1="15" y1="19" x2="15" y2="22" />
   </svg>
 );
 const PizzaIcon = () => (
   <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
-    <path d="M12 2L2 19.5h20L12 2z"/><circle cx="10" cy="13" r="1"/><circle cx="14" cy="13" r="1"/><circle cx="12" cy="9" r="1"/>
+    <path d="M12 2L2 19.5h20L12 2z" /><circle cx="10" cy="13" r="1" /><circle cx="14" cy="13" r="1" /><circle cx="12" cy="9" r="1" />
   </svg>
 );
 const ComboIcon = () => (
   <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
-    <rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/>
+    <rect x="3" y="3" width="7" height="7" rx="1" /><rect x="14" y="3" width="7" height="7" rx="1" /><rect x="3" y="14" width="7" height="7" rx="1" /><rect x="14" y="14" width="7" height="7" rx="1" />
   </svg>
 );
 const DrinkIcon = () => (
   <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
-    <path d="M6 2l-2 18h16L18 2H6z"/><path d="M6 6h12"/><path d="M10 10v4"/><path d="M14 10v4"/>
+    <path d="M6 2l-2 18h16L18 2H6z" /><path d="M6 6h12" /><path d="M10 10v4" /><path d="M14 10v4" />
   </svg>
 );
 const DessertIcon = () => (
   <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
-    <path d="M12 2a5 5 0 00-5 5c0 1 .5 2 1 3h8c.5-1 1-2 1-3a5 5 0 00-5-5z"/>
-    <path d="M8 10l-1 8h10l-1-8"/><path d="M9 18l-1 4h8l-1-4"/><line x1="12" y1="2" x2="12" y2="0"/>
+    <path d="M12 2a5 5 0 00-5 5c0 1 .5 2 1 3h8c.5-1 1-2 1-3a5 5 0 00-5-5z" />
+    <path d="M8 10l-1 8h10l-1-8" /><path d="M9 18l-1 4h8l-1-4" /><line x1="12" y1="2" x2="12" y2="0" />
   </svg>
 );
 
-const StarRating = ({ rating }) => {
-  const fullStars = Math.floor(rating);
-  const hasHalf = rating - fullStars >= 0.5;
-  return (
-    <div className="flex items-center gap-0.5">
-      {[...Array(5)].map((_, i) => (
-        <svg key={i} width="14" height="14" viewBox="0 0 20 20" fill={i < fullStars ? '#f59e0b' : (i === fullStars && hasHalf ? 'url(#half)' : '#e5e7eb')} xmlns="http://www.w3.org/2000/svg">
-          <defs><linearGradient id="half"><stop offset="50%" stopColor="#f59e0b"/><stop offset="50%" stopColor="#e5e7eb"/></linearGradient></defs>
-          <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z"/>
-        </svg>
-      ))}
-      <span className="text-xs text-gray-500 ml-1 font-medium">{rating}</span>
-    </div>
-  );
-};
+
 
 /* ───────── Static Data ───────── */
 // Static categories list removed
@@ -87,7 +74,7 @@ const defaultImages = {
 
 // Auto badges removed
 
-const formatPrice = (val) => val.toLocaleString('vi-VN') + ' VNĐ';
+const formatPrice = (val) => val.toLocaleString('vi-VN') + 'đ';
 
 const getHomeBannerImage = () => {
   try {
@@ -103,15 +90,15 @@ const getHomeBannerImage = () => {
    HOMEPAGE COMPONENT
    ═══════════════════════════════════════════════ */
 const HomePage = () => {
-  const { addItem } = useCart();
-  const [featured, setFeatured] = useState([]);
-  const [toast, setToast] = useState({ show: false, message: '' });
+  const { addItem, addCombo } = useCart();
+  const { user } = useAuth();
+  const [menuItems, setMenuItems] = useState([]);
+  const [toast, setToast] = useState({ show: false, message: '', type: 'success' });
   const [homeBanner, setHomeBanner] = useState(getHomeBannerImage);
 
   useEffect(() => {
     publicService.getHomepageData()
       .then(data => {
-        setFeatured(data.featured || []);
         if (data.banners && data.banners.length > 0) {
           const activeBanner = data.banners.find(b => b.isActive) || data.banners[0];
           setHomeBanner(activeBanner.image);
@@ -122,7 +109,21 @@ const HomePage = () => {
           localStorage.setItem('activePromotionBannerIndex', String(activeIndex !== -1 ? activeIndex : 0));
         }
       })
-      .catch(() => {});
+      .catch(() => { });
+
+    Promise.all([
+      publicService.getMenu(),
+      publicService.getCombos(),
+    ]).then(([menuData, comboData]) => {
+      const normalizedMenu = (menuData || []).map(item => ({ ...item, type: 'item' }));
+      const normalizedCombos = (comboData || []).map(combo => ({
+        ...combo,
+        type: 'combo',
+        category: COMBO_CATEGORY,
+        description: combo.description || '',
+      }));
+      setMenuItems([...normalizedMenu, ...normalizedCombos]);
+    }).catch(() => { });
   }, []);
 
   useEffect(() => {
@@ -137,24 +138,37 @@ const HomePage = () => {
     };
   }, []);
 
-  const bestSellers = featured.slice(0, 4).map((item, idx) => ({
-    ...item,
-    image: item.image 
-      ? getImageUrl(item.image, defaultImages[item.category] || '/images/home/product-burger.png') 
-      : defaultImages[item.category] || '/images/home/product-burger.png',
-    badge: null,
-    rating: item.rating || 5,
-    oldPrice: null,
-  }));
+  const bestSellers = useMemo(() => {
+    return [...menuItems]
+      .sort((a, b) => (b.soldCount || 0) - (a.soldCount || 0))
+      .slice(0, 4)
+      .map(item => {
+        const isOutOfStock = item.isAvailable === false;
+        const resolvedImage = item.image
+          ? getImageUrl(item.image, defaultImages[item.category] || '/images/home/product-burger.png')
+          : defaultImages[item.category] || '/images/home/product-burger.png';
+        return {
+          ...item,
+          isOutOfStock,
+          resolvedImage,
+        };
+      });
+  }, [menuItems]);
+
+  const showToast = (message, type = 'success') => {
+    setToast({ show: true, message, type });
+    setTimeout(() => {
+      setToast({ show: false, message: '', type: 'success' });
+    }, 3000);
+  };
 
   const handleAddToCart = (item) => {
-    addItem(item, 1);
-    setToast({ show: true, message: `Đã thêm "${item.name}" vào giỏ hàng!` });
-    
-    // Tự động tắt sau 2.5 giây
-    setTimeout(() => {
-      setToast({ show: false, message: '' });
-    }, 2500);
+    if (item.type === 'combo') {
+      addCombo(item, 1);
+    } else {
+      addItem(item, 1);
+    }
+    showToast(`Đã thêm "${item.name}" vào giỏ hàng!`, 'success');
   };
 
   return (
@@ -173,11 +187,11 @@ const HomePage = () => {
           {/* Left Text */}
           <div className="w-[48%] pr-8 py-16 pl-5">
             <h1 className="text-white text-[42px] leading-[1.15] font-black mb-5 tracking-tight">
-              Nhanh Chóng. Tươi Ngon.<br/>
+              Nhanh Chóng. Tươi Ngon.<br />
               <span className="text-yellow-300">Vô Cùng Hấp Dẫn.</span>
             </h1>
             <p className="text-white/80 text-[15px] leading-relaxed mb-8 max-w-md">
-              Trải nghiệm những món ăn tuyệt hảo với bánh mì kẹp thịt hảo hạng, gà rán giòn và pizza nướng tay. 
+              Trải nghiệm những món ăn tuyệt hảo với bánh mì kẹp thịt hảo hạng, gà rán giòn và pizza nướng tay.
               Sẵn sàng trong vài phút.
             </p>
             <div className="flex gap-4">
@@ -202,17 +216,17 @@ const HomePage = () => {
             <div className="relative w-full max-w-[500px] h-[380px]">
               {/* Main large image */}
               <div className="absolute top-0 right-0 w-[280px] h-[280px] rounded-3xl overflow-hidden shadow-2xl border-4 border-white transform rotate-2 hover:rotate-0 transition-transform duration-500 z-20">
-                <img 
+                <img
                   src={getImageUrl(homeBanner, '/images/home/hero-burger.png')}
-                  alt="Burger ngon" 
+                  alt="Burger ngon"
                   className="w-full h-full object-cover"
                 />
               </div>
               {/* Secondary image */}
               <div className="absolute bottom-0 left-4 w-[240px] h-[240px] rounded-3xl overflow-hidden shadow-2xl border-4 border-white transform -rotate-3 hover:rotate-0 transition-transform duration-500 z-10">
-                <img 
-                  src="/images/home/hero-collage.png" 
-                  alt="Đồ ăn hấp dẫn" 
+                <img
+                  src="/images/home/hero-collage.png"
+                  alt="Đồ ăn hấp dẫn"
                   className="w-full h-full object-cover"
                 />
               </div>
@@ -240,10 +254,10 @@ const HomePage = () => {
                   to={`/menu?category=${cat.name}`}
                   className="group flex flex-col items-center gap-3 no-underline w-[110px]"
                 >
-                  <div 
+                  <div
                     className="w-[72px] h-[72px] rounded-2xl flex items-center justify-center transition-all duration-300 group-hover:scale-110 group-hover:shadow-lg"
-                    style={{ 
-                      backgroundColor: `${cat.color}10`, 
+                    style={{
+                      backgroundColor: `${cat.color}10`,
                       color: cat.color,
                       border: `1.5px solid ${cat.color}25`
                     }}
@@ -279,69 +293,111 @@ const HomePage = () => {
               className="text-[#c0392b] font-semibold text-sm hover:underline no-underline flex items-center gap-1 shrink-0"
             >
               Xem Tất Cả
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M5 12h14M12 5l7 7-7 7"/></svg>
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M5 12h14M12 5l7 7-7 7" /></svg>
             </Link>
           </div>
 
           {/* Cards Grid */}
-          <div className="grid grid-cols-4 gap-5">
-            {bestSellers.map((item, idx) => (
-              <div
-                key={item._id || idx}
-                className="bg-white rounded-2xl overflow-hidden border border-gray-100 shadow-sm hover:shadow-xl hover:-translate-y-1 transition-all duration-300 group"
-              >
-                {/* Image */}
-                <div className="relative h-[200px] bg-gray-50 overflow-hidden">
-                  <img
-                    src={item.image}
-                    alt={item.name}
-                    className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
-                  />
-                  {item.badge && (
-                    <span
-                      className="absolute top-3 left-3 px-3 py-1 rounded-full text-white text-xs font-bold shadow-md"
-                      style={{ backgroundColor: item.badge.color }}
-                    >
-                      {item.badge.text}
-                    </span>
-                  )}
-                </div>
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5">
+            {bestSellers.map((item, idx) => {
+              const isOutOfStock = item.isOutOfStock;
+              return (
+                <div
+                  key={item._id || idx}
+                  className="bg-white rounded-3xl border border-gray-100 overflow-hidden shadow-sm hover:shadow-xl hover:-translate-y-1 transition-all duration-300 flex flex-col group"
+                >
+                  {/* KHU VỰC ẢNH */}
+                  <div className="h-[200px] overflow-hidden relative bg-gray-50 shrink-0">
+                    <img
+                      src={item.resolvedImage}
+                      alt={item.name}
+                      className={`w-full h-full object-cover group-hover:scale-105 transition-transform duration-500 ${isOutOfStock ? 'grayscale blur-[1px] opacity-60' : ''}`}
+                    />
 
-                {/* Info */}
-                <div className="p-4">
-                  <div className="flex items-center justify-between mb-1.5">
-                    <h3 className="text-[15px] font-bold text-gray-800 truncate pr-2">
-                      {item.name}
-                    </h3>
-                    <StarRating rating={item.rating} />
-                  </div>
-                  <p className="text-gray-400 text-xs leading-relaxed mb-4 line-clamp-2 h-8">
-                    {item.description}
-                  </p>
 
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <span className="text-[#c0392b] font-extrabold text-base">
-                        {formatPrice(item.price)}
-                      </span>
-                      {item.oldPrice && (
-                        <span className="text-gray-400 text-xs line-through ml-2">
-                          {formatPrice(item.oldPrice)}
+
+                    {/* Combo Discount Badge */}
+                    {item.type === 'combo' && !isOutOfStock && (() => {
+                      const totalItemsPrice = (item.items || []).reduce((sum, subItem) => {
+                        const price = subItem.menuItem?.price || 0;
+                        return sum + price * (subItem.quantity || 1);
+                      }, 0);
+                      return totalItemsPrice > item.price ? (
+                        <span className="absolute left-3 top-3 rounded-full bg-[#c0392b] px-3 py-1 text-[11px] font-black text-white z-10">
+                          Combo -{Math.max(10, Math.round(((totalItemsPrice - item.price) / totalItemsPrice) * 100))}%
                         </span>
+                      ) : null;
+                    })()}
+
+                    {/* Phủ Hết Hàng */}
+                    {isOutOfStock && (
+                      <div className="absolute inset-0 flex items-center justify-center bg-black/20 backdrop-blur-[0.5px]">
+                        <span className="bg-white/95 text-gray-800 text-[11px] font-black uppercase px-4 py-1.5 rounded-full shadow-md tracking-wider">
+                          Hết hàng
+                        </span>
+                      </div>
+                    )}
+                  </div>
+
+                  {/* KHU VỰC THÔNG TIN */}
+                  <div className="p-5 flex-1 flex flex-col justify-between">
+                    <div>
+                      <div className="flex items-start justify-between gap-2 mb-2">
+                        <h3 className="text-[15px] font-extrabold text-gray-800 leading-snug line-clamp-2 pr-1">
+                          {item.name}
+                        </h3>
+                        <span className="flex flex-col items-end shrink-0">
+                          {item.type === 'combo' && (() => {
+                            const totalItemsPrice = (item.items || []).reduce((sum, subItem) => {
+                              const price = subItem.menuItem?.price || 0;
+                              return sum + price * (subItem.quantity || 1);
+                            }, 0);
+                            return totalItemsPrice > item.price ? (
+                              <span className="text-xs font-bold text-gray-400 line-through">
+                                {formatPrice(totalItemsPrice)}
+                              </span>
+                            ) : null;
+                          })()}
+                          <span className="text-[#c0392b] font-black text-[16px]">
+                            {formatPrice(item.price)}
+                          </span>
+                        </span>
+                      </div>
+
+                      {item.type === 'combo' && (
+                        <div className="mb-3 rounded-2xl bg-[#f6f1ef] p-3 text-left">
+                          <div className="mb-1 text-[10px] font-black uppercase tracking-wider text-red-950">Thành phần:</div>
+                          <ul className="m-0 flex list-none flex-col gap-1 p-0">
+                            {(item.items || []).slice(0, 3).map(subItem => (
+                              <li key={subItem._id || `${subItem.menuItem?._id || subItem.menuItem}-${subItem.quantity}`} className="flex items-start gap-1 text-[11px] font-semibold text-red-950">
+                                <span className="text-[#c0392b]">⊗</span>
+                                <span>{subItem.quantity}x {subItem.menuItem?.name || subItem.name || 'Món ăn'}</span>
+                              </li>
+                            ))}
+                            {item.items?.length > 3 && (
+                              <li className="text-[10px] font-bold text-gray-500">+{item.items.length - 3} món khác</li>
+                            )}
+                          </ul>
+                        </div>
                       )}
+
+                      <p className="text-gray-400 text-xs leading-relaxed mb-4 line-clamp-2">
+                        {item.description}
+                      </p>
                     </div>
+
+                    {/* Nút thêm vào giỏ */}
                     <button
                       onClick={() => handleAddToCart(item)}
-                      className="w-9 h-9 rounded-full bg-[#c0392b] text-white flex items-center justify-center hover:bg-[#a93226] transition-colors shadow-md hover:shadow-lg focus:outline-none"
+                      disabled={isOutOfStock}
+                      className="w-full py-2.5 bg-[#c0392b] hover:bg-[#a93226] text-white font-extrabold text-[13px] rounded-2xl flex items-center justify-center gap-2 border-none cursor-pointer shadow-sm hover:shadow-md transition-all duration-300 disabled:bg-gray-200 disabled:text-gray-400 disabled:cursor-not-allowed disabled:shadow-none focus:outline-none"
                     >
-                      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                        <line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/>
-                      </svg>
+                      Thêm vào giỏ
                     </button>
                   </div>
                 </div>
-              </div>
-            ))}
+              );
+            })}
           </div>
         </div>
       </section>
@@ -382,28 +438,38 @@ const HomePage = () => {
         <div className="max-w-[1200px] mx-auto px-5 flex items-center justify-between">
           <div>
             <h2 className="text-white text-3xl font-black mb-2">
-              Đặt hàng ngay hôm nay! 🍔
+              {user ? `Chào mừng bạn quay lại, ${user.name || 'Khách hàng Sơn Đông'}! 🍔` : 'Đặt hàng ngay hôm nay! 🍔'}
             </h2>
             <p className="text-white/80 text-base">
-              Nhận ưu đãi giảm 10% cho đơn hàng đầu tiên khi đăng ký thành viên.
+              {user ? 'Hôm nay bạn muốn thưởng thức món ăn thơm ngon nào từ thực đơn của chúng tôi?' : 'Đăng ký thành viên để nhận nhiều ưu đãi hấp dẫn.'}
             </p>
           </div>
-          <Link
-            to="/register"
-            className="px-8 py-4 bg-white text-[#c0392b] font-bold rounded-full hover:bg-yellow-300 hover:text-[#991b1b] transition-all duration-300 shadow-xl no-underline text-base shrink-0"
-          >
-            Đăng Ký Ngay
-          </Link>
+          {user ? (
+            <Link
+              to="/menu"
+              className="px-8 py-4 bg-white text-[#c0392b] font-bold rounded-full hover:bg-yellow-300 hover:text-[#991b1b] transition-all duration-300 shadow-xl no-underline text-base shrink-0"
+            >
+              Xem Thực Đơn Ngay
+            </Link>
+          ) : (
+            <Link
+              to="/register"
+              className="px-8 py-4 bg-white text-[#c0392b] font-bold rounded-full hover:bg-yellow-300 hover:text-[#991b1b] transition-all duration-300 shadow-xl no-underline text-base shrink-0"
+            >
+              Đăng Ký Ngay
+            </Link>
+          )}
         </div>
       </section>
 
       {/* ===== TOAST NOTIFICATION ===== */}
       {toast.show && (
         <div className="fixed bottom-6 right-6 z-50 bg-slate-900 text-white px-5 py-3.5 rounded-xl shadow-2xl flex items-center gap-3 border border-slate-700 animate-bounce duration-300">
-          <div className="w-5 h-5 rounded-full bg-emerald-500 flex items-center justify-center text-white text-[11px] font-bold">
-            ✓
+          <div className={`w-5 h-5 rounded-full flex items-center justify-center text-white text-[11px] font-bold ${toast.type === 'success' ? 'bg-emerald-500' : 'bg-rose-500'
+            }`}>
+            {toast.type === 'success' ? '✓' : '✕'}
           </div>
-          <span className="text-sm font-medium">{toast.message}</span>
+          <span className="text-sm font-semibold">{toast.message}</span>
         </div>
       )}
 

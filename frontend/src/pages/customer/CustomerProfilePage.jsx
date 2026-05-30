@@ -70,7 +70,7 @@ const CustomerProfilePage = () => {
   const PROMO_PAGE_SIZE = 4;
   const [showAddressForm, setShowAddressForm] = useState(false);
   const [addressForm, setAddressForm] = useState({ label: 'Nhà riêng', address: '', district: '', city: 'Hồ Chí Minh' });
-  const [message, setMessage] = useState({ type: '', text: '' });
+  const [toast, setToast] = useState({ show: false, message: '', type: 'success' });
   const [saving, setSaving] = useState(false);
 
   useEffect(() => {
@@ -102,7 +102,7 @@ const CustomerProfilePage = () => {
           setAddresses([]);
         }
       } catch (error) {
-        setMessage({ type: 'error', text: 'Không thể tải hồ sơ khách hàng.' });
+        showToast('Không thể tải hồ sơ khách hàng.', 'error');
       }
     };
 
@@ -146,9 +146,9 @@ const CustomerProfilePage = () => {
 
 
 
-  const showMessage = (type, text) => {
-    setMessage({ type, text });
-    window.setTimeout(() => setMessage({ type: '', text: '' }), 3000);
+  const showToast = (message, type = 'success') => {
+    setToast({ show: true, message, type });
+    window.setTimeout(() => setToast({ show: false, message: '', type: 'success' }), 3000);
   };
 
   const handleEditProfile = () => {
@@ -159,7 +159,7 @@ const CustomerProfilePage = () => {
   const handleSaveProfile = async () => {
     const error = validateProfile(profileForm);
     if (error) {
-      showMessage('error', error);
+      showToast(error, 'error');
       return;
     }
 
@@ -172,9 +172,9 @@ const CustomerProfilePage = () => {
       setProfile(updated);
       updateCurrentUser(updated);
       setEditingProfile(false);
-      showMessage('success', 'Đã cập nhật thông tin cá nhân.');
+      showToast('Đã cập nhật thông tin cá nhân.', 'success');
     } catch (error) {
-      showMessage('error', error.response?.data?.message || 'Cập nhật thông tin thất bại.');
+      showToast(error.response?.data?.message || 'Cập nhật thông tin thất bại.', 'error');
     } finally {
       setSaving(false);
     }
@@ -209,7 +209,7 @@ const CustomerProfilePage = () => {
   const handleAddAddress = async () => {
     const error = validateAddress(addressForm);
     if (error) {
-      showMessage('error', error);
+      showToast(error, 'error');
       return;
     }
 
@@ -222,14 +222,14 @@ const CustomerProfilePage = () => {
       const nextAddresses = persistAddresses([...addresses, nextAddress]);
       await saveAddressesToProfile(nextAddresses);
     } catch (error) {
-      showMessage('error', error.response?.data?.message || 'Lưu địa chỉ thất bại.');
+      showToast(error.response?.data?.message || 'Lưu địa chỉ thất bại.', 'error');
       setSaving(false);
       return;
     }
     setSaving(false);
     setAddressForm({ label: 'Nhà riêng', address: '', district: '', city: 'Hồ Chí Minh' });
     setShowAddressForm(false);
-    showMessage('success', 'Đã thêm địa chỉ nhận hàng.');
+    showToast('Đã thêm địa chỉ nhận hàng.', 'success');
   };
 
   const handleSetDefaultAddress = async (id) => {
@@ -237,9 +237,9 @@ const CustomerProfilePage = () => {
     try {
       const nextAddresses = persistAddresses(addresses.map(item => ({ ...item, isDefault: item.id === id })));
       await saveAddressesToProfile(nextAddresses);
-      showMessage('success', 'Đã đặt địa chỉ mặc định.');
+      showToast('Đã đặt địa chỉ mặc định.', 'success');
     } catch (error) {
-      showMessage('error', error.response?.data?.message || 'Cập nhật địa chỉ thất bại.');
+      showToast(error.response?.data?.message || 'Cập nhật địa chỉ thất bại.', 'error');
     } finally {
       setSaving(false);
     }
@@ -250,9 +250,9 @@ const CustomerProfilePage = () => {
     try {
       const nextAddresses = persistAddresses(addresses.filter(item => item.id !== id));
       await saveAddressesToProfile(nextAddresses);
-      showMessage('success', 'Đã xóa địa chỉ.');
+      showToast('Đã xóa địa chỉ.', 'success');
     } catch (error) {
-      showMessage('error', error.response?.data?.message || 'Xóa địa chỉ thất bại.');
+      showToast(error.response?.data?.message || 'Xóa địa chỉ thất bại.', 'error');
     } finally {
       setSaving(false);
     }
@@ -266,12 +266,7 @@ const CustomerProfilePage = () => {
           <p className="mt-2 text-sm font-medium text-slate-500">Quản lý thông tin cá nhân, địa chỉ nhận hàng và lịch sử đơn.</p>
         </div>
 
-        {message.text && (
-          <div className={`mb-5 rounded-lg px-4 py-3 text-sm font-bold ${message.type === 'error' ? 'bg-red-50 text-red-700' : 'bg-emerald-50 text-emerald-700'
-            }`}>
-            {message.text}
-          </div>
-        )}
+
 
         <div className="grid gap-6 lg:grid-cols-[360px_1fr]">
           <aside className="space-y-6">
@@ -560,6 +555,18 @@ const CustomerProfilePage = () => {
           </main>
         </div>
       </div>
+
+      {/* ===== TOAST NOTIFICATION ===== */}
+      {toast.show && (
+        <div className="fixed bottom-6 right-6 z-50 bg-slate-900 text-white px-5 py-3.5 rounded-xl shadow-2xl flex items-center gap-3 border border-slate-700 animate-bounce duration-300">
+          <div className={`w-5 h-5 rounded-full flex items-center justify-center text-white text-[11px] font-bold ${
+            toast.type === 'success' ? 'bg-emerald-500' : 'bg-rose-500'
+          }`}>
+            {toast.type === 'success' ? '✓' : '✕'}
+          </div>
+          <span className="text-sm font-semibold">{toast.message}</span>
+        </div>
+      )}
     </div>
   );
 };

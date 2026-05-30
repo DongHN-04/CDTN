@@ -63,7 +63,7 @@ const getInitialCustomerInfo = (user) => {
 };
 
 const CheckoutPage = () => {
-  const { items, clearCart, getCartTotal, refreshCartProducts } = useCart();
+  const { items, getCartTotal, refreshCartProducts } = useCart();
   const { user, updateCurrentUser } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
@@ -208,9 +208,6 @@ const CheckoutPage = () => {
         return;
       }
 
-      localStorage.removeItem('appliedPromo');
-      localStorage.removeItem('discountAmount');
-      clearCart();
       navigate(`/payment-result?status=order-pending&orderId=${order._id}`, { replace: true });
     } catch (err) {
       showToast(err.response?.data?.message || err.message || 'Có lỗi xảy ra khi đặt hàng. Vui lòng thử lại.', 'error');
