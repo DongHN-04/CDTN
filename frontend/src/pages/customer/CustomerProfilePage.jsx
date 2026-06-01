@@ -247,7 +247,7 @@ const CustomerProfilePage = () => {
       return;
     }
     setSaving(false);
-    setAddressForm({ label: 'Nhà riêng', address: '', district: '', city: 'Hồ Chí Minh' });
+    setAddressForm({ label: 'Nhà riêng', address: '', district: '', city: 'Hà Nội' });
     setShowAddressForm(false);
     showToast('Đã thêm địa chỉ nhận hàng.', 'success');
   };
