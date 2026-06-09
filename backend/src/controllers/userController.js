@@ -143,8 +143,8 @@ const changeMyPassword = async (req, res) => {
     if (!currentPassword || !newPassword) {
       return res.status(400).json({ message: 'Vui lòng nhập đầy đủ mật khẩu hiện tại và mật khẩu mới' });
     }
-    if (newPassword.length < 6) {
-      return res.status(400).json({ message: 'Mật khẩu mới phải có ít nhất 6 ký tự' });
+    if (newPassword.length < 8) {
+      return res.status(400).json({ message: 'Mật khẩu mới phải có ít nhất 8 ký tự' });
     }
 
     const user = await User.findById(req.user._id);
@@ -248,7 +248,7 @@ const updateUser = async (req, res) => {
     user.name = req.body.name || user.name;
     user.email = nextEmail;
     user.phone = nextPhone;
-    
+
     // Cập nhật lương nếu có
     if (req.body.salary !== undefined) {
       user.salary = req.body.salary;
