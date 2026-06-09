@@ -12,7 +12,7 @@ const contactCards = [
   {
     title: 'Email',
     subtitle: 'Gửi phản hồi cho chúng tôi',
-    value: 'sondong@gmail.com',
+    value: 'sondongfood@gmail.com',
     icon: Mail,
     tone: 'bg-cyan-50 text-cyan-700',
   },

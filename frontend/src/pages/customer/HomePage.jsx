@@ -5,7 +5,6 @@ import { useCart } from '../../contexts/CartContext';
 import { useAuth } from '../../contexts/AuthContext';
 import { getImageUrl } from '../../utils/imageUrl';
 import { COMBO_CATEGORY, MENU_CATEGORIES, normalizeCategory } from '../../constants/menuCategories';
-
 /* ───────── SVG Icon Components ───────── */
 const BurgerIcon = () => (
   <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
@@ -43,19 +42,14 @@ const DessertIcon = () => (
   </svg>
 );
 
-
-
-/* ───────── Static Data ───────── */
-// Static categories list removed
-
-// Ảnh mặc định theo category
 const categoryVisuals = {
   [normalizeCategory('Burger')]: { icon: BurgerIcon, color: '#ef4444' },
-  [normalizeCategory('Gà rán')]: { icon: ChickenIcon, color: '#f97316' },
+  [normalizeCategory('Gà Rán')]: { icon: ChickenIcon, color: '#f97316' },
   [normalizeCategory('Pizza')]: { icon: PizzaIcon, color: '#ec4899' },
   [normalizeCategory(COMBO_CATEGORY)]: { icon: ComboIcon, color: '#8b5cf6' },
-  [normalizeCategory('Đồ uống')]: { icon: DrinkIcon, color: '#06b6d4' },
-  [normalizeCategory('Tráng miệng')]: { icon: DessertIcon, color: '#10b981' },
+  [normalizeCategory('Đồ Uống')]: { icon: DrinkIcon, color: '#06b6d4' },
+  [normalizeCategory('Tráng Miệng')]: { icon: DessertIcon, color: '#10b981' },
+  [normalizeCategory('Khai Vị')]: { icon: ChickenIcon, color: '#f59e0b' },
 };
 
 const adminCategories = [...MENU_CATEGORIES, COMBO_CATEGORY].map(name => ({
@@ -71,8 +65,6 @@ const defaultImages = {
   'Tráng Miệng': '/images/home/product-sandwich.png',
   'Khai Vị': '/images/home/product-chicken.png',
 };
-
-// Auto badges removed
 
 const formatPrice = (val) => val.toLocaleString('vi-VN') + 'đ';
 

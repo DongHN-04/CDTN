@@ -3,7 +3,7 @@ import { useCart } from '../../contexts/CartContext';
 import publicService from '../../services/publicService';
 import { useLocation } from 'react-router-dom';
 import { getImageUrl } from '../../utils/imageUrl';
-import { ALL_MENU_CATEGORY, COMBO_CATEGORY, MENU_CATEGORIES, normalizeCategory } from '../../constants/menuCategories';
+import { ALL_MENU_CATEGORY, COMBO_CATEGORY, MENU_CATEGORIES, normalizeCategory, standardizeCategory } from '../../constants/menuCategories';
 
 // Định nghĩa defaultImages
 const defaultImages = {
@@ -35,7 +35,11 @@ const MenuPage = () => {
       publicService.getMenu(),
       publicService.getCombos(),
     ]).then(([menuData, comboData]) => {
-      const normalizedMenu = (menuData || []).map(item => ({ ...item, type: 'item' }));
+      const normalizedMenu = (menuData || []).map(item => ({
+        ...item,
+        type: 'item',
+        category: standardizeCategory(item.category),
+      }));
       const normalizedCombos = (comboData || []).map(combo => ({
         ...combo,
         type: 'combo',
@@ -47,8 +51,9 @@ const MenuPage = () => {
   }, []);
 
   const categoriesUI = useMemo(() => {
-    const liveCategories = menuItems.map(item => item.category).filter(Boolean);
-    const categories = Array.from(new Set([...MENU_CATEGORIES, COMBO_CATEGORY, ...liveCategories]));
+    const liveCategories = menuItems.map(item => standardizeCategory(item.category)).filter(Boolean);
+    const standardizedCats = [...MENU_CATEGORIES.map(standardizeCategory), COMBO_CATEGORY, ...liveCategories];
+    const categories = Array.from(new Set(standardizedCats));
 
     return [
       { id: 'all', label: ALL_MENU_CATEGORY },

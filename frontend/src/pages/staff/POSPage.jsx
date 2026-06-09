@@ -18,15 +18,16 @@ import menuService from '../../services/menuService';
 import orderService from '../../services/orderService';
 import promotionService from '../../services/promotionService';
 import { getImageUrl } from '../../utils/imageUrl';
-import { ALL_MENU_CATEGORY, COMBO_CATEGORY, MENU_CATEGORIES, normalizeCategory } from '../../constants/menuCategories';
+import { ALL_MENU_CATEGORY, COMBO_CATEGORY, MENU_CATEGORIES, normalizeCategory, standardizeCategory } from '../../constants/menuCategories';
 import { useToast } from '../../contexts/ToastContext';
 
 const defaultImages = {
   'Burger': '/images/home/product-burger.png',
-  'Gà rán': '/images/home/product-chicken.png',
+  'Gà Rán': '/images/home/product-chicken.png',
   'Pizza': '/images/home/product-pizza.png',
-  'Đồ uống': '/images/home/product-sandwich.png',
-  'Tráng miệng': '/images/home/product-sandwich.png',
+  'Đồ Uống': '/images/home/product-sandwich.png',
+  'Tráng Miệng': '/images/home/product-sandwich.png',
+  'Khai Vị': '/images/home/product-chicken.png',
   'Combo': '/images/home/product-burger.png',
 };
 
@@ -64,7 +65,11 @@ const POSPage = () => {
         ]);
 
         const activeCombos = comboData.filter(combo => combo.isActive !== false);
-        setMenuItems(menuData || []);
+        const standardizedMenu = (menuData || []).map(item => ({
+          ...item,
+          category: standardizeCategory(item.category),
+        }));
+        setMenuItems(standardizedMenu);
         setCombos(activeCombos);
         setPromotions(promoData.filter(promo => promo.isActive !== false));
       } catch (error) {

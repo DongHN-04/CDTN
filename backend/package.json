@@ -5,7 +5,8 @@
   "scripts": {
     "start": "node src/index.js",
     "dev": "nodemon src/index.js",
-    "seed": "node src/utils/runSeed.js"
+    "seed": "node src/utils/runSeed.js",
+    "export": "node src/utils/exportData.js"
   },
   "keywords": [],
   "author": "",
@@ -16,6 +17,7 @@
     "cloudinary": "^1.41.3",
     "cors": "^2.8.6",
     "dotenv": "^17.4.2",
+    "exceljs": "^4.4.0",
     "express": "^5.2.1",
     "jsonwebtoken": "^9.0.3",
     "mongoose": "^9.5.0",
