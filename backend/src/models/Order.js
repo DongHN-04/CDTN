@@ -45,6 +45,8 @@ const orderSchema = new mongoose.Schema({
   paymentStatus: { type: String, enum: ['unpaid', 'paid', 'failed'], default: 'unpaid' },
   txnRef: { type: String, default: '' },
   completedAt: { type: Date },
+  cancelledAt: { type: Date },
+  cancelReason: { type: String, default: '' },
   inventoryDeducted: { type: Boolean, default: false },
   status: {
     type: String,

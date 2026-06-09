@@ -505,7 +505,7 @@ const confirmOrder = async (req, res) => {
 const updateOrderStatus = async (req, res) => {
   try {
     const allowedStatuses = ['pending', 'confirmed', 'delivering', 'completed', 'cancelled'];
-    const { status } = req.body;
+    const { status, cancelReason } = req.body;
 
     if (!allowedStatuses.includes(status)) {
       return res.status(400).json({ message: 'Trạng thái đơn hàng không hợp lệ' });
@@ -537,6 +537,8 @@ const updateOrderStatus = async (req, res) => {
           await releaseReservedStockForOrder(order, session);
         }
         order.status = 'cancelled';
+        order.cancelReason = cancelReason;
+        order.cancelledAt = new Date();
         await order.save({ session });
         return order._id;
       }

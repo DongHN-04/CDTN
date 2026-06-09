@@ -7,6 +7,8 @@ const ConfirmDeleteModal = ({
   confirmText = 'Xóa',
   cancelText = 'Hủy',
   loading = false,
+  confirmDisabled = false,
+  children,
   onCancel,
   onConfirm,
 }) => {
@@ -18,6 +20,7 @@ const ConfirmDeleteModal = ({
         <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-full bg-red-50 text-2xl font-black text-red-600">!</div>
         <h2 className="m-0 text-xl font-black text-gray-950">{title}</h2>
         <p className="mt-2 text-sm font-medium text-gray-500">{message}</p>
+        {children}
         <div className="mt-6 flex gap-3">
           <button
             type="button"
@@ -30,7 +33,7 @@ const ConfirmDeleteModal = ({
           <button
             type="button"
             onClick={onConfirm}
-            disabled={loading}
+            disabled={loading || confirmDisabled}
             className="flex-1 rounded-xl bg-[#c70d1a] px-4 py-3 text-sm font-black text-white disabled:opacity-60"
           >
             {loading ? 'Đang xóa...' : confirmText}

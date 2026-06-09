@@ -42,8 +42,8 @@ const orderService = {
     return response.data;
   },
 
-  updateOrderStatus: async (id, status) => {
-    const response = await axios.put(API_URL + id + '/status', { status }, { headers: getAuthHeader() });
+  updateOrderStatus: async (id, status, extra = {}) => {
+    const response = await axios.put(API_URL + id + '/status', { status, ...extra }, { headers: getAuthHeader() });
     return response.data;
   }
 };

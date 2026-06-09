@@ -319,9 +319,8 @@ const EmployeeManagementPage = () => {
                 key={page}
                 type="button"
                 onClick={() => setCurrentPage(page)}
-                className={`flex h-8 w-8 items-center justify-center rounded-full ${
-                  currentPage === page ? 'bg-[#c70d1a] font-black text-white' : 'border border-gray-100 text-gray-600'
-                }`}
+                className={`flex h-8 w-8 items-center justify-center rounded-full ${currentPage === page ? 'bg-[#c70d1a] font-black text-white' : 'border border-gray-100 text-gray-600'
+                  }`}
               >
                 {page}
               </button>
@@ -432,7 +431,7 @@ const EmployeeFormModal = ({ formData, setFormData, editingEmployee, onSubmit, o
             type="password"
             value={formData.password}
             onChange={event => setFormData({ ...formData, password: event.target.value })}
-            placeholder={editingEmployee ? 'Bỏ trống nếu không đổi' : 'Tối thiểu 6 ký tự'}
+            placeholder={editingEmployee ? 'Bỏ trống nếu không đổi' : 'Tối thiểu 8 ký tự'}
             autoComplete="new-password"
             className={inputClass}
             required={!editingEmployee}

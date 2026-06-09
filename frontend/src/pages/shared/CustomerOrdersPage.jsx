@@ -90,6 +90,8 @@ const CustomerOrdersPage = () => {
   const [updatingId, setUpdatingId] = useState('');
   const [currentPage, setCurrentPage] = useState(1);
   const [cancelOrder, setCancelOrder] = useState(null);
+  const [cancelReason, setCancelReason] = useState('');
+  const [cancelReasonError, setCancelReasonError] = useState('');
 
   const fetchOrders = useCallback(async () => {
     setLoading(true);
@@ -190,17 +192,19 @@ const CustomerOrdersPage = () => {
     if (currentPage > totalPages) setCurrentPage(totalPages);
   }, [currentPage, totalPages]);
 
-  const updateStatus = async (order, status) => {
+  const updateStatus = async (order, status, extra = {}) => {
     setUpdatingId(order._id);
     setError('');
     try {
-      const updated = await orderService.updateOrderStatus(order._id, status);
+      const updated = await orderService.updateOrderStatus(order._id, status, extra);
       setOrders(current => current.map(item => item._id === updated._id ? updated : item));
       showToast('Đã cập nhật trạng thái đơn hàng');
+      return updated;
     } catch (err) {
       const message = err.response?.data?.message || 'Không thể cập nhật đơn hàng';
       setError(message);
       showToast(message, 'error');
+      return null;
     } finally {
       setUpdatingId('');
     }
@@ -213,12 +217,30 @@ const CustomerOrdersPage = () => {
 
   const handleCancelClick = (order) => {
     setCancelOrder(order);
+    setCancelReason('');
+    setCancelReasonError('');
   };
 
   const confirmCancelOrder = async () => {
     if (!cancelOrder) return;
-    await updateStatus(cancelOrder, 'cancelled');
+    const reason = cancelReason.trim();
+    if (!reason) {
+      setCancelReasonError('Vui lòng nhập lý do hủy đơn');
+      return;
+    }
+
+    const updated = await updateStatus(cancelOrder, 'cancelled', { cancelReason: reason });
+    if (updated) {
+      setCancelOrder(null);
+      setCancelReason('');
+      setCancelReasonError('');
+    }
+  };
+
+  const closeCancelModal = () => {
     setCancelOrder(null);
+    setCancelReason('');
+    setCancelReasonError('');
   };
 
   const clearDateFilters = () => {
@@ -442,9 +464,28 @@ const CustomerOrdersPage = () => {
         confirmText="Hủy đơn"
         cancelText="Không"
         loading={updatingId === cancelOrder?._id}
-        onCancel={() => setCancelOrder(null)}
+        confirmDisabled={!cancelReason.trim()}
+        onCancel={closeCancelModal}
         onConfirm={confirmCancelOrder}
-      />
+      >
+        <label className="mt-4 block text-left">
+          <span className="text-xs font-black uppercase tracking-wider text-gray-500">Lý do hủy</span>
+          <textarea
+            value={cancelReason}
+            onChange={event => {
+              setCancelReason(event.target.value);
+              if (cancelReasonError) setCancelReasonError('');
+            }}
+            maxLength={1000}
+            rows={4}
+            className="mt-2 w-full resize-none rounded-xl border border-gray-200 bg-white px-3 py-3 text-sm font-semibold text-gray-800 outline-none transition focus:border-[#c0392b] focus:ring-2 focus:ring-red-100"
+            placeholder="Nhập lý do hủy đơn"
+          />
+        </label>
+        {cancelReasonError && (
+          <p className="mt-2 text-left text-xs font-bold text-red-600">{cancelReasonError}</p>
+        )}
+      </ConfirmDeleteModal>
     </div>
   );
 };

@@ -648,8 +648,8 @@ const validatePasswordChange = validateBody((body, errors) => {
   const newPassword = body.newPassword;
 
   requireNonEmpty(errors, 'currentPassword', currentPassword, 'Mật khẩu hiện tại là bắt buộc');
-  if (typeof newPassword !== 'string' || newPassword.length < 6) {
-    errors.push({ field: 'newPassword', message: 'Mật khẩu mới phải có ít nhất 6 ký tự' });
+  if (typeof newPassword !== 'string' || newPassword.length < 8) {
+    errors.push({ field: 'newPassword', message: 'Mật khẩu mới phải có ít nhất 8 ký tự' });
   }
   if (currentPassword && newPassword && currentPassword === newPassword) {
     errors.push({ field: 'newPassword', message: 'Mật khẩu mới không được trùng mật khẩu hiện tại' });
@@ -735,11 +735,16 @@ const validatePaymentCreate = validateBody((body, errors) => {
 
 const validateOrderStatusUpdate = validateBody((body, errors) => {
   const status = trimString(body.status);
+  const cancelReason = trimString(body.cancelReason || '');
   const allowedStatuses = ['pending', 'confirmed', 'delivering', 'completed', 'cancelled'];
   if (!allowedStatuses.includes(status)) {
     errors.push({ field: 'status', message: 'Trạng thái đơn hàng không hợp lệ' });
   }
-  return { status };
+  if (status === 'cancelled') {
+    requireNonEmpty(errors, 'cancelReason', cancelReason, 'Lý do hủy đơn là bắt buộc');
+    validateTextLength(errors, 'cancelReason', cancelReason, LIMITS.notes);
+  }
+  return { status, cancelReason };
 });
 
 const validateBannerCreate = validateBody((body, errors) => {

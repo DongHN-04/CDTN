@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { CalendarDays, Home, MapPin, PackageCheck, Pencil, Plus, Save, TicketPercent, Trash2, X } from 'lucide-react';
+import { CalendarDays, Home, Lock, MapPin, PackageCheck, Pencil, Plus, Save, TicketPercent, Trash2, X } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
 import publicService from '../../services/publicService';
 import userService from '../../services/userService';
@@ -77,6 +77,15 @@ const validateAddress = ({ label, address, district }) => {
   return '';
 };
 
+const validatePasswordForm = ({ currentPassword, newPassword, confirmPassword }) => {
+  if (!currentPassword) return 'Vui lòng nhập mật khẩu hiện tại.';
+  if (!newPassword) return 'Vui lòng nhập mật khẩu mới.';
+  if (newPassword.length < 8) return 'Mật khẩu mới phải có ít nhất 8 ký tự.';
+  if (newPassword === currentPassword) return 'Mật khẩu mới không được trùng mật khẩu hiện tại.';
+  if (newPassword !== confirmPassword) return 'Mật khẩu nhập lại không khớp.';
+  return '';
+};
+
 const CustomerProfilePage = () => {
   const { user, updateCurrentUser } = useAuth();
   const [profile, setProfile] = useState(user);
@@ -92,6 +101,13 @@ const CustomerProfilePage = () => {
   const [addressForm, setAddressForm] = useState({ label: 'Nhà riêng', address: '', district: '', city: 'Hà Nội' });
   const [toast, setToast] = useState({ show: false, message: '', type: 'success' });
   const [saving, setSaving] = useState(false);
+  const [showPasswordModal, setShowPasswordModal] = useState(false);
+  const [passwordSaving, setPasswordSaving] = useState(false);
+  const [passwordForm, setPasswordForm] = useState({
+    currentPassword: '',
+    newPassword: '',
+    confirmPassword: '',
+  });
 
   useEffect(() => {
     const fetchProfile = async () => {
@@ -278,6 +294,40 @@ const CustomerProfilePage = () => {
     }
   };
 
+  const closePasswordModal = () => {
+    if (passwordSaving) return;
+    setShowPasswordModal(false);
+    setPasswordForm({ currentPassword: '', newPassword: '', confirmPassword: '' });
+  };
+
+  const handlePasswordChange = event => {
+    setPasswordForm(current => ({ ...current, [event.target.name]: event.target.value }));
+  };
+
+  const handleChangePassword = async event => {
+    event.preventDefault();
+    const error = validatePasswordForm(passwordForm);
+    if (error) {
+      showToast(error, 'error');
+      return;
+    }
+
+    setPasswordSaving(true);
+    try {
+      await userService.changePassword({
+        currentPassword: passwordForm.currentPassword,
+        newPassword: passwordForm.newPassword,
+      });
+      setShowPasswordModal(false);
+      setPasswordForm({ currentPassword: '', newPassword: '', confirmPassword: '' });
+      showToast('Đã đổi mật khẩu thành công.', 'success');
+    } catch (error) {
+      showToast(error.response?.data?.message || 'Đổi mật khẩu thất bại.', 'error');
+    } finally {
+      setPasswordSaving(false);
+    }
+  };
+
   return (
     <div className="bg-[#fbf7f4] py-10 text-slate-950">
       <div className="mx-auto max-w-6xl px-5">
@@ -344,6 +394,24 @@ const CustomerProfilePage = () => {
                   </button>
                 )}
               </div>
+            </section>
+
+            <section className="rounded-lg border border-red-50 bg-white p-5 shadow-sm">
+              <div className="mb-4 flex items-center justify-between">
+                <div>
+                  <h2 className="m-0 text-lg font-black">Bảo mật</h2>
+                  <p className="m-0 mt-1 text-xs font-semibold text-slate-500">Cập nhật mật khẩu tài khoản khách hàng.</p>
+                </div>
+                <Lock size={18} className="text-[#c0392b]" />
+              </div>
+              <button
+                type="button"
+                onClick={() => setShowPasswordModal(true)}
+                className="inline-flex h-10 w-full items-center justify-center gap-2 rounded-lg bg-[#c0392b] text-sm font-black text-white"
+              >
+                <Lock size={15} />
+                Đổi mật khẩu
+              </button>
             </section>
 
             <section className="rounded-lg border border-red-50 bg-white p-5 shadow-sm">
@@ -582,6 +650,73 @@ const CustomerProfilePage = () => {
             {toast.type === 'success' ? '✓' : '✕'}
           </div>
           <span className="text-sm font-semibold">{toast.message}</span>
+        </div>
+      )}
+
+      {showPasswordModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/35 px-4">
+          <div className="w-full max-w-md rounded-lg bg-white p-6 shadow-2xl">
+            <div className="mb-5 flex items-start justify-between gap-4">
+              <div>
+                <h2 className="m-0 text-xl font-black text-slate-950">Đổi mật khẩu</h2>
+                <p className="mt-1 text-sm font-medium text-slate-500">Mật khẩu mới phải có ít nhất 8 ký tự.</p>
+              </div>
+              <button type="button" onClick={closePasswordModal} disabled={passwordSaving} className="text-slate-400 disabled:opacity-60">
+                <X size={18} />
+              </button>
+            </div>
+
+            <form onSubmit={handleChangePassword} className="space-y-4">
+              <Field label="Mật khẩu hiện tại">
+                <input
+                  type="password"
+                  name="currentPassword"
+                  value={passwordForm.currentPassword}
+                  onChange={handlePasswordChange}
+                  className={inputClass}
+                  autoComplete="current-password"
+                />
+              </Field>
+              <Field label="Mật khẩu mới">
+                <input
+                  type="password"
+                  name="newPassword"
+                  value={passwordForm.newPassword}
+                  onChange={handlePasswordChange}
+                  className={inputClass}
+                  autoComplete="new-password"
+                />
+              </Field>
+              <Field label="Nhập lại mật khẩu mới">
+                <input
+                  type="password"
+                  name="confirmPassword"
+                  value={passwordForm.confirmPassword}
+                  onChange={handlePasswordChange}
+                  className={inputClass}
+                  autoComplete="new-password"
+                />
+              </Field>
+
+              <div className="flex gap-3 pt-2">
+                <button
+                  type="button"
+                  onClick={closePasswordModal}
+                  disabled={passwordSaving}
+                  className="flex-1 rounded-lg bg-slate-100 px-4 py-3 text-sm font-black text-slate-600 disabled:opacity-60"
+                >
+                  Hủy
+                </button>
+                <button
+                  type="submit"
+                  disabled={passwordSaving}
+                  className="flex-1 rounded-lg bg-[#c0392b] px-4 py-3 text-sm font-black text-white disabled:opacity-60"
+                >
+                  {passwordSaving ? 'Đang lưu...' : 'Lưu mật khẩu'}
+                </button>
+              </div>
+            </form>
+          </div>
         </div>
       )}
     </div>
