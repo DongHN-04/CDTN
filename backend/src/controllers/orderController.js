@@ -248,7 +248,7 @@ const getPromotionDiscount = async (subtotal, promotionId, session = null) => {
 };
 
 const releaseReservedStockForOrder = async (order, session = null) => {
-  if (!order || !order.inventoryDeducted || order.status !== 'pending') return;
+  if (!order || !order.inventoryDeducted || !['pending', 'confirmed'].includes(order.status)) return;
 
   let requirements = (order.inventoryRequirements || []).map((requirement) => ({
     ingredientId: requirement.ingredient,

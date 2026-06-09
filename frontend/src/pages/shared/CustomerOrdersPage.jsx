@@ -2,6 +2,7 @@ import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import orderService from '../../services/orderService';
 import { useToast } from '../../contexts/ToastContext';
+import ConfirmDeleteModal from '../../components/ConfirmDeleteModal';
 
 const statusConfig = {
   pending: { label: 'Chờ xác nhận', badge: 'bg-blue-50 text-blue-700', dot: 'bg-blue-500' },
@@ -68,6 +69,13 @@ const getNextStatus = (order) => {
   if (!order?.isCustomerOrder && order?.status === 'confirmed') return 'completed';
   return nextStatus[order?.status];
 };
+const getCancelConfirmMessage = (order) => {
+  if (['pending', 'confirmed'].includes(order?.status)) {
+    return 'Bạn có chắc chắn muốn hủy đơn hàng này không? Nếu hủy đơn sẽ được hoàn kho.';
+  }
+
+  return 'Bạn có chắc chắn muốn hủy đơn hàng này không? Nếu hủy đơn sẽ không được hoàn kho.';
+};
 
 const CustomerOrdersPage = () => {
   const { showToast } = useToast();
@@ -81,6 +89,7 @@ const CustomerOrdersPage = () => {
   const [yearFilter, setYearFilter] = useState('all');
   const [updatingId, setUpdatingId] = useState('');
   const [currentPage, setCurrentPage] = useState(1);
+  const [cancelOrder, setCancelOrder] = useState(null);
 
   const fetchOrders = useCallback(async () => {
     setLoading(true);
@@ -200,6 +209,16 @@ const CustomerOrdersPage = () => {
   const handlePrimaryAction = (order) => {
     const target = getNextStatus(order);
     if (target) updateStatus(order, target);
+  };
+
+  const handleCancelClick = (order) => {
+    setCancelOrder(order);
+  };
+
+  const confirmCancelOrder = async () => {
+    if (!cancelOrder) return;
+    await updateStatus(cancelOrder, 'cancelled');
+    setCancelOrder(null);
   };
 
   const clearDateFilters = () => {
@@ -358,7 +377,7 @@ const CustomerOrdersPage = () => {
                         )}
                         {!['completed', 'cancelled'].includes(order.status) && (
                           <button
-                            onClick={() => updateStatus(order, 'cancelled')}
+                            onClick={() => handleCancelClick(order)}
                             disabled={updatingId === order._id}
                             className="rounded-lg border border-gray-200 px-3 py-2 text-xs font-bold text-gray-600 disabled:opacity-60"
                           >
@@ -416,6 +435,16 @@ const CustomerOrdersPage = () => {
           </div>
         </div>
       </div>
+      <ConfirmDeleteModal
+        isOpen={Boolean(cancelOrder)}
+        title="Hủy đơn hàng?"
+        message={getCancelConfirmMessage(cancelOrder)}
+        confirmText="Hủy đơn"
+        cancelText="Không"
+        loading={updatingId === cancelOrder?._id}
+        onCancel={() => setCancelOrder(null)}
+        onConfirm={confirmCancelOrder}
+      />
     </div>
   );
 };
