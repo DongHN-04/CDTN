@@ -61,7 +61,7 @@ const districts = [
   'Ứng Hòa',
 ];
 
-const formatPrice = (value) => `${Number(value || 0).toLocaleString('vi-VN')}đ`;
+const formatPrice = (value) => `${Number(value || 0).toLocaleString('vi-VN')} VNĐ`;
 
 const getInitialCustomerInfo = (user) => {
   if (user?.role !== 'customer') {

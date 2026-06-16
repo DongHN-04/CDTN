@@ -89,58 +89,59 @@ const forgotPassword = asyncHandler(async (req, res) => {
     throw new ApiError(404, 'Không tìm thấy tài khoản với email này');
   }
 
-  const resetToken = crypto.randomBytes(20).toString('hex');
+  // Generate a 6-digit OTP
+  const otp = Math.floor(100000 + Math.random() * 900000).toString();
 
   user.resetPasswordToken = crypto
     .createHash('sha256')
-    .update(resetToken)
+    .update(otp)
     .digest('hex');
 
   user.resetPasswordExpires = Date.now() + 3600000;
 
   await user.save();
 
-  const resetUrl = `${process.env.CLIENT_URL || 'http://localhost:3000'}/reset-password/${resetToken}`;
-
   console.log('========================================================');
   console.log(`Yêu cầu đặt lại mật khẩu cho email: ${email}`);
-  console.log(`Link khôi phục mật khẩu (Reset Link): ${resetUrl}`);
-  console.log(`Mã khôi phục (Reset Token): ${resetToken}`);
+  console.log(`Mã khôi phục OTP: ${otp}`);
   console.log('========================================================');
 
   const responseData = {
-    message: 'Yêu cầu khôi phục mật khẩu thành công. Vui lòng kiểm tra email của bạn (hoặc console backend để lấy link).',
+    message: 'Yêu cầu khôi phục mật khẩu thành công. Hệ thống đã tạo mã OTP cho bạn.',
   };
   
   if (process.env.NODE_ENV !== 'production') {
-    responseData.resetToken = resetToken;
-    responseData.resetUrl = resetUrl;
-    responseData.debugInfo = 'Chế độ DEVELOPMENT: Trả về link reset trực tiếp trong phản hồi API.';
+    responseData.resetToken = otp; // Gửi mã OTP về Frontend trong chế độ DEV
+    responseData.debugInfo = 'Chế độ DEVELOPMENT: Trả về mã OTP trực tiếp trong phản hồi API.';
   }
 
   res.status(200).json(responseData);
 });
 
 const resetPassword = asyncHandler(async (req, res) => {
-  const { token } = req.params;
-  const { password } = req.body;
+  const { email, otp, password } = req.body;
 
   if (typeof password !== 'string' || password.length < 8 || !/[A-Za-z]/.test(password) || !/[0-9]/.test(password)) {
     throw new ApiError(400, 'Mật khẩu phải có ít nhất 8 ký tự, gồm chữ và số');
   }
 
-  const hashedToken = crypto
+  if (!otp || typeof otp !== 'string') {
+    throw new ApiError(400, 'Vui lòng cung cấp mã OTP');
+  }
+
+  const hashedOTP = crypto
     .createHash('sha256')
-    .update(token)
+    .update(otp)
     .digest('hex');
 
   const user = await User.findOne({
-    resetPasswordToken: hashedToken,
+    email,
+    resetPasswordToken: hashedOTP,
     resetPasswordExpires: { $gt: Date.now() },
   });
 
   if (!user || user.isDeleted === true) {
-    throw new ApiError(400, 'Mã khôi phục mật khẩu không hợp lệ hoặc đã hết hạn');
+    throw new ApiError(400, 'Mã OTP không hợp lệ hoặc đã hết hạn');
   }
 
   user.password = password;
@@ -154,4 +155,29 @@ const resetPassword = asyncHandler(async (req, res) => {
   });
 });
 
-module.exports = { registerUser, loginUser, forgotPassword, resetPassword };
+const verifyOTP = asyncHandler(async (req, res) => {
+  const { email, otp } = req.body;
+
+  if (!email || !otp) {
+    throw new ApiError(400, 'Vui lòng cung cấp email và mã OTP');
+  }
+
+  const hashedOTP = crypto
+    .createHash('sha256')
+    .update(otp)
+    .digest('hex');
+
+  const user = await User.findOne({
+    email,
+    resetPasswordToken: hashedOTP,
+    resetPasswordExpires: { $gt: Date.now() },
+  });
+
+  if (!user || user.isDeleted === true) {
+    throw new ApiError(400, 'Mã OTP không hợp lệ hoặc đã hết hạn');
+  }
+
+  res.status(200).json({ message: 'Mã OTP hợp lệ', valid: true });
+});
+
+module.exports = { registerUser, loginUser, forgotPassword, verifyOTP, resetPassword };

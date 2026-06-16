@@ -7,7 +7,7 @@ import { useToast } from '../../contexts/ToastContext';
 import { formatApiError } from '../../utils/apiError';
 
 const pageSize = 5;
-const formatCurrency = (value = 0) => `${Number(value || 0).toLocaleString('vi-VN')}đ`;
+const formatCurrency = (value = 0) => `${Number(value || 0).toLocaleString('vi-VN')} VNĐ`;
 const formatLastPurchase = (value) => {
   if (!value) return 'Chưa mua hàng';
   const date = new Date(value);

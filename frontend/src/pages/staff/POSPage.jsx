@@ -34,7 +34,7 @@ const defaultImages = {
 const categories = [ALL_MENU_CATEGORY, ...MENU_CATEGORIES, COMBO_CATEGORY];
 
 const formatCurrency = value =>
-  new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND' }).format(Math.max(0, Math.round(value || 0)));
+  `${Number(Math.max(0, Math.round(value || 0))).toLocaleString('vi-VN')} VNĐ`;
 
 const getCartLineId = item => (item.type === 'combo' ? item.comboId : item.menuItem?._id);
 
@@ -48,7 +48,7 @@ const POSPage = () => {
   const [selectedCategory, setSelectedCategory] = useState(ALL_MENU_CATEGORY);
   const [search, setSearch] = useState('');
   const [customer, setCustomer] = useState({ name: '', phone: '' });
-  const [selectedPromoId, setSelectedPromoId] = useState('auto');
+  const [selectedPromoId, setSelectedPromoId] = useState('');
   const [discount, setDiscount] = useState(0);
   const [paymentMethod, setPaymentMethod] = useState('cash');
   const [loading, setLoading] = useState(false);
@@ -105,8 +105,8 @@ const POSPage = () => {
   }, [cartTotal, promotions]);
 
   useEffect(() => {
-    if (selectedPromoId === 'auto') {
-      setDiscount(applicablePromotions[0]?.discountValue || 0);
+    if (!selectedPromoId) {
+      setDiscount(0);
       return;
     }
 
@@ -114,7 +114,8 @@ const POSPage = () => {
     if (promo) {
       setDiscount(promo.discountValue);
     } else {
-      setSelectedPromoId('auto');
+      setSelectedPromoId('');
+      setDiscount(0);
     }
   }, [applicablePromotions, selectedPromoId]);
 
@@ -174,13 +175,13 @@ const POSPage = () => {
         items: orderItems,
         discount,
         paymentMethod,
-        promotionId: selectedPromoId !== 'auto' ? selectedPromoId : null,
+        promotionId: selectedPromoId ? selectedPromoId : null,
       });
 
       showToast(`Đã tạo hóa đơn #${order._id.slice(-6)} với tổng tiền ${formatCurrency(order.total || grandTotal)}.`);
       clearCart();
       setCustomer({ name: '', phone: '' });
-      setSelectedPromoId('auto');
+      setSelectedPromoId('');
     } catch (error) {
       const errMsg = error.response?.data?.message || error.message || 'Không thể tạo đơn hàng.';
       showToast(errMsg, 'error');
@@ -189,9 +190,7 @@ const POSPage = () => {
     }
   };
 
-  const selectedPromo = selectedPromoId === 'auto'
-    ? applicablePromotions[0]
-    : applicablePromotions.find(item => item._id === selectedPromoId);
+  const selectedPromo = applicablePromotions.find(item => item._id === selectedPromoId);
 
   return (
     <div className="min-h-full bg-[#fbf7f4] text-slate-900 -m-6 sm:-m-8">
@@ -433,7 +432,7 @@ const POSPage = () => {
                 onChange={event => setSelectedPromoId(event.target.value)}
                 className="min-w-0 flex-1 bg-transparent text-sm font-semibold outline-none"
               >
-                <option value="auto">Tự động chọn voucher tốt nhất</option>
+                <option value="">Chọn mã giảm giá</option>
                 {applicablePromotions.map(promo => (
                   <option key={promo._id} value={promo._id}>
                     {promo.name} - giảm {formatCurrency(promo.discountValue)}

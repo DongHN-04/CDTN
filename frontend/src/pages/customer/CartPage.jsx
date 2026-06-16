@@ -354,7 +354,7 @@ const CartPage = () => {
                   <option value="">Chọn mã giảm giá</option>
                   {savedUsablePromotions.map(promo => (
                     <option key={promo._id || promo.name} value={promo.name}>
-                      {promo.name} - Giảm {promo.type === 'percent' ? `${promo.value}%` : `${Number(promo.value || 0).toLocaleString('vi-VN')}đ`} (Đơn từ {Number(promo.minOrderValue || 0).toLocaleString('vi-VN')}đ)
+                      {promo.name} - Giảm {promo.type === 'percent' ? `${promo.value}%` : `${Number(promo.value || 0).toLocaleString('vi-VN')} VNĐ`} (Đơn từ {Number(promo.minOrderValue || 0).toLocaleString('vi-VN')} VNĐ)
                     </option>
                   ))}
               </select>
@@ -363,7 +363,7 @@ const CartPage = () => {
                   ✓ Đang áp dụng mã: <strong className="font-extrabold">{appliedPromo}</strong>
                   {activePromoInfo && (
                     <span className="text-gray-500 font-semibold ml-1">
-                      (Giảm {activePromoInfo.type === 'percent' ? `${activePromoInfo.value}%` : `${Number(activePromoInfo.value || 0).toLocaleString('vi-VN')}đ`} cho đơn từ {Number(activePromoInfo.minOrderValue || 0).toLocaleString('vi-VN')}đ)
+                      (Giảm {activePromoInfo.type === 'percent' ? `${activePromoInfo.value}%` : `${Number(activePromoInfo.value || 0).toLocaleString('vi-VN')} VNĐ`} cho đơn từ {Number(activePromoInfo.minOrderValue || 0).toLocaleString('vi-VN')} VNĐ)
                     </span>
                   )}
                 </span>

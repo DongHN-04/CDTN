@@ -24,7 +24,7 @@ const formatDateInput = (date) => {
   return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}T${pad(date.getHours())}:${pad(date.getMinutes())}`;
 };
 
-const formatCurrency = (value = 0) => `${Number(value).toLocaleString('vi-VN')}₫`;
+const formatCurrency = (value = 0) => `${Number(value).toLocaleString('vi-VN')} VNĐ`;
 
 const getMonday = (date) => {
   const result = new Date(date);

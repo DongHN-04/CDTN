@@ -11,9 +11,9 @@ const pageSize = 5;
 const formatCurrency = (value = 0, compact = false) => {
   const number = Number(value || 0);
   if (compact && Math.abs(number) >= 1000000) {
-    return `${(number / 1000000).toLocaleString('vi-VN', { maximumFractionDigits: 1 })}Mđ`;
+    return `${(number / 1000000).toLocaleString('vi-VN', { maximumFractionDigits: 1 })}M VNĐ`;
   }
-  return `${number.toLocaleString('vi-VN')}đ`;
+  return `${number.toLocaleString('vi-VN')} VNĐ`;
 };
 
 const SupplierManagementPage = () => {

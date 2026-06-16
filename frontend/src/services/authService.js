@@ -39,8 +39,14 @@ const forgotPassword = async (email) => {
 };
 
 // Đặt lại mật khẩu
-const resetPassword = async (token, password) => {
-  const response = await axios.post(API_URL + 'reset-password/' + token, { password });
+const resetPassword = async (email, otp, password) => {
+  const response = await axios.post(API_URL + 'reset-password', { email, otp, password });
+  return response.data;
+};
+
+// Xác minh OTP
+const verifyOTP = async (email, otp) => {
+  const response = await axios.post(API_URL + 'verify-otp', { email, otp });
   return response.data;
 };
 
@@ -50,6 +56,7 @@ const authService = {
   logout,
   getCurrentUser,
   forgotPassword,
+  verifyOTP,
   resetPassword,
 };
 

@@ -10,7 +10,7 @@ const formatCurrency = (value = 0, compact = false) => {
   if (compact && Math.abs(number) >= 1000000) {
     return `${(number / 1000000).toLocaleString('vi-VN', { maximumFractionDigits: 1 })}M`;
   }
-  return `${number.toLocaleString('vi-VN')}đ`;
+  return `${number.toLocaleString('vi-VN')} VNĐ`;
 };
 
 const getPaymentStatus = (purchase) => {

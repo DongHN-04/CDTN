@@ -36,7 +36,7 @@ const formatDateText = (value) => {
   return new Date(value).toLocaleDateString('vi-VN');
 };
 
-const formatCurrency = (value = 0) => `${Number(value).toLocaleString('vi-VN')} ₫`;
+const formatCurrency = (value = 0) => `${Number(value).toLocaleString('vi-VN')} VNĐ`;
 
 const getPromotionStatus = (promotion) => {
   const now = new Date();

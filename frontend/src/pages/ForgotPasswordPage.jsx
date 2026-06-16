@@ -1,15 +1,32 @@
 import React, { useState } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import authService from '../services/authService';
 import { useToast } from '../contexts/ToastContext';
-import { Mail, ArrowRight, Utensils, ArrowLeft, CheckCircle } from 'lucide-react';
+import { Mail, ArrowRight, Utensils, ArrowLeft, CheckCircle, KeyRound } from 'lucide-react';
 
 const ForgotPasswordPage = () => {
   const [email, setEmail] = useState('');
   const [loading, setLoading] = useState(false);
   const [success, setSuccess] = useState(false);
-  const [resetUrl, setResetUrl] = useState('');
+  const [otpCode, setOtpCode] = useState('');
+  const [otpInput, setOtpInput] = useState('');
+  const [verifying, setVerifying] = useState(false);
   const { showToast } = useToast();
+  const navigate = useNavigate();
+
+  const handleVerifyOTP = async (e) => {
+    e.preventDefault();
+    setVerifying(true);
+    try {
+      await authService.verifyOTP(email, otpInput);
+      showToast('Xác minh thành công, vui lòng đặt lại mật khẩu!', 'success');
+      navigate('/reset-password', { state: { email, otp: otpInput } });
+    } catch (err) {
+      showToast(err.response?.data?.message || 'Mã OTP không hợp lệ', 'error');
+    } finally {
+      setVerifying(false);
+    }
+  };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -19,10 +36,8 @@ const ForgotPasswordPage = () => {
       const data = await authService.forgotPassword(email);
       showToast(data.message || 'Yêu cầu khôi phục thành công!', 'success');
       setSuccess(true);
-      if (data.resetUrl) {
-        // Lấy đường dẫn tương đối để chuyển hướng đúng cổng port chạy của React
-        const parsedUrl = new URL(data.resetUrl);
-        setResetUrl(parsedUrl.pathname);
+      if (data.resetToken) {
+        setOtpCode(data.resetToken);
       }
     } catch (err) {
       showToast(err.response?.data?.message || 'Có lỗi xảy ra. Vui lòng thử lại!', 'error');
@@ -34,7 +49,7 @@ const ForgotPasswordPage = () => {
   return (
     <div className="flex items-center justify-center min-h-screen bg-gradient-to-br from-[#fdfbf7] to-[#f5ece5] p-5 font-sans">
       <div className="flex flex-col md:flex-row w-[900px] max-w-full bg-white rounded-[24px] shadow-[0_25px_50px_-12px_rgba(139,92,246,0.04),0_16px_24px_-8px_rgba(0,0,0,0.04)] overflow-hidden min-h-[520px] items-stretch">
-        
+
         {/* Cột trái: Panel Slogan */}
         <div className="hidden md:flex w-[42%] bg-gradient-to-br from-[#c0392b] to-[#a93226] p-10 text-white flex-col justify-between relative box-border">
           <div className="flex items-center gap-2.5">
@@ -61,7 +76,7 @@ const ForgotPasswordPage = () => {
 
         {/* Cột phải: Form Quên mật khẩu */}
         <div className="w-full md:w-[58%] p-8 sm:p-12 flex flex-col justify-center box-border">
-          
+
           <Link to="/login" className="inline-flex items-center text-[13px] font-bold text-slate-500 hover:text-[#c0392b] transition-colors mb-6 no-underline gap-1">
             <ArrowLeft size={16} /> Quay lại đăng nhập
           </Link>
@@ -111,20 +126,44 @@ const ForgotPasswordPage = () => {
                 Chúng tôi đã ghi nhận yêu cầu khôi phục mật khẩu cho email <strong className="text-slate-700">{email}</strong>.
               </p>
 
-              {resetUrl && (
-                <div className="mb-6 p-4 bg-orange-50 border border-orange-200 rounded-xl text-left">
-                  <span className="block text-[11px] font-bold text-orange-700 tracking-wide uppercase mb-1">Môi trường thử nghiệm (Local Dev)</span>
+              {otpCode && (
+                <div className="mb-6 p-4 bg-orange-50 border border-orange-200 rounded-xl text-center">
                   <p className="text-[13px] text-slate-600 mb-3 leading-relaxed">
-                    Hệ thống chạy giả lập không gửi email thật. Click nút bên dưới để khôi phục mật khẩu ngay lập tức:
+                    Mã OTP mô phỏng của bạn là:
                   </p>
-                  <Link
-                    to={resetUrl}
-                    className="inline-flex items-center justify-center w-full py-2.5 bg-orange-600 text-white text-sm font-bold rounded-lg hover:bg-orange-700 transition-colors no-underline shadow-sm"
-                  >
-                    Đi đến trang Đặt lại mật khẩu
-                  </Link>
+                  <div className="inline-flex items-center justify-center bg-white border-2 border-orange-200 rounded-lg px-6 py-2">
+                    <span className="text-2xl font-black text-orange-600 tracking-[0.25em] ml-2">{otpCode}</span>
+                  </div>
                 </div>
               )}
+
+              <form onSubmit={handleVerifyOTP} className="flex flex-col gap-5 mb-6">
+                <div className="flex flex-col gap-2 w-full text-left">
+                  <label className="text-[11px] font-extrabold text-slate-500 tracking-wider uppercase">NHẬP MÃ OTP</label>
+                  <div className="relative flex items-center w-full">
+                    <span className="absolute left-3.5 flex items-center pointer-events-none">
+                      <KeyRound size={18} className="text-gray-400" />
+                    </span>
+                    <input
+                      type="text"
+                      value={otpInput}
+                      onChange={(e) => setOtpInput(e.target.value)}
+                      required
+                      maxLength={6}
+                      className="w-full pl-11 pr-3.5 py-3 text-[16px] tracking-widest font-bold text-slate-800 bg-slate-50 border-[1.5px] border-slate-100 rounded-xl outline-none focus:border-red-200 focus:bg-white focus:ring-2 focus:ring-red-100/50 transition-all duration-200 box-border text-center"
+                      placeholder="XXXXXX"
+                    />
+                  </div>
+                </div>
+                <button
+                  type="submit"
+                  disabled={verifying || otpInput.length < 6}
+                  className="w-full py-3.5 bg-[#c0392b] text-white rounded-xl text-[14px] font-extrabold cursor-pointer flex items-center justify-center shadow-[0_4px_12px_rgba(192,57,43,0.15)] hover:bg-[#a93226] hover:shadow-[0_6px_20px_rgba(192,57,43,0.25)] focus:ring-4 focus:ring-red-100 active:scale-[0.98] transition-all duration-200 disabled:opacity-70 disabled:cursor-not-allowed"
+                >
+                  {verifying ? 'Đang xác minh...' : 'Xác minh mã OTP'}
+                  <ArrowRight size={18} className="ml-2" />
+                </button>
+              </form>
 
               <p className="text-sm text-slate-400">
                 Không nhận được yêu cầu?{' '}

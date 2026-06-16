@@ -9,7 +9,7 @@ import { getImageUrl } from '../../utils/imageUrl';
 import { normalizeSavedPromotions } from '../../utils/savedPromotions';
 
 const formatCurrency = value =>
-  new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND' }).format(Math.max(0, Math.round(value || 0)));
+  `${Number(Math.max(0, Math.round(value || 0))).toLocaleString('vi-VN')} VNĐ`;
 
 const formatPromoValue = promo => {
   if (promo.type === 'percent') return `${promo.value}%`;
@@ -230,7 +230,7 @@ const PromotionsPage = () => {
                       {promo.minOrderValue > 0 && (
                         <div className="mb-2">
                           <span className="rounded bg-red-50 px-2 py-0.5 text-[10px] font-black text-[#c70d18]">
-                            Đơn từ {Number(promo.minOrderValue).toLocaleString('vi-VN')}đ
+                            Đơn từ {Number(promo.minOrderValue).toLocaleString('vi-VN')} VNĐ
                           </span>
                         </div>
                       )}

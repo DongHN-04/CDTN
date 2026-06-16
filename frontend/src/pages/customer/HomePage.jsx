@@ -5,6 +5,7 @@ import { useCart } from '../../contexts/CartContext';
 import { useAuth } from '../../contexts/AuthContext';
 import { getImageUrl } from '../../utils/imageUrl';
 import { COMBO_CATEGORY, MENU_CATEGORIES, normalizeCategory } from '../../constants/menuCategories';
+import ProductDetailModal from '../../components/ProductDetailModal';
 /* ───────── SVG Icon Components ───────── */
 const BurgerIcon = () => (
   <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
@@ -66,7 +67,7 @@ const defaultImages = {
   'Khai Vị': '/images/home/product-chicken.png',
 };
 
-const formatPrice = (val) => val.toLocaleString('vi-VN') + 'đ';
+const formatPrice = (val) => val.toLocaleString('vi-VN') + ' VNĐ';
 
 const getHomeBannerImage = () => {
   try {
@@ -87,6 +88,7 @@ const HomePage = () => {
   const [menuItems, setMenuItems] = useState([]);
   const [toast, setToast] = useState({ show: false, message: '', type: 'success' });
   const [homeBanner, setHomeBanner] = useState(getHomeBannerImage);
+  const [selectedItem, setSelectedItem] = useState(null);
 
   useEffect(() => {
     publicService.getHomepageData()
@@ -299,7 +301,10 @@ const HomePage = () => {
                   className="bg-white rounded-3xl border border-gray-100 overflow-hidden shadow-sm hover:shadow-xl hover:-translate-y-1 transition-all duration-300 flex flex-col group"
                 >
                   {/* KHU VỰC ẢNH */}
-                  <div className="h-[200px] overflow-hidden relative bg-gray-50 shrink-0">
+                  <div 
+                    className="h-[200px] overflow-hidden relative bg-gray-50 shrink-0 cursor-pointer"
+                    onClick={() => setSelectedItem(item)}
+                  >
                     <img
                       src={item.resolvedImage}
                       alt={item.name}
@@ -335,7 +340,10 @@ const HomePage = () => {
                   <div className="p-5 flex-1 flex flex-col justify-between">
                     <div>
                       <div className="flex items-start justify-between gap-2 mb-2">
-                        <h3 className="text-[15px] font-extrabold text-gray-800 leading-snug line-clamp-2 pr-1">
+                        <h3 
+                          className="text-[15px] font-extrabold text-gray-800 leading-snug line-clamp-2 pr-1 cursor-pointer hover:text-[#c0392b] transition-colors"
+                          onClick={() => setSelectedItem(item)}
+                        >
                           {item.name}
                         </h3>
                         <span className="flex flex-col items-end shrink-0">
@@ -464,6 +472,14 @@ const HomePage = () => {
           <span className="text-sm font-semibold">{toast.message}</span>
         </div>
       )}
+
+      {/* ===== MODAL CHI TIẾT SẢN PHẨM ===== */}
+      <ProductDetailModal 
+        product={selectedItem} 
+        isOpen={!!selectedItem} 
+        onClose={() => setSelectedItem(null)} 
+        showToast={showToast}
+      />
 
     </div>
   );

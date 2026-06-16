@@ -24,7 +24,7 @@ const paymentStatusLabels = {
   failed: 'Thanh toán lỗi',
 };
 
-const formatCurrency = (value = 0) => `${Number(value || 0).toLocaleString('vi-VN')}đ`;
+const formatCurrency = (value = 0) => `${Number(value || 0).toLocaleString('vi-VN')} VNĐ`;
 const formatOrderCode = (id = '') => `#SD-${id.slice(-6).toUpperCase()}`;
 const formatDateTime = (value) => {
   if (!value) return 'Không có dữ liệu';

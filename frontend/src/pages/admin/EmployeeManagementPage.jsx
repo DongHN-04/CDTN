@@ -27,7 +27,7 @@ const getPosition = (employee) => {
   return 'Nhân viên';
 };
 
-const formatCurrency = (value) => `${Number(value || 0).toLocaleString('vi-VN')} đ`;
+const formatCurrency = (value) => `${Number(value || 0).toLocaleString('vi-VN')} VNĐ`;
 
 const getInitials = (name = '') => {
   const parts = name.trim().split(/\s+/).filter(Boolean);

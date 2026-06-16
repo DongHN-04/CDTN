@@ -24,7 +24,7 @@ const paymentLabel = {
   qr: 'VNPay',
 };
 
-const formatCurrency = (value = 0) => `${Number(value).toLocaleString('vi-VN')} ₫`;
+const formatCurrency = (value = 0) => `${Number(value).toLocaleString('vi-VN')} VNĐ`;
 const formatOrderCode = (id = '') => `#SD-${id.slice(-4).toUpperCase()}`;
 const formatTime = (value) => new Date(value).toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' });
 const formatDate = (value) => new Date(value).toLocaleDateString('vi-VN');

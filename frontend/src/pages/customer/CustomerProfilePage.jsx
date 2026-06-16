@@ -46,7 +46,7 @@ const districts = [
 const PAGE_SIZE = 5;
 
 const formatCurrency = value =>
-  new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND' }).format(value || 0);
+  `${Number(value || 0).toLocaleString('vi-VN')} VNĐ`;
 
 const statusMap = {
   pending: { label: 'Chờ xác nhận', className: 'bg-amber-50 text-amber-700' },
@@ -586,11 +586,11 @@ const CustomerProfilePage = () => {
                         <span className="rounded bg-red-50 px-2 py-0.5 text-xs font-black text-red-700">
                           Giảm {promo.type === 'percent'
                             ? `${promo.value}%`
-                            : `${Number(promo.value).toLocaleString('vi-VN')}đ`}
+                            : `${Number(promo.value).toLocaleString('vi-VN')} VNĐ`}
                         </span>
                         {promo.minOrderValue > 0 && (
                           <span className="rounded bg-red-50 px-2 py-0.5 text-[10px] font-black text-[#c70d18]">
-                            Đơn từ {Number(promo.minOrderValue).toLocaleString('vi-VN')}đ
+                            Đơn từ {Number(promo.minOrderValue).toLocaleString('vi-VN')} VNĐ
                           </span>
                         )}
                       </div>

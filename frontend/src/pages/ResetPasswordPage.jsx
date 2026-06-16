@@ -1,11 +1,13 @@
 import React, { useState } from 'react';
-import { useParams, Link, useNavigate } from 'react-router-dom';
+import { useLocation, Link, useNavigate, Navigate } from 'react-router-dom';
 import authService from '../services/authService';
 import { useToast } from '../contexts/ToastContext';
 import { Lock, ArrowRight, Utensils, Eye, EyeOff, CheckCircle } from 'lucide-react';
 
 const ResetPasswordPage = () => {
-  const { token } = useParams();
+  const location = useLocation();
+  const email = location.state?.email;
+  const otp = location.state?.otp;
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
@@ -13,6 +15,10 @@ const ResetPasswordPage = () => {
   const [success, setSuccess] = useState(false);
   const { showToast } = useToast();
   const navigate = useNavigate();
+
+  if (!email || !otp) {
+    return <Navigate to="/forgot-password" replace />;
+  }
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -28,7 +34,7 @@ const ResetPasswordPage = () => {
     setLoading(true);
 
     try {
-      const data = await authService.resetPassword(token, password);
+      const data = await authService.resetPassword(email, otp, password);
       showToast(data.message || 'Mật khẩu đã đặt lại thành công!', 'success');
       setSuccess(true);
       setTimeout(() => {

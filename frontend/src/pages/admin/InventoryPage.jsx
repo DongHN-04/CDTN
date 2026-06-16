@@ -9,7 +9,7 @@ const LOW_STOCK_THRESHOLD = 10;
 const pageSize = 5;
 
 const formatNumber = (value = 0) => Number(value || 0).toLocaleString('vi-VN');
-const formatCurrency = (value = 0) => `${Number(value || 0).toLocaleString('vi-VN')}đ`;
+const formatCurrency = (value = 0) => `${Number(value || 0).toLocaleString('vi-VN')} VNĐ`;
 
 const getStatus = (stock = 0) => {
   if (Number(stock) <= 0) return { label: 'Hết hàng', className: 'bg-red-50 text-red-700' };

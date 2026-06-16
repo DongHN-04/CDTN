@@ -25,7 +25,7 @@ const formatDate = value => {
 
 const formatCurrency = value => {
   if (value === undefined || value === null || value === '') return 'Chưa cập nhật';
-  return `${Number(value || 0).toLocaleString('vi-VN')}đ`;
+  return `${Number(value || 0).toLocaleString('vi-VN')} VNĐ`;
 };
 
 const getEmployeeCode = user => {
