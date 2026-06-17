@@ -302,6 +302,11 @@ const deleteUser = async (req, res) => {
       return res.status(400).json({ message: 'Bạn không thể xóa chính mình' });
     }
 
+    // Ngăn xóa tài khoản Quản trị viên
+    if (user.role === 'admin') {
+      return res.status(400).json({ message: 'Không thể xóa tài khoản Quản trị viên' });
+    }
+
     const [orderCount, shiftCount] = await Promise.all([
       Order.countDocuments({ staff: user._id }),
       Shift.countDocuments({ staff: user._id }),

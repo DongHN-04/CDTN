@@ -208,6 +208,9 @@ const InvoiceDetailPage = () => {
                 value={order.isCustomerOrder ? (order.customer?.address || 'Không có địa chỉ') : 'Thanh toán tại quầy POS'}
               />
               {order.notes && <InfoLine label="Ghi chú" value={order.notes} />}
+              {order.status === 'cancelled' && order.cancelReason && (
+                <InfoLine label="Lý do hủy" value={order.cancelReason} />
+              )}
             </div>
           </section>
 

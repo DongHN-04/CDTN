@@ -18,7 +18,7 @@ const PaymentResultPage = () => {
   const params = new URLSearchParams(location.search);
   const status = params.get('status');
   const txnRef = params.get('txnRef');
-  const orderId = params.get('orderId');
+  // const orderId = params.get('orderId');
   const code = params.get('code');
 
   const isSuccess = status === 'success';
@@ -74,11 +74,11 @@ const PaymentResultPage = () => {
             Mã giao dịch: <strong className="text-gray-800">{txnRef}</strong>
           </p>
         )}
-        {orderId && (
+        {/* {orderId && (
           <p className="mb-2 text-sm text-gray-500">
             Mã đơn hàng: <strong className="text-gray-800">{orderId}</strong>
           </p>
-        )}
+        )} */}
         {code && (
           <p className="mb-2 text-xs font-semibold text-gray-400">
             Mã lỗi: {code}

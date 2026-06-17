@@ -144,7 +144,7 @@ const checkAndDecreaseStock = async (requirements, session = null) => {
     }
 
     if (ingredient.isActive === false || ingredient.isDeleted === true) {
-      throw new Error(`Nguyên liệu ${ingredient.name} da ngung su dung`);
+      throw new Error(`Nguyên liệu ${ingredient.name} đã ngưng sử dụng`);
     }
 
     if (ingredient.stock < requirement.requiredQty) {
@@ -160,7 +160,7 @@ const checkAndDecreaseStock = async (requirements, session = null) => {
     );
 
     if (result.modifiedCount !== 1) {
-      throw new Error(`Nguyên liệu ${ingredient.name} không đủ de tru kho`);
+      throw new Error(`Nguyên liệu ${ingredient.name} không đủ để trừ kho`);
     }
   }
 };
@@ -173,7 +173,7 @@ const checkStockAvailability = async (requirements, session = null) => {
     }
 
     if (ingredient.isActive === false || ingredient.isDeleted === true) {
-      throw new Error(`Nguyên liệu ${ingredient.name} da ngung su dung`);
+      throw new Error(`Nguyên liệu ${ingredient.name} đã ngung su dung`);
     }
 
     if (ingredient.stock < requirement.requiredQty) {

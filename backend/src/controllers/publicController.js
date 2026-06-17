@@ -173,7 +173,7 @@ const createOrder = async (req, res) => {
 
       if (discountBase < promotion.minOrderValue) {
         return res.status(400).json({
-          message: `Đơn hàng cần tối thiểu ${promotion.minOrderValue.toLocaleString('vi-VN')}₫ để dùng mã này`,
+          message: `Đơn hàng cần tối thiểu ${promotion.minOrderValue.toLocaleString('vi-VN')}VNĐ để dùng mã này`,
         });
       }
 

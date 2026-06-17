@@ -5,6 +5,7 @@ import uploadService from '../../services/uploadService';
 import { getImageUrl } from '../../utils/imageUrl';
 import ConfirmDeleteModal from '../../components/ConfirmDeleteModal';
 import { useToast } from '../../contexts/ToastContext';
+import Pagination from '../../components/Pagination';
 
 const pageSize = 6;
 
@@ -585,36 +586,7 @@ const PaginationFooter = ({ currentPage, pageSize, totalItems, totalPages, label
       Hiển thị {totalItems ? (currentPage - 1) * pageSize + 1 : 0}
       -{Math.min(currentPage * pageSize, totalItems)} của {totalItems} {label}
     </span>
-    <div className="flex items-center gap-2">
-      <button
-        type="button"
-        disabled={currentPage === 1}
-        onClick={() => onPageChange(page => Math.max(1, page - 1))}
-        className="flex h-8 w-8 items-center justify-center rounded-full border border-gray-100 disabled:cursor-not-allowed disabled:opacity-40"
-      >
-        ‹
-      </button>
-      {Array.from({ length: totalPages }, (_, index) => index + 1).map(page => (
-        <button
-          key={page}
-          type="button"
-          onClick={() => onPageChange(page)}
-          className={`flex h-8 w-8 items-center justify-center rounded-full ${
-            currentPage === page ? 'bg-[#c70d1a] font-black text-white' : 'border border-gray-100 text-gray-600'
-          }`}
-        >
-          {page}
-        </button>
-      ))}
-      <button
-        type="button"
-        disabled={currentPage === totalPages}
-        onClick={() => onPageChange(page => Math.min(totalPages, page + 1))}
-        className="flex h-8 w-8 items-center justify-center rounded-full border border-gray-100 disabled:cursor-not-allowed disabled:opacity-40"
-      >
-        ›
-      </button>
-    </div>
+    <Pagination currentPage={currentPage} totalPages={totalPages} onPageChange={onPageChange} />
   </div>
 );
 

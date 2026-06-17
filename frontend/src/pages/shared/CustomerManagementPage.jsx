@@ -5,6 +5,7 @@ import { useAuth } from '../../contexts/AuthContext';
 import ConfirmDeleteModal from '../../components/ConfirmDeleteModal';
 import { useToast } from '../../contexts/ToastContext';
 import { formatApiError } from '../../utils/apiError';
+import Pagination from '../../components/Pagination';
 
 const pageSize = 5;
 const formatCurrency = (value = 0) => `${Number(value || 0).toLocaleString('vi-VN')} VNĐ`;
@@ -214,7 +215,7 @@ const CustomerManagementPage = () => {
           >
             <option value="all">Lọc</option>
             <option value="vip">VIP</option>
-            <option value="regular">Thường xuyên</option>
+            <option value="regular">Thường</option>
           </select>
           <button
             onClick={openCreate}
@@ -273,36 +274,7 @@ const CustomerManagementPage = () => {
             Hiển thị {filteredCustomers.length ? (currentPage - 1) * pageSize + 1 : 0}
             -{Math.min(currentPage * pageSize, filteredCustomers.length)} của {filteredCustomers.length} khách hàng
           </span>
-          <div className="flex items-center gap-2">
-            <button
-              type="button"
-              disabled={currentPage === 1}
-              onClick={() => setCurrentPage(page => Math.max(1, page - 1))}
-              className="flex h-8 w-8 items-center justify-center rounded-full border border-gray-100 disabled:cursor-not-allowed disabled:opacity-40"
-            >
-              ‹
-            </button>
-            {Array.from({ length: totalPages }, (_, index) => index + 1).map(page => (
-              <button
-                key={page}
-                type="button"
-                onClick={() => setCurrentPage(page)}
-                className={`flex h-8 w-8 items-center justify-center rounded-full ${
-                  currentPage === page ? 'bg-[#c70d1a] font-black text-white' : 'border border-gray-100 text-gray-600'
-                }`}
-              >
-                {page}
-              </button>
-            ))}
-            <button
-              type="button"
-              disabled={currentPage === totalPages}
-              onClick={() => setCurrentPage(page => Math.min(totalPages, page + 1))}
-              className="flex h-8 w-8 items-center justify-center rounded-full border border-gray-100 disabled:cursor-not-allowed disabled:opacity-40"
-            >
-              ›
-            </button>
-          </div>
+          <Pagination currentPage={currentPage} totalPages={totalPages} onPageChange={setCurrentPage} />
         </div>
       </div>
 
@@ -354,7 +326,7 @@ const CustomerRow = ({ customer, canDelete, onEdit, onDelete }) => {
           <div>
             <div className="font-black text-gray-950">{customer.name}</div>
             <span className={`mt-1 inline-flex rounded-full px-2 py-0.5 text-[10px] font-black ${isVip ? 'bg-sky-600 text-white' : 'bg-gray-100 text-gray-600'}`}>
-              {isVip ? 'VIP' : 'THƯỜNG XUYÊN'}
+              {isVip ? 'VIP' : 'THƯỜNG'}
             </span>
           </div>
         </div>

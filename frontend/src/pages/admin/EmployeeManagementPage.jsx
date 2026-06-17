@@ -3,6 +3,7 @@ import { PlusCircle } from 'lucide-react';
 import userService from '../../services/userService';
 import ConfirmDeleteModal from '../../components/ConfirmDeleteModal';
 import { useToast } from '../../contexts/ToastContext';
+import Pagination from '../../components/Pagination';
 
 const emptyForm = {
   name: '',
@@ -305,35 +306,7 @@ const EmployeeManagementPage = () => {
             Hiển thị {filteredEmployees.length ? (currentPage - 1) * pageSize + 1 : 0}
             -{Math.min(currentPage * pageSize, filteredEmployees.length)} trong số {filteredEmployees.length} nhân viên
           </span>
-          <div className="flex items-center gap-2">
-            <button
-              type="button"
-              disabled={currentPage === 1}
-              onClick={() => setCurrentPage(page => Math.max(1, page - 1))}
-              className="flex h-8 w-8 items-center justify-center rounded-full border border-gray-100 disabled:cursor-not-allowed disabled:opacity-40"
-            >
-              ‹
-            </button>
-            {Array.from({ length: totalPages }, (_, index) => index + 1).map(page => (
-              <button
-                key={page}
-                type="button"
-                onClick={() => setCurrentPage(page)}
-                className={`flex h-8 w-8 items-center justify-center rounded-full ${currentPage === page ? 'bg-[#c70d1a] font-black text-white' : 'border border-gray-100 text-gray-600'
-                  }`}
-              >
-                {page}
-              </button>
-            ))}
-            <button
-              type="button"
-              disabled={currentPage === totalPages}
-              onClick={() => setCurrentPage(page => Math.min(totalPages, page + 1))}
-              className="flex h-8 w-8 items-center justify-center rounded-full border border-gray-100 disabled:cursor-not-allowed disabled:opacity-40"
-            >
-              ›
-            </button>
-          </div>
+          <Pagination currentPage={currentPage} totalPages={totalPages} onPageChange={setCurrentPage} />
         </div>
       </div>
 
@@ -401,7 +374,9 @@ const EmployeeRow = ({ employee, onEdit, onDelete }) => {
       <td className="px-5 py-5">
         <div className="flex justify-end gap-2">
           <button onClick={onEdit} className="rounded-lg bg-gray-100 px-3 py-2 text-xs font-black text-gray-700">Sửa</button>
-          <button onClick={onDelete} className="rounded-lg bg-red-50 px-3 py-2 text-xs font-black text-red-600">Xóa</button>
+          {employee.role !== 'admin' && (
+            <button onClick={onDelete} className="rounded-lg bg-red-50 px-3 py-2 text-xs font-black text-red-600">Xóa</button>
+          )}
         </div>
       </td>
     </tr>

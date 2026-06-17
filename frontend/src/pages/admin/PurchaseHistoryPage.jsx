@@ -2,6 +2,7 @@ import React, { useEffect, useMemo, useState } from 'react';
 import * as XLSX from 'xlsx';
 import supplierService from '../../services/supplierService';
 import { useToast } from '../../contexts/ToastContext';
+import Pagination from '../../components/Pagination';
 
 const PAGE_SIZE = 5;
 
@@ -258,33 +259,7 @@ const PurchaseHistoryPage = () => {
             Hiển thị {filteredPurchases.length ? (currentPage - 1) * PAGE_SIZE + 1 : 0}
             -{Math.min(currentPage * PAGE_SIZE, filteredPurchases.length)} của {filteredPurchases.length} mục
           </span>
-          <div className="flex items-center gap-2">
-            <button
-              type="button"
-              disabled={currentPage === 1}
-              onClick={() => setPage(Math.max(1, currentPage - 1))}
-              className="rounded-lg px-3 py-2 hover:bg-gray-100 disabled:cursor-not-allowed disabled:opacity-40"
-            >
-              ‹
-            </button>
-            {Array.from({ length: totalPages }, (_, index) => (
-              <button
-                key={index + 1}
-                onClick={() => setPage(index + 1)}
-                className={`h-8 w-8 rounded-lg font-black ${currentPage === index + 1 ? 'bg-[#c70d1a] text-white' : 'hover:bg-gray-100'}`}
-              >
-                {index + 1}
-              </button>
-            ))}
-            <button
-              type="button"
-              disabled={currentPage === totalPages}
-              onClick={() => setPage(Math.min(totalPages, currentPage + 1))}
-              className="rounded-lg px-3 py-2 hover:bg-gray-100 disabled:cursor-not-allowed disabled:opacity-40"
-            >
-              ›
-            </button>
-          </div>
+          <Pagination currentPage={currentPage} totalPages={totalPages} onPageChange={setPage} />
         </div>
       </section>
 
